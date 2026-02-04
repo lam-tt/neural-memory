@@ -13,7 +13,7 @@ from neural_memory.core.synapse import Direction, Synapse, SynapseType
 from neural_memory.engine.encoder import EncodingResult, MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline, RetrievalResult
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "__version__",

@@ -1,0 +1,153 @@
+# Changelog
+
+All notable changes to NeuralMemory are documented here.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.5.0] - 2026-02-05
+
+### Added
+
+- **Documentation Site** - MkDocs with Material theme
+  - Getting started guides (installation, quickstart, CLI reference)
+  - Concept documentation (how it works, neurons, synapses, memory types)
+  - Integration guides (Claude, Cursor, Windsurf, Aider)
+  - API reference (Python, Server)
+  - Architecture documentation
+  - Contributing guide
+- GitHub Actions workflow for automatic docs deployment
+- Interactive logo and assets
+
+### Changed
+
+- Documentation URL now points to GitHub Pages
+- Reorganized docs structure for better navigation
+
+## [0.4.0] - 2026-02-05
+
+### Added
+
+- **Web UI Visualization** - Interactive brain graph at `/ui` endpoint
+  - vis.js-based network visualization
+  - Color-coded nodes by neuron type
+  - Click nodes to see details
+  - Statistics display
+- **API endpoint** `/api/graph` for visualization data
+- Fiber information in graph response
+
+### Changed
+
+- Server now includes visualization endpoints by default
+- Updated dependencies
+
+## [0.3.0] - 2026-02-05
+
+### Added
+
+- **Scheduled Memory Decay** - Ebbinghaus forgetting curve implementation
+  - `DecayManager` class in `engine/lifecycle.py`
+  - Configurable decay rate and prune threshold
+  - Dry-run mode for previewing changes
+- **CLI `decay` command** - Apply decay with `nmem decay --dry-run`
+- `ReinforcementManager` for strengthening accessed paths
+- `get_all_neuron_states()` method in storage backends
+- `get_all_synapses()` method in storage backends
+
+### Changed
+
+- Improved neuron state management
+- Better activation level tracking
+
+## [0.2.0] - 2026-02-05
+
+### Added
+
+- **MCP System Prompt** - AI instructions in `mcp/prompt.py`
+  - Full and compact prompt versions
+  - Resource URIs for prompts
+- **Auto-capture** - `nmem_auto` tool with "process" action
+  - One-call memory detection and saving
+  - Configurable confidence threshold
+- **MCP Resources** - `neuralmemory://prompt/system` and `neuralmemory://prompt/compact`
+- CLI commands: `prompt`, `mcp-config`
+
+### Changed
+
+- MCP server now exposes 6 tools (was 5)
+- Improved auto-detection of memory types
+
+## [0.1.0] - 2026-02-05
+
+### Added
+
+- **Core Data Structures**
+  - `Neuron`, `NeuronType`, `NeuronState`
+  - `Synapse`, `SynapseType`, `Direction`
+  - `Fiber` - Memory clusters
+  - `Brain`, `BrainConfig` - Container and configuration
+  - `TypedMemory`, `MemoryType`, `Priority`
+  - `Project` - Project scoping
+
+- **Storage Backends**
+  - `InMemoryStorage` - NetworkX-based for testing
+  - `SQLiteStorage` - Persistent single-user storage
+  - `SharedStorage` - HTTP client for remote server
+
+- **Engine**
+  - `MemoryEncoder` - Text to neural structure
+  - `ReflexPipeline` - Query with spreading activation
+  - `SpreadingActivation` - Core retrieval algorithm
+  - `DepthLevel` - Retrieval depth control
+
+- **Extraction**
+  - `QueryParser` - Query decomposition
+  - `QueryRouter` - Intent and depth detection
+  - `TemporalExtractor` - Time reference parsing (EN + VI)
+
+- **CLI Commands**
+  - `remember`, `recall`, `todo`, `context`, `list`
+  - `stats`, `check`, `cleanup`
+  - `brain list/create/use/export/import/delete/health`
+  - `project create/list/show/delete/extend`
+  - `shared enable/disable/status/test/sync`
+  - `serve`, `mcp`, `export`, `import`
+
+- **Server**
+  - FastAPI-based REST API
+  - Memory and brain endpoints
+  - WebSocket sync support
+  - CORS configuration
+
+- **MCP Server**
+  - `nmem_remember` - Store memories
+  - `nmem_recall` - Query memories
+  - `nmem_context` - Get recent context
+  - `nmem_todo` - Quick TODO
+  - `nmem_stats` - Brain statistics
+
+- **Features**
+  - Multi-language support (English + Vietnamese)
+  - Memory types with auto-expiry
+  - Priority system (0-10)
+  - Sensitive content detection
+  - Brain export/import
+  - Real-time sharing
+
+## [Unreleased]
+
+### Planned
+
+- Neo4j storage backend
+- Semantic search with embeddings
+- Memory compression for old fibers
+- Admin dashboard
+- Brain marketplace
+
+---
+
+[0.5.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.5.0
+[0.4.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.4.0
+[0.3.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.3.0
+[0.2.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.2.0
+[0.1.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.1.0

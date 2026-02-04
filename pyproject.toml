@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "neural-memory"
-version = "0.4.0"
+version = "0.5.0"
 description = "Reflex-based memory system for AI agents - retrieval through activation, not search"
 readme = "README.md"
 license = "MIT"
@@ -73,10 +73,16 @@ dev = [
     "pre-commit>=3.0",
     "httpx>=0.24",
 ]
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+    "mike>=2.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/nhadaututtheky/neural-memory"
-Documentation = "https://github.com/nhadaututtheky/neural-memory#readme"
+Documentation = "https://nhadaututtheky.github.io/neural-memory"
 Repository = "https://github.com/nhadaututtheky/neural-memory"
 Issues = "https://github.com/nhadaututtheky/neural-memory/issues"
 
