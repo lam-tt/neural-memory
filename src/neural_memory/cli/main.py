@@ -14,6 +14,18 @@ from neural_memory.cli.config import CLIConfig
 from neural_memory.cli.storage import PersistentStorage
 from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
+from neural_memory.safety.freshness import (
+    FreshnessLevel,
+    analyze_freshness,
+    evaluate_freshness,
+    format_age,
+    get_freshness_indicator,
+)
+from neural_memory.safety.sensitive import (
+    check_sensitive_content,
+    filter_sensitive_content,
+    format_sensitive_warning,
+)
 
 # Main app
 app = typer.Typer(
@@ -48,14 +60,33 @@ def output_result(data: dict, as_json: bool = False) -> None:
             typer.secho(f"Error: {data['error']}", fg=typer.colors.RED)
         elif "answer" in data:
             typer.echo(data["answer"])
-            if data.get("confidence"):
-                typer.secho(
-                    f"\n[confidence: {data['confidence']:.2f}, "
-                    f"neurons: {data.get('neurons_activated', 0)}]",
-                    fg=typer.colors.BRIGHT_BLACK,
-                )
+
+            # Show freshness warnings
+            if data.get("freshness_warnings"):
+                typer.echo("")
+                for warning in data["freshness_warnings"]:
+                    typer.secho(warning, fg=typer.colors.YELLOW)
+
+            # Show metadata
+            meta_parts = []
+            if data.get("confidence") is not None:
+                meta_parts.append(f"confidence: {data['confidence']:.2f}")
+            if data.get("neurons_activated"):
+                meta_parts.append(f"neurons: {data['neurons_activated']}")
+            if data.get("oldest_memory_age"):
+                meta_parts.append(f"oldest: {data['oldest_memory_age']}")
+
+            if meta_parts:
+                typer.secho(f"\n[{', '.join(meta_parts)}]", fg=typer.colors.BRIGHT_BLACK)
+
         elif "message" in data:
             typer.secho(data["message"], fg=typer.colors.GREEN)
+
+            # Show warnings if any
+            if data.get("warnings"):
+                for warning in data["warnings"]:
+                    typer.secho(warning, fg=typer.colors.YELLOW)
+
         elif "context" in data:
             typer.echo(data["context"])
         else:
@@ -73,6 +104,12 @@ def remember(
     tags: Annotated[
         Optional[list[str]], typer.Option("--tag", "-t", help="Tags for the memory")
     ] = None,
+    force: Annotated[
+        bool, typer.Option("--force", "-f", help="Store even if sensitive content detected")
+    ] = False,
+    redact: Annotated[
+        bool, typer.Option("--redact", "-r", help="Auto-redact sensitive content before storing")
+    ] = False,
     json_output: Annotated[
         bool, typer.Option("--json", "-j", help="Output as JSON")
     ] = False,
@@ -82,7 +119,22 @@ def remember(
     Examples:
         nmem remember "Fixed auth bug by adding null check"
         nmem remember "Meeting with Alice about API design" -t meeting -t alice
+        nmem remember "API_KEY=xxx" --redact  # Will redact sensitive content
+        nmem remember "password=secret" --force  # Store despite warning
     """
+    # Check for sensitive content
+    sensitive_matches = check_sensitive_content(content, min_severity=2)
+
+    if sensitive_matches and not force and not redact:
+        warning = format_sensitive_warning(sensitive_matches)
+        typer.echo(warning)
+        raise typer.Exit(1)
+
+    # Redact if requested
+    store_content = content
+    if redact and sensitive_matches:
+        store_content, _ = filter_sensitive_content(content)
+        typer.secho(f"Redacted {len(sensitive_matches)} sensitive item(s)", fg=typer.colors.YELLOW)
 
     async def _remember() -> dict:
         config = get_config()
@@ -98,7 +150,7 @@ def remember(
         storage.disable_auto_save()
 
         result = await encoder.encode(
-            content=content,
+            content=store_content,
             timestamp=datetime.now(),
             tags=set(tags) if tags else None,
         )
@@ -106,13 +158,22 @@ def remember(
         # Save once after encoding
         await storage.batch_save()
 
-        return {
-            "message": f"Remembered: {content[:50]}{'...' if len(content) > 50 else ''}",
+        response = {
+            "message": f"Remembered: {store_content[:50]}{'...' if len(store_content) > 50 else ''}",
             "fiber_id": result.fiber.id,
             "neurons_created": len(result.neurons_created),
             "neurons_linked": len(result.neurons_linked),
             "synapses_created": len(result.synapses_created),
         }
+
+        # Add warnings
+        warnings = []
+        if force and sensitive_matches:
+            warnings.append(f"[!] Stored with {len(sensitive_matches)} sensitive item(s) - consider using --redact")
+        if warnings:
+            response["warnings"] = warnings
+
+        return response
 
     result = asyncio.run(_remember())
     output_result(result, json_output)
@@ -128,6 +189,12 @@ def recall(
     max_tokens: Annotated[
         int, typer.Option("--max-tokens", "-m", help="Max tokens in response")
     ] = 500,
+    min_confidence: Annotated[
+        float, typer.Option("--min-confidence", "-c", help="Minimum confidence threshold (0.0-1.0)")
+    ] = 0.0,
+    show_age: Annotated[
+        bool, typer.Option("--show-age", "-a", help="Show memory ages in results")
+    ] = True,
     json_output: Annotated[
         bool, typer.Option("--json", "-j", help="Output as JSON")
     ] = False,
@@ -137,7 +204,8 @@ def recall(
     Examples:
         nmem recall "What did I do with auth?"
         nmem recall "meetings with Alice" --depth 2
-        nmem recall "project status" --json
+        nmem recall "project status" --min-confidence 0.5
+        nmem recall "old projects" --show-age
     """
 
     async def _recall() -> dict:
@@ -159,7 +227,30 @@ def recall(
             reference_time=datetime.now(),
         )
 
-        return {
+        # Check confidence threshold
+        if result.confidence < min_confidence:
+            return {
+                "answer": f"No memories found with confidence >= {min_confidence:.2f}",
+                "confidence": result.confidence,
+                "neurons_activated": result.neurons_activated,
+                "below_threshold": True,
+            }
+
+        # Gather freshness information from matched fibers
+        freshness_warnings: list[str] = []
+        oldest_age = 0
+
+        if result.fibers_matched:
+            for fiber_id in result.fibers_matched:
+                fiber = await storage.get_fiber(fiber_id)
+                if fiber:
+                    freshness = evaluate_freshness(fiber.created_at)
+                    if freshness.warning:
+                        freshness_warnings.append(freshness.warning)
+                    if freshness.age_days > oldest_age:
+                        oldest_age = freshness.age_days
+
+        response = {
             "answer": result.context or "No relevant memories found.",
             "confidence": result.confidence,
             "depth_used": result.depth_used.value,
@@ -167,6 +258,16 @@ def recall(
             "fibers_matched": result.fibers_matched,
             "latency_ms": result.latency_ms,
         }
+
+        if show_age and oldest_age > 0:
+            response["oldest_memory_age"] = format_age(oldest_age)
+
+        if freshness_warnings:
+            # Deduplicate warnings
+            unique_warnings = list(dict.fromkeys(freshness_warnings))[:3]
+            response["freshness_warnings"] = unique_warnings
+
+        return response
 
     result = asyncio.run(_recall())
     output_result(result, json_output)
@@ -177,6 +278,9 @@ def context(
     limit: Annotated[
         int, typer.Option("--limit", "-l", help="Number of recent memories")
     ] = 10,
+    fresh_only: Annotated[
+        bool, typer.Option("--fresh-only", help="Only include memories < 30 days old")
+    ] = False,
     json_output: Annotated[
         bool, typer.Option("--json", "-j", help="Output as JSON")
     ] = False,
@@ -186,6 +290,7 @@ def context(
     Examples:
         nmem context
         nmem context --limit 5 --json
+        nmem context --fresh-only
     """
 
     async def _context() -> dict:
@@ -193,34 +298,63 @@ def context(
         storage = await get_storage(config)
 
         # Get recent fibers
-        fibers = await storage.get_fibers(limit=limit)
+        fibers = await storage.get_fibers(limit=limit * 2 if fresh_only else limit)
 
         if not fibers:
             return {"context": "No memories stored yet.", "count": 0}
 
-        # Build context string
+        # Filter by freshness if requested
+        now = datetime.now()
+        if fresh_only:
+            fresh_fibers = []
+            for fiber in fibers:
+                freshness = evaluate_freshness(fiber.created_at, now)
+                if freshness.level in (FreshnessLevel.FRESH, FreshnessLevel.RECENT):
+                    fresh_fibers.append(fiber)
+            fibers = fresh_fibers[:limit]
+
+        # Build context string with age indicators
         context_parts = []
+        fiber_data = []
+
         for fiber in fibers:
-            if fiber.summary:
-                context_parts.append(f"- {fiber.summary}")
-            elif fiber.anchor_neuron_id:
+            freshness = evaluate_freshness(fiber.created_at, now)
+            indicator = get_freshness_indicator(freshness.level)
+            age_str = format_age(freshness.age_days)
+
+            content = fiber.summary
+            if not content and fiber.anchor_neuron_id:
                 anchor = await storage.get_neuron(fiber.anchor_neuron_id)
                 if anchor:
-                    context_parts.append(f"- {anchor.content}")
+                    content = anchor.content
+
+            if content:
+                context_parts.append(f"{indicator} [{age_str}] {content}")
+                fiber_data.append({
+                    "id": fiber.id,
+                    "summary": content,
+                    "created_at": fiber.created_at.isoformat(),
+                    "age": age_str,
+                    "freshness": freshness.level.value,
+                })
 
         context_str = "\n".join(context_parts) if context_parts else "No context available."
 
+        # Analyze overall freshness
+        created_dates = [f.created_at for f in fibers]
+        freshness_report = analyze_freshness(created_dates, now)
+
         return {
             "context": context_str,
-            "count": len(fibers),
-            "fibers": [
-                {
-                    "id": f.id,
-                    "summary": f.summary,
-                    "created_at": f.created_at.isoformat(),
-                }
-                for f in fibers
-            ],
+            "count": len(fiber_data),
+            "fibers": fiber_data,
+            "freshness_summary": {
+                "fresh": freshness_report.fresh,
+                "recent": freshness_report.recent,
+                "aging": freshness_report.aging,
+                "stale": freshness_report.stale,
+                "ancient": freshness_report.ancient,
+            },
         }
 
     result = asyncio.run(_context())
@@ -233,7 +367,7 @@ def stats(
         bool, typer.Option("--json", "-j", help="Output as JSON")
     ] = False,
 ) -> None:
-    """Show brain statistics.
+    """Show brain statistics including freshness analysis.
 
     Examples:
         nmem stats
@@ -250,6 +384,11 @@ def stats(
 
         stats_data = await storage.get_stats(brain.id)
 
+        # Get fibers for freshness analysis
+        fibers = await storage.get_fibers(limit=1000)
+        created_dates = [f.created_at for f in fibers]
+        freshness_report = analyze_freshness(created_dates)
+
         return {
             "brain": brain.name,
             "brain_id": brain.id,
@@ -257,6 +396,14 @@ def stats(
             "synapse_count": stats_data["synapse_count"],
             "fiber_count": stats_data["fiber_count"],
             "created_at": brain.created_at.isoformat(),
+            "freshness": {
+                "fresh": freshness_report.fresh,
+                "recent": freshness_report.recent,
+                "aging": freshness_report.aging,
+                "stale": freshness_report.stale,
+                "ancient": freshness_report.ancient,
+                "average_age_days": round(freshness_report.average_age_days, 1),
+            },
         }
 
     result = asyncio.run(_stats())
@@ -268,6 +415,51 @@ def stats(
         typer.echo(f"Neurons: {result['neuron_count']}")
         typer.echo(f"Synapses: {result['synapse_count']}")
         typer.echo(f"Fibers (memories): {result['fiber_count']}")
+
+        if result.get("freshness") and result["fiber_count"] > 0:
+            f = result["freshness"]
+            typer.echo("\nMemory Freshness:")
+            typer.echo(f"  [+] Fresh (<7d): {f['fresh']}")
+            typer.echo(f"  [+] Recent (7-30d): {f['recent']}")
+            typer.echo(f"  [~] Aging (30-90d): {f['aging']}")
+            typer.echo(f"  [!] Stale (90-365d): {f['stale']}")
+            typer.echo(f"  [!!] Ancient (>365d): {f['ancient']}")
+            typer.echo(f"  Average age: {f['average_age_days']} days")
+
+
+@app.command()
+def check(
+    content: Annotated[str, typer.Argument(help="Content to check for sensitive data")],
+    json_output: Annotated[
+        bool, typer.Option("--json", "-j", help="Output as JSON")
+    ] = False,
+) -> None:
+    """Check content for sensitive information without storing.
+
+    Examples:
+        nmem check "My API_KEY=sk-xxx123"
+        nmem check "password: secret123" --json
+    """
+    matches = check_sensitive_content(content)
+
+    if json_output:
+        output_result({
+            "sensitive": len(matches) > 0,
+            "matches": [
+                {
+                    "type": m.type.value,
+                    "pattern": m.pattern_name,
+                    "severity": m.severity,
+                    "redacted": m.redacted(),
+                }
+                for m in matches
+            ],
+        }, True)
+    else:
+        if matches:
+            typer.echo(format_sensitive_warning(matches))
+        else:
+            typer.secho("[OK] No sensitive content detected", fg=typer.colors.GREEN)
 
 
 # =============================================================================
@@ -369,13 +561,16 @@ def brain_export(
     name: Annotated[
         Optional[str], typer.Option("--name", "-n", help="Brain name (default: current)")
     ] = None,
+    exclude_sensitive: Annotated[
+        bool, typer.Option("--exclude-sensitive", "-s", help="Exclude memories with sensitive content")
+    ] = False,
 ) -> None:
     """Export brain to JSON file.
 
     Examples:
         nmem brain export
         nmem brain export -o backup.json
-        nmem brain export --name work -o work-backup.json
+        nmem brain export --exclude-sensitive -o safe.json
     """
 
     async def _export() -> None:
@@ -390,14 +585,50 @@ def brain_export(
         storage = await PersistentStorage.load(brain_path)
         snapshot = await storage.export_brain(storage._current_brain_id)
 
+        # Filter sensitive content if requested
+        neurons = snapshot.neurons
+        excluded_count = 0
+
+        if exclude_sensitive:
+            filtered_neurons = []
+            excluded_neuron_ids = set()
+
+            for neuron in neurons:
+                content = neuron.get("content", "")
+                matches = check_sensitive_content(content, min_severity=2)
+                if matches:
+                    excluded_neuron_ids.add(neuron["id"])
+                    excluded_count += 1
+                else:
+                    filtered_neurons.append(neuron)
+
+            neurons = filtered_neurons
+
+            # Also filter synapses connected to excluded neurons
+            synapses = [
+                s for s in snapshot.synapses
+                if s["source_id"] not in excluded_neuron_ids
+                and s["target_id"] not in excluded_neuron_ids
+            ]
+
+            # Update fiber neuron references
+            fibers = []
+            for fiber in snapshot.fibers:
+                fiber_neuron_ids = set(fiber.get("neuron_ids", []))
+                if not fiber_neuron_ids.intersection(excluded_neuron_ids):
+                    fibers.append(fiber)
+        else:
+            synapses = snapshot.synapses
+            fibers = snapshot.fibers
+
         export_data = {
             "brain_id": snapshot.brain_id,
             "brain_name": snapshot.brain_name,
             "exported_at": snapshot.exported_at.isoformat(),
             "version": snapshot.version,
-            "neurons": snapshot.neurons,
-            "synapses": snapshot.synapses,
-            "fibers": snapshot.fibers,
+            "neurons": neurons,
+            "synapses": synapses,
+            "fibers": fibers,
             "config": snapshot.config,
             "metadata": snapshot.metadata,
         }
@@ -406,6 +637,8 @@ def brain_export(
             with open(output, "w", encoding="utf-8") as f:
                 json.dump(export_data, f, indent=2, default=str)
             typer.secho(f"Exported to: {output}", fg=typer.colors.GREEN)
+            if excluded_count > 0:
+                typer.secho(f"Excluded {excluded_count} neurons with sensitive content", fg=typer.colors.YELLOW)
         else:
             typer.echo(json.dumps(export_data, indent=2, default=str))
 
@@ -421,18 +654,36 @@ def brain_import(
     use: Annotated[
         bool, typer.Option("--use", "-u", help="Switch to imported brain")
     ] = True,
+    scan_sensitive: Annotated[
+        bool, typer.Option("--scan", help="Scan for sensitive content before importing")
+    ] = True,
 ) -> None:
     """Import brain from JSON file.
 
     Examples:
         nmem brain import backup.json
         nmem brain import shared-brain.json --name shared
+        nmem brain import untrusted.json --scan
     """
     from neural_memory.core.brain import BrainSnapshot
 
     async def _import() -> None:
         with open(file, encoding="utf-8") as f:
             data = json.load(f)
+
+        # Scan for sensitive content
+        if scan_sensitive:
+            sensitive_count = 0
+            for neuron in data.get("neurons", []):
+                content = neuron.get("content", "")
+                matches = check_sensitive_content(content, min_severity=2)
+                if matches:
+                    sensitive_count += 1
+
+            if sensitive_count > 0:
+                typer.secho(f"[!] Found {sensitive_count} neurons with potentially sensitive content", fg=typer.colors.YELLOW)
+                if not typer.confirm("Continue importing?"):
+                    raise typer.Exit(0)
 
         brain_name = name or data.get("brain_name", "imported")
         config = get_config()
@@ -504,6 +755,134 @@ def brain_delete(
     brain_path = config.get_brain_path(name)
     brain_path.unlink()
     typer.secho(f"Deleted brain: {name}", fg=typer.colors.GREEN)
+
+
+@brain_app.command("health")
+def brain_health(
+    name: Annotated[
+        Optional[str], typer.Option("--name", "-n", help="Brain name (default: current)")
+    ] = None,
+    json_output: Annotated[
+        bool, typer.Option("--json", "-j", help="Output as JSON")
+    ] = False,
+) -> None:
+    """Check brain health (freshness, sensitive content).
+
+    Examples:
+        nmem brain health
+        nmem brain health --name work --json
+    """
+
+    async def _health() -> dict:
+        config = get_config()
+        brain_name = name or config.current_brain
+        brain_path = config.get_brain_path(brain_name)
+
+        if not brain_path.exists():
+            return {"error": f"Brain '{brain_name}' not found."}
+
+        storage = await PersistentStorage.load(brain_path)
+        brain = await storage.get_brain(storage._current_brain_id)
+
+        if not brain:
+            return {"error": "No brain configured"}
+
+        # Get all neurons to check
+        neurons = list(storage._neurons[storage._current_brain_id].values())
+        fibers = await storage.get_fibers(limit=10000)
+
+        # Check for sensitive content
+        sensitive_neurons = []
+        for neuron in neurons:
+            matches = check_sensitive_content(neuron.content, min_severity=2)
+            if matches:
+                sensitive_neurons.append({
+                    "id": neuron.id,
+                    "type": neuron.type.value,
+                    "sensitive_types": [m.type.value for m in matches],
+                })
+
+        # Analyze freshness
+        created_dates = [f.created_at for f in fibers]
+        freshness_report = analyze_freshness(created_dates)
+
+        # Calculate health score (0-100)
+        health_score = 100
+        issues = []
+
+        # Penalize for sensitive content
+        if sensitive_neurons:
+            penalty = min(30, len(sensitive_neurons) * 5)
+            health_score -= penalty
+            issues.append(f"{len(sensitive_neurons)} neurons with sensitive content")
+
+        # Penalize for stale memories
+        stale_ratio = (freshness_report.stale + freshness_report.ancient) / max(1, freshness_report.total)
+        if stale_ratio > 0.5:
+            health_score -= 20
+            issues.append(f"{stale_ratio*100:.0f}% of memories are stale/ancient")
+        elif stale_ratio > 0.2:
+            health_score -= 10
+            issues.append(f"{stale_ratio*100:.0f}% of memories are stale/ancient")
+
+        health_score = max(0, health_score)
+
+        return {
+            "brain": brain_name,
+            "health_score": health_score,
+            "issues": issues,
+            "sensitive_content": {
+                "count": len(sensitive_neurons),
+                "neurons": sensitive_neurons[:5],  # Show first 5
+            },
+            "freshness": {
+                "total": freshness_report.total,
+                "fresh": freshness_report.fresh,
+                "recent": freshness_report.recent,
+                "aging": freshness_report.aging,
+                "stale": freshness_report.stale,
+                "ancient": freshness_report.ancient,
+            },
+        }
+
+    result = asyncio.run(_health())
+
+    if json_output:
+        output_result(result, True)
+    else:
+        if "error" in result:
+            typer.secho(result["error"], fg=typer.colors.RED)
+            return
+
+        score = result["health_score"]
+        if score >= 80:
+            color = typer.colors.GREEN
+            indicator = "[OK]"
+        elif score >= 50:
+            color = typer.colors.YELLOW
+            indicator = "[~]"
+        else:
+            color = typer.colors.RED
+            indicator = "[!!]"
+
+        typer.echo(f"\nBrain: {result['brain']}")
+        typer.secho(f"Health Score: {indicator} {score}/100", fg=color)
+
+        if result["issues"]:
+            typer.echo("\nIssues:")
+            for issue in result["issues"]:
+                typer.secho(f"  [!] {issue}", fg=typer.colors.YELLOW)
+
+        if result["sensitive_content"]["count"] > 0:
+            typer.echo(f"\nSensitive content: {result['sensitive_content']['count']} neurons")
+            typer.secho("  Run 'nmem brain export --exclude-sensitive' for safe export", fg=typer.colors.BRIGHT_BLACK)
+
+        f = result["freshness"]
+        if f["total"] > 0:
+            typer.echo(f"\nMemory freshness ({f['total']} total):")
+            typer.echo(f"  [+] Fresh/Recent: {f['fresh'] + f['recent']}")
+            typer.echo(f"  [~] Aging: {f['aging']}")
+            typer.echo(f"  [!!] Stale/Ancient: {f['stale'] + f['ancient']}")
 
 
 # =============================================================================
