@@ -7,10 +7,17 @@ from neural_memory.extraction.parser import (
     QueryParser,
     Stimulus,
 )
+from neural_memory.extraction.router import (
+    QueryRouter,
+    QueryType,
+    RouteConfidence,
+    RouteDecision,
+    route_query,
+)
 from neural_memory.extraction.temporal import (
+    TemporalExtractor,
     TimeGranularity,
     TimeHint,
-    TemporalExtractor,
 )
 
 __all__ = [
@@ -23,6 +30,12 @@ __all__ = [
     "QueryIntent",
     "Perspective",
     "QueryParser",
+    # Router (MemoCore integration)
+    "QueryRouter",
+    "QueryType",
+    "RouteConfidence",
+    "RouteDecision",
+    "route_query",
     # Entities
     "Entity",
     "EntityExtractor",

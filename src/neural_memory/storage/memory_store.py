@@ -10,6 +10,13 @@ import networkx as nx
 
 from neural_memory.core.brain import Brain, BrainSnapshot
 from neural_memory.core.fiber import Fiber
+from neural_memory.core.memory_types import (
+    Confidence,
+    MemoryType,
+    Priority,
+    Provenance,
+    TypedMemory,
+)
 from neural_memory.core.neuron import Neuron, NeuronState, NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.storage.base import NeuralStorage
@@ -38,6 +45,7 @@ class InMemoryStorage(NeuralStorage):
         self._synapses: dict[str, dict[str, Synapse]] = defaultdict(dict)
         self._fibers: dict[str, dict[str, Fiber]] = defaultdict(dict)
         self._states: dict[str, dict[str, NeuronState]] = defaultdict(dict)
+        self._typed_memories: dict[str, dict[str, TypedMemory]] = defaultdict(dict)
         self._brains: dict[str, Brain] = {}
 
         # Current brain context
@@ -446,6 +454,92 @@ class InMemoryStorage(NeuralStorage):
 
         return fibers[:limit]
 
+    # ========== TypedMemory Operations ==========
+
+    async def add_typed_memory(self, typed_memory: TypedMemory) -> str:
+        """Add a typed memory for a fiber."""
+        brain_id = self._get_brain_id()
+
+        # Verify fiber exists
+        if typed_memory.fiber_id not in self._fibers[brain_id]:
+            raise ValueError(f"Fiber {typed_memory.fiber_id} does not exist")
+
+        self._typed_memories[brain_id][typed_memory.fiber_id] = typed_memory
+        return typed_memory.fiber_id
+
+    async def get_typed_memory(self, fiber_id: str) -> TypedMemory | None:
+        """Get typed memory for a fiber."""
+        brain_id = self._get_brain_id()
+        return self._typed_memories[brain_id].get(fiber_id)
+
+    async def find_typed_memories(
+        self,
+        memory_type: MemoryType | None = None,
+        min_priority: Priority | None = None,
+        include_expired: bool = False,
+        project_id: str | None = None,
+        tags: set[str] | None = None,
+        limit: int = 100,
+    ) -> list[TypedMemory]:
+        """Find typed memories matching criteria."""
+        brain_id = self._get_brain_id()
+        results: list[TypedMemory] = []
+
+        for tm in self._typed_memories[brain_id].values():
+            # Type filter
+            if memory_type is not None and tm.memory_type != memory_type:
+                continue
+
+            # Priority filter
+            if min_priority is not None and tm.priority < min_priority:
+                continue
+
+            # Expired filter
+            if not include_expired and tm.is_expired:
+                continue
+
+            # Project filter
+            if project_id is not None and tm.project_id != project_id:
+                continue
+
+            # Tags filter (must have ALL specified tags)
+            if tags is not None:
+                if not tags.issubset(tm.tags):
+                    continue
+
+            results.append(tm)
+
+            if len(results) >= limit:
+                break
+
+        # Sort by priority descending, then created_at descending
+        results.sort(key=lambda t: (t.priority, t.created_at), reverse=True)
+        return results
+
+    async def update_typed_memory(self, typed_memory: TypedMemory) -> None:
+        """Update a typed memory."""
+        brain_id = self._get_brain_id()
+
+        if typed_memory.fiber_id not in self._typed_memories[brain_id]:
+            raise ValueError(f"TypedMemory for fiber {typed_memory.fiber_id} does not exist")
+
+        self._typed_memories[brain_id][typed_memory.fiber_id] = typed_memory
+
+    async def delete_typed_memory(self, fiber_id: str) -> bool:
+        """Delete typed memory for a fiber."""
+        brain_id = self._get_brain_id()
+
+        if fiber_id not in self._typed_memories[brain_id]:
+            return False
+
+        del self._typed_memories[brain_id][fiber_id]
+        return True
+
+    async def get_expired_memories(self) -> list[TypedMemory]:
+        """Get all expired typed memories."""
+        brain_id = self._get_brain_id()
+        return [tm for tm in self._typed_memories[brain_id].values() if tm.is_expired]
+
     # ========== Brain Operations ==========
 
     async def save_brain(self, brain: Brain) -> None:
@@ -509,6 +603,29 @@ class InMemoryStorage(NeuralStorage):
             for f in self._fibers[brain_id].values()
         ]
 
+        # Serialize typed memories
+        typed_memories = [
+            {
+                "fiber_id": tm.fiber_id,
+                "memory_type": tm.memory_type.value,
+                "priority": tm.priority.value,
+                "provenance": {
+                    "source": tm.provenance.source,
+                    "confidence": tm.provenance.confidence.value,
+                    "verified": tm.provenance.verified,
+                    "verified_at": tm.provenance.verified_at.isoformat() if tm.provenance.verified_at else None,
+                    "created_by": tm.provenance.created_by,
+                    "last_confirmed": tm.provenance.last_confirmed.isoformat() if tm.provenance.last_confirmed else None,
+                },
+                "expires_at": tm.expires_at.isoformat() if tm.expires_at else None,
+                "project_id": tm.project_id,
+                "tags": list(tm.tags),
+                "metadata": tm.metadata,
+                "created_at": tm.created_at.isoformat(),
+            }
+            for tm in self._typed_memories[brain_id].values()
+        ]
+
         return BrainSnapshot(
             brain_id=brain_id,
             brain_name=brain.name,
@@ -518,6 +635,7 @@ class InMemoryStorage(NeuralStorage):
             synapses=synapses,
             fibers=fibers,
             config=asdict(brain.config),
+            metadata={"typed_memories": typed_memories},
         )
 
     async def import_brain(
@@ -598,6 +716,46 @@ class InMemoryStorage(NeuralStorage):
                 )
                 await self.add_fiber(fiber)
 
+            # Import typed memories
+            typed_memories_data = snapshot.metadata.get("typed_memories", [])
+            for tm_data in typed_memories_data:
+                prov_data = tm_data.get("provenance", {})
+                provenance = Provenance(
+                    source=prov_data.get("source", "import"),
+                    confidence=Confidence(prov_data.get("confidence", "medium")),
+                    verified=prov_data.get("verified", False),
+                    verified_at=(
+                        datetime.fromisoformat(prov_data["verified_at"])
+                        if prov_data.get("verified_at")
+                        else None
+                    ),
+                    created_by=prov_data.get("created_by", "import"),
+                    last_confirmed=(
+                        datetime.fromisoformat(prov_data["last_confirmed"])
+                        if prov_data.get("last_confirmed")
+                        else None
+                    ),
+                )
+
+                typed_memory = TypedMemory(
+                    fiber_id=tm_data["fiber_id"],
+                    memory_type=MemoryType(tm_data["memory_type"]),
+                    priority=Priority(tm_data["priority"]),
+                    provenance=provenance,
+                    expires_at=(
+                        datetime.fromisoformat(tm_data["expires_at"])
+                        if tm_data.get("expires_at")
+                        else None
+                    ),
+                    project_id=tm_data.get("project_id"),
+                    tags=frozenset(tm_data.get("tags", [])),
+                    metadata=tm_data.get("metadata", {}),
+                    created_at=datetime.fromisoformat(tm_data["created_at"]),
+                )
+                # Only add if fiber exists
+                if typed_memory.fiber_id in self._fibers[brain_id]:
+                    self._typed_memories[brain_id][typed_memory.fiber_id] = typed_memory
+
         finally:
             # Restore context
             self._current_brain_id = old_brain_id
@@ -627,4 +785,5 @@ class InMemoryStorage(NeuralStorage):
         self._synapses[brain_id].clear()
         self._fibers[brain_id].clear()
         self._states[brain_id].clear()
+        self._typed_memories[brain_id].clear()
         self._brains.pop(brain_id, None)
