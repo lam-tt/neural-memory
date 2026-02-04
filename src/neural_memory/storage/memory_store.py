@@ -18,6 +18,7 @@ from neural_memory.core.memory_types import (
     TypedMemory,
 )
 from neural_memory.core.neuron import Neuron, NeuronState, NeuronType
+from neural_memory.core.project import Project
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.storage.base import NeuralStorage
 
@@ -46,6 +47,7 @@ class InMemoryStorage(NeuralStorage):
         self._fibers: dict[str, dict[str, Fiber]] = defaultdict(dict)
         self._states: dict[str, dict[str, NeuronState]] = defaultdict(dict)
         self._typed_memories: dict[str, dict[str, TypedMemory]] = defaultdict(dict)
+        self._projects: dict[str, dict[str, Project]] = defaultdict(dict)
         self._brains: dict[str, Brain] = {}
 
         # Current brain context
@@ -540,6 +542,99 @@ class InMemoryStorage(NeuralStorage):
         brain_id = self._get_brain_id()
         return [tm for tm in self._typed_memories[brain_id].values() if tm.is_expired]
 
+    # ========== Project Operations ==========
+
+    async def add_project(self, project: Project) -> str:
+        """Add a project."""
+        brain_id = self._get_brain_id()
+
+        if project.id in self._projects[brain_id]:
+            raise ValueError(f"Project {project.id} already exists")
+
+        self._projects[brain_id][project.id] = project
+        return project.id
+
+    async def get_project(self, project_id: str) -> Project | None:
+        """Get a project by ID."""
+        brain_id = self._get_brain_id()
+        return self._projects[brain_id].get(project_id)
+
+    async def get_project_by_name(self, name: str) -> Project | None:
+        """Get a project by name (case-insensitive)."""
+        brain_id = self._get_brain_id()
+        name_lower = name.lower()
+        for project in self._projects[brain_id].values():
+            if project.name.lower() == name_lower:
+                return project
+        return None
+
+    async def list_projects(
+        self,
+        active_only: bool = False,
+        tags: set[str] | None = None,
+        limit: int = 100,
+    ) -> list[Project]:
+        """List projects with optional filters."""
+        brain_id = self._get_brain_id()
+        results: list[Project] = []
+
+        for project in self._projects[brain_id].values():
+            # Active filter
+            if active_only and not project.is_active:
+                continue
+
+            # Tags filter (must have at least one matching tag)
+            if tags is not None and not tags.intersection(project.tags):
+                continue
+
+            results.append(project)
+
+            if len(results) >= limit:
+                break
+
+        # Sort by priority descending, then start_date descending
+        results.sort(key=lambda p: (p.priority, p.start_date), reverse=True)
+        return results
+
+    async def update_project(self, project: Project) -> None:
+        """Update a project."""
+        brain_id = self._get_brain_id()
+
+        if project.id not in self._projects[brain_id]:
+            raise ValueError(f"Project {project.id} does not exist")
+
+        self._projects[brain_id][project.id] = project
+
+    async def delete_project(self, project_id: str) -> bool:
+        """Delete a project."""
+        brain_id = self._get_brain_id()
+
+        if project_id not in self._projects[brain_id]:
+            return False
+
+        del self._projects[brain_id][project_id]
+        return True
+
+    async def get_project_memories(
+        self,
+        project_id: str,
+        include_expired: bool = False,
+    ) -> list[TypedMemory]:
+        """Get all typed memories associated with a project."""
+        brain_id = self._get_brain_id()
+        results: list[TypedMemory] = []
+
+        for tm in self._typed_memories[brain_id].values():
+            if tm.project_id != project_id:
+                continue
+            if not include_expired and tm.is_expired:
+                continue
+            results.append(tm)
+
+        # Sort by priority descending, then created_at descending
+        results.sort(key=lambda t: (t.priority, t.created_at), reverse=True)
+        return results
+
     # ========== Brain Operations ==========
 
     async def save_brain(self, brain: Brain) -> None:
@@ -626,6 +721,9 @@ class InMemoryStorage(NeuralStorage):
             for tm in self._typed_memories[brain_id].values()
         ]
 
+        # Serialize projects
+        projects = [p.to_dict() for p in self._projects[brain_id].values()]
+
         return BrainSnapshot(
             brain_id=brain_id,
             brain_name=brain.name,
@@ -635,7 +733,7 @@ class InMemoryStorage(NeuralStorage):
             synapses=synapses,
             fibers=fibers,
             config=asdict(brain.config),
-            metadata={"typed_memories": typed_memories},
+            metadata={"typed_memories": typed_memories, "projects": projects},
         )
 
     async def import_brain(
@@ -756,6 +854,12 @@ class InMemoryStorage(NeuralStorage):
                 if typed_memory.fiber_id in self._fibers[brain_id]:
                     self._typed_memories[brain_id][typed_memory.fiber_id] = typed_memory
 
+            # Import projects
+            projects_data = snapshot.metadata.get("projects", [])
+            for p_data in projects_data:
+                project = Project.from_dict(p_data)
+                self._projects[brain_id][project.id] = project
+
         finally:
             # Restore context
             self._current_brain_id = old_brain_id
@@ -769,6 +873,7 @@ class InMemoryStorage(NeuralStorage):
             "neuron_count": len(self._neurons[brain_id]),
             "synapse_count": len(self._synapses[brain_id]),
             "fiber_count": len(self._fibers[brain_id]),
+            "project_count": len(self._projects[brain_id]),
         }
 
     # ========== Cleanup ==========
@@ -786,4 +891,5 @@ class InMemoryStorage(NeuralStorage):
         self._fibers[brain_id].clear()
         self._states[brain_id].clear()
         self._typed_memories[brain_id].clear()
+        self._projects[brain_id].clear()
         self._brains.pop(brain_id, None)
