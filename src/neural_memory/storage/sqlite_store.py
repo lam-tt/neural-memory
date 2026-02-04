@@ -396,6 +396,18 @@ class SQLiteStorage(NeuralStorage):
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
+    async def get_all_neuron_states(self) -> list[NeuronState]:
+        """Get all neuron states for current brain."""
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
+
+        async with conn.execute(
+            "SELECT * FROM neuron_states WHERE brain_id = ?",
+            (brain_id,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [self._row_to_neuron_state(row) for row in rows]
+
     # ========== Synapse Operations ==========
 
     async def add_synapse(self, synapse: Synapse) -> str:
@@ -485,6 +497,10 @@ class SQLiteStorage(NeuralStorage):
         async with conn.execute(query, params) as cursor:
             rows = await cursor.fetchall()
             return [self._row_to_synapse(row) for row in rows]
+
+    async def get_all_synapses(self) -> list[Synapse]:
+        """Get all synapses for current brain."""
+        return await self.get_synapses()
 
     async def update_synapse(self, synapse: Synapse) -> None:
         conn = self._ensure_conn()

@@ -2913,6 +2913,62 @@ def serve(
 
 
 @app.command()
+def decay(
+    brain: Annotated[
+        str | None, typer.Option("--brain", "-b", help="Brain to apply decay to")
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", "-n", help="Preview changes without applying")
+    ] = False,
+    prune_threshold: Annotated[
+        float, typer.Option("--prune", "-p", help="Prune below this activation level")
+    ] = 0.01,
+) -> None:
+    """Apply memory decay to simulate forgetting.
+
+    Memories that haven't been accessed recently will have their
+    activation levels reduced following the Ebbinghaus forgetting curve.
+
+    Examples:
+        nmem decay                    # Apply decay to current brain
+        nmem decay -b work            # Apply to specific brain
+        nmem decay --dry-run          # Preview without changes
+        nmem decay --prune 0.05       # More aggressive pruning
+    """
+    from neural_memory.engine.lifecycle import DecayManager
+    from neural_memory.unified_config import get_config, get_shared_storage
+
+    async def _decay() -> None:
+        config = get_config()
+        brain_name = brain or config.current_brain
+
+        typer.echo(f"Applying decay to brain '{brain_name}'...")
+        if dry_run:
+            typer.echo("(dry run - no changes will be saved)")
+
+        storage = await get_shared_storage(brain_name)
+
+        manager = DecayManager(
+            decay_rate=config.brain.decay_rate,
+            prune_threshold=prune_threshold,
+        )
+
+        report = await manager.apply_decay(storage, dry_run=dry_run)
+
+        typer.echo("")
+        typer.echo(report.summary())
+
+        if report.neurons_pruned > 0 or report.synapses_pruned > 0:
+            typer.echo("")
+            typer.echo(
+                f"Pruned {report.neurons_pruned} neurons and "
+                f"{report.synapses_pruned} synapses below threshold {prune_threshold}"
+            )
+
+    asyncio.run(_decay())
+
+
+@app.command()
 def version() -> None:
     """Show version information."""
     from neural_memory import __version__
