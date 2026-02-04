@@ -1,0 +1,169 @@
+"""Memory API routes."""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from neural_memory.core.brain import Brain
+from neural_memory.engine.encoder import MemoryEncoder
+from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
+from neural_memory.server.dependencies import get_brain, get_storage
+from neural_memory.server.models import (
+    EncodeRequest,
+    EncodeResponse,
+    ErrorResponse,
+    QueryRequest,
+    QueryResponse,
+    SubgraphResponse,
+)
+from neural_memory.storage.base import NeuralStorage
+
+router = APIRouter(prefix="/memory", tags=["memory"])
+
+
+@router.post(
+    "/encode",
+    response_model=EncodeResponse,
+    responses={404: {"model": ErrorResponse}},
+    summary="Encode a new memory",
+    description="Store a new memory by encoding content into neural structures.",
+)
+async def encode_memory(
+    request: EncodeRequest,
+    brain: Annotated[Brain, Depends(get_brain)],
+    storage: Annotated[NeuralStorage, Depends(get_storage)],
+) -> EncodeResponse:
+    """Encode new content as a memory."""
+    encoder = MemoryEncoder(storage, brain.config)
+
+    tags = set(request.tags) if request.tags else None
+
+    result = await encoder.encode(
+        content=request.content,
+        timestamp=request.timestamp,
+        metadata=request.metadata,
+        tags=tags,
+    )
+
+    return EncodeResponse(
+        fiber_id=result.fiber.id,
+        neurons_created=len(result.neurons_created),
+        neurons_linked=len(result.neurons_linked),
+        synapses_created=len(result.synapses_created),
+    )
+
+
+@router.post(
+    "/query",
+    response_model=QueryResponse,
+    responses={404: {"model": ErrorResponse}},
+    summary="Query memories",
+    description="Query memories through spreading activation retrieval.",
+)
+async def query_memory(
+    request: QueryRequest,
+    brain: Annotated[Brain, Depends(get_brain)],
+    storage: Annotated[NeuralStorage, Depends(get_storage)],
+) -> QueryResponse:
+    """Query memories using the reflex pipeline."""
+    pipeline = ReflexPipeline(storage, brain.config)
+
+    depth = DepthLevel(request.depth) if request.depth is not None else None
+
+    result = await pipeline.query(
+        query=request.query,
+        depth=depth,
+        max_tokens=request.max_tokens,
+        reference_time=request.reference_time,
+    )
+
+    subgraph = None
+    if request.include_subgraph:
+        subgraph = SubgraphResponse(
+            neuron_ids=result.subgraph.neuron_ids,
+            synapse_ids=result.subgraph.synapse_ids,
+            anchor_ids=result.subgraph.anchor_ids,
+        )
+
+    return QueryResponse(
+        answer=result.answer,
+        confidence=result.confidence,
+        depth_used=result.depth_used.value,
+        neurons_activated=result.neurons_activated,
+        fibers_matched=result.fibers_matched,
+        context=result.context,
+        latency_ms=result.latency_ms,
+        subgraph=subgraph,
+        metadata=result.metadata,
+    )
+
+
+@router.get(
+    "/fiber/{fiber_id}",
+    responses={404: {"model": ErrorResponse}},
+    summary="Get a specific fiber",
+    description="Retrieve details of a specific memory fiber.",
+)
+async def get_fiber(
+    fiber_id: str,
+    brain: Annotated[Brain, Depends(get_brain)],
+    storage: Annotated[NeuralStorage, Depends(get_storage)],
+) -> dict:
+    """Get a specific fiber by ID."""
+    fiber = await storage.get_fiber(fiber_id)
+    if fiber is None:
+        raise HTTPException(status_code=404, detail=f"Fiber {fiber_id} not found")
+
+    return {
+        "id": fiber.id,
+        "neuron_ids": list(fiber.neuron_ids),
+        "synapse_ids": list(fiber.synapse_ids),
+        "anchor_neuron_id": fiber.anchor_neuron_id,
+        "time_start": fiber.time_start.isoformat() if fiber.time_start else None,
+        "time_end": fiber.time_end.isoformat() if fiber.time_end else None,
+        "coherence": fiber.coherence,
+        "salience": fiber.salience,
+        "frequency": fiber.frequency,
+        "summary": fiber.summary,
+        "tags": list(fiber.tags),
+        "created_at": fiber.created_at.isoformat(),
+    }
+
+
+@router.get(
+    "/neurons",
+    summary="List neurons",
+    description="List neurons in the brain with optional filters.",
+)
+async def list_neurons(
+    brain: Annotated[Brain, Depends(get_brain)],
+    storage: Annotated[NeuralStorage, Depends(get_storage)],
+    type: str | None = None,
+    content_contains: str | None = None,
+    limit: int = 50,
+) -> dict:
+    """List neurons with optional filters."""
+    from neural_memory.core.neuron import NeuronType
+
+    neuron_type = NeuronType(type) if type else None
+
+    neurons = await storage.find_neurons(
+        type=neuron_type,
+        content_contains=content_contains,
+        limit=limit,
+    )
+
+    return {
+        "neurons": [
+            {
+                "id": n.id,
+                "type": n.type.value,
+                "content": n.content,
+                "created_at": n.created_at.isoformat(),
+            }
+            for n in neurons
+        ],
+        "count": len(neurons),
+    }
