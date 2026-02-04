@@ -128,9 +128,7 @@ class TypedMemory:
     fiber_id: str
     memory_type: MemoryType
     priority: Priority = Priority.NORMAL
-    provenance: Provenance = field(
-        default_factory=lambda: Provenance(source="user_input")
-    )
+    provenance: Provenance = field(default_factory=lambda: Provenance(source="user_input"))
     expires_at: datetime | None = None
     project_id: str | None = None
     tags: frozenset[str] = field(default_factory=frozenset)
@@ -302,10 +300,7 @@ def suggest_memory_type(content: str) -> MemoryType:
         return MemoryType.INSTRUCTION
 
     # Preference patterns
-    if any(
-        kw in content_lower
-        for kw in ["prefer", "like", "favorite", "hate"]
-    ):
+    if any(kw in content_lower for kw in ["prefer", "like", "favorite", "hate"]):
         return MemoryType.PREFERENCE
 
     # Insight patterns (check BEFORE error - "discovered" vs "issue")
@@ -324,8 +319,7 @@ def suggest_memory_type(content: str) -> MemoryType:
 
     # Workflow patterns
     if any(
-        kw in content_lower
-        for kw in ["workflow", "process", "step", "flow", "pipeline", "deploy"]
+        kw in content_lower for kw in ["workflow", "process", "step", "flow", "pipeline", "deploy"]
     ):
         return MemoryType.WORKFLOW
 

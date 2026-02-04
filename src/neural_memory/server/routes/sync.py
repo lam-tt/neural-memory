@@ -252,12 +252,9 @@ class SyncManager:
         return {
             "connected_clients": len(self._clients),
             "brain_subscriptions": {
-                brain_id: len(clients)
-                for brain_id, clients in self._brain_subscriptions.items()
+                brain_id: len(clients) for brain_id, clients in self._brain_subscriptions.items()
             },
-            "event_history_size": sum(
-                len(events) for events in self._event_history.values()
-            ),
+            "event_history_size": sum(len(events) for events in self._event_history.values()),
         }
 
 
@@ -308,9 +305,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 brain_id = message.get("brain_id")
                 if brain_id:
                     success = await sync_manager.subscribe(client_id, brain_id)
-                    event_type = (
-                        SyncEventType.SUBSCRIBED if success else SyncEventType.ERROR
-                    )
+                    event_type = SyncEventType.SUBSCRIBED if success else SyncEventType.ERROR
                     await websocket.send_text(
                         SyncEvent(
                             type=event_type,

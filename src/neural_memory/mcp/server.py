@@ -55,33 +55,41 @@ class MCPServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "content": {
-                            "type": "string",
-                            "description": "The content to remember"
-                        },
+                        "content": {"type": "string", "description": "The content to remember"},
                         "type": {
                             "type": "string",
-                            "enum": ["fact", "decision", "preference", "todo", "insight", "context", "instruction", "error", "workflow", "reference"],
-                            "description": "Memory type (auto-detected if not specified)"
+                            "enum": [
+                                "fact",
+                                "decision",
+                                "preference",
+                                "todo",
+                                "insight",
+                                "context",
+                                "instruction",
+                                "error",
+                                "workflow",
+                                "reference",
+                            ],
+                            "description": "Memory type (auto-detected if not specified)",
                         },
                         "priority": {
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 10,
-                            "description": "Priority 0-10 (5=normal, 10=critical)"
+                            "description": "Priority 0-10 (5=normal, 10=critical)",
                         },
                         "tags": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Tags for categorization"
+                            "description": "Tags for categorization",
                         },
                         "expires_days": {
                             "type": "integer",
-                            "description": "Days until memory expires"
-                        }
+                            "description": "Days until memory expires",
+                        },
                     },
-                    "required": ["content"]
-                }
+                    "required": ["content"],
+                },
             },
             {
                 "name": "nmem_recall",
@@ -89,29 +97,26 @@ class MCPServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "The query to search memories"
-                        },
+                        "query": {"type": "string", "description": "The query to search memories"},
                         "depth": {
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 3,
-                            "description": "Search depth: 0=instant, 1=context, 2=habit, 3=deep"
+                            "description": "Search depth: 0=instant, 1=context, 2=habit, 3=deep",
                         },
                         "max_tokens": {
                             "type": "integer",
-                            "description": "Maximum tokens in response (default: 500)"
+                            "description": "Maximum tokens in response (default: 500)",
                         },
                         "min_confidence": {
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1,
-                            "description": "Minimum confidence threshold"
-                        }
+                            "description": "Minimum confidence threshold",
+                        },
                     },
-                    "required": ["query"]
-                }
+                    "required": ["query"],
+                },
             },
             {
                 "name": "nmem_context",
@@ -121,14 +126,14 @@ class MCPServer:
                     "properties": {
                         "limit": {
                             "type": "integer",
-                            "description": "Number of recent memories (default: 10)"
+                            "description": "Number of recent memories (default: 10)",
                         },
                         "fresh_only": {
                             "type": "boolean",
-                            "description": "Only include memories < 30 days old"
-                        }
-                    }
-                }
+                            "description": "Only include memories < 30 days old",
+                        },
+                    },
+                },
             },
             {
                 "name": "nmem_todo",
@@ -136,28 +141,22 @@ class MCPServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "task": {
-                            "type": "string",
-                            "description": "The task to remember"
-                        },
+                        "task": {"type": "string", "description": "The task to remember"},
                         "priority": {
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 10,
-                            "description": "Priority 0-10 (default: 5)"
-                        }
+                            "description": "Priority 0-10 (default: 5)",
+                        },
                     },
-                    "required": ["task"]
-                }
+                    "required": ["task"],
+                },
             },
             {
                 "name": "nmem_stats",
                 "description": "Get brain statistics including memory counts and freshness.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {}
-                }
-            }
+                "inputSchema": {"type": "object", "properties": {}},
+            },
         ]
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -221,7 +220,7 @@ class MCPServer:
             "fiber_id": result.fiber.id,
             "memory_type": mem_type.value,
             "neurons_created": len(result.neurons_created),
-            "message": f"Remembered: {content[:50]}{'...' if len(content) > 50 else ''}"
+            "message": f"Remembered: {content[:50]}{'...' if len(content) > 50 else ''}",
         }
 
     async def _recall(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -248,7 +247,7 @@ class MCPServer:
             return {
                 "answer": None,
                 "message": f"No memories found with confidence >= {min_confidence}",
-                "confidence": result.confidence
+                "confidence": result.confidence,
             }
 
         return {
@@ -256,7 +255,7 @@ class MCPServer:
             "confidence": result.confidence,
             "neurons_activated": result.neurons_activated,
             "fibers_matched": result.fibers_matched,
-            "depth_used": result.depth_used.value
+            "depth_used": result.depth_used.value,
         }
 
     async def _context(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -274,6 +273,7 @@ class MCPServer:
         # Filter by freshness if requested
         if fresh_only:
             from neural_memory.safety.freshness import FreshnessLevel, evaluate_freshness
+
             now = datetime.now()
             fresh_fibers = []
             for fiber in fibers:
@@ -295,17 +295,19 @@ class MCPServer:
 
         return {
             "context": "\n".join(context_parts) if context_parts else "No context available.",
-            "count": len(context_parts)
+            "count": len(context_parts),
         }
 
     async def _todo(self, args: dict[str, Any]) -> dict[str, Any]:
         """Add a TODO."""
-        return await self._remember({
-            "content": args["task"],
-            "type": "todo",
-            "priority": args.get("priority", 5),
-            "expires_days": 30
-        })
+        return await self._remember(
+            {
+                "content": args["task"],
+                "type": "todo",
+                "priority": args.get("priority", 5),
+                "expires_days": 30,
+            }
+        )
 
     async def _stats(self, args: dict[str, Any]) -> dict[str, Any]:
         """Get brain statistics."""
@@ -341,24 +343,13 @@ async def handle_message(server: MCPServer, message: dict[str, Any]) -> dict[str
             "id": msg_id,
             "result": {
                 "protocolVersion": "2024-11-05",
-                "serverInfo": {
-                    "name": "neural-memory",
-                    "version": "0.1.0"
-                },
-                "capabilities": {
-                    "tools": {}
-                }
-            }
+                "serverInfo": {"name": "neural-memory", "version": "0.1.0"},
+                "capabilities": {"tools": {}},
+            },
         }
 
     elif method == "tools/list":
-        return {
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "result": {
-                "tools": server.get_tools()
-            }
-        }
+        return {"jsonrpc": "2.0", "id": msg_id, "result": {"tools": server.get_tools()}}
 
     elif method == "tools/call":
         tool_name = params.get("name", "")
@@ -369,24 +360,10 @@ async def handle_message(server: MCPServer, message: dict[str, Any]) -> dict[str
             return {
                 "jsonrpc": "2.0",
                 "id": msg_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(result, indent=2)
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
             }
         except Exception as e:
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "error": {
-                    "code": -32000,
-                    "message": str(e)
-                }
-            }
+            return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32000, "message": str(e)}}
 
     elif method == "notifications/initialized":
         # No response needed for notifications
@@ -396,10 +373,7 @@ async def handle_message(server: MCPServer, message: dict[str, Any]) -> dict[str
         return {
             "jsonrpc": "2.0",
             "id": msg_id,
-            "error": {
-                "code": -32601,
-                "message": f"Method not found: {method}"
-            }
+            "error": {"code": -32601, "message": f"Method not found: {method}"},
         }
 
 
@@ -410,9 +384,7 @@ async def run_mcp_server() -> None:
     # Read from stdin, write to stdout
     while True:
         try:
-            line = await asyncio.get_event_loop().run_in_executor(
-                None, sys.stdin.readline
-            )
+            line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
 
             if not line:
                 break

@@ -228,9 +228,7 @@ class QueryParser:
 
         self._intent_compiled: dict[QueryIntent, list[re.Pattern[str]]] = {}
         for intent, patterns in self.INTENT_PATTERNS.items():
-            self._intent_compiled[intent] = [
-                re.compile(p, re.IGNORECASE) for p in patterns
-            ]
+            self._intent_compiled[intent] = [re.compile(p, re.IGNORECASE) for p in patterns]
 
     def parse(
         self,

@@ -78,9 +78,7 @@ class Fiber:
             A new Fiber instance
         """
         if anchor_neuron_id not in neuron_ids:
-            raise ValueError(
-                f"Anchor neuron {anchor_neuron_id} must be in neuron_ids"
-            )
+            raise ValueError(f"Anchor neuron {anchor_neuron_id} must be in neuron_ids")
 
         return cls(
             id=fiber_id or str(uuid4()),

@@ -110,9 +110,7 @@ class TestTemporalExtractor:
 
         assert len(hints) >= 1
 
-    def test_auto_detects_english(
-        self, extractor: TemporalExtractor, ref_time: datetime
-    ) -> None:
+    def test_auto_detects_english(self, extractor: TemporalExtractor, ref_time: datetime) -> None:
         """Test auto-detection finds English patterns."""
         hints = extractor.extract("Yesterday was great", ref_time, language="auto")
 
@@ -120,9 +118,7 @@ class TestTemporalExtractor:
 
     # Edge cases
 
-    def test_no_time_references(
-        self, extractor: TemporalExtractor, ref_time: datetime
-    ) -> None:
+    def test_no_time_references(self, extractor: TemporalExtractor, ref_time: datetime) -> None:
         """Test text with no time references."""
         hints = extractor.extract("The cat sat on the mat", ref_time, language="en")
 

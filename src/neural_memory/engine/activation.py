@@ -238,7 +238,9 @@ class SpreadingActivation:
                     # Combine activations (take max, but boost if in intersection)
                     if neuron_id in intersection:
                         # Boost: multiply activations
-                        new_level = min(1.0, existing.activation_level + activation.activation_level * 0.5)
+                        new_level = min(
+                            1.0, existing.activation_level + activation.activation_level * 0.5
+                        )
                     else:
                         new_level = max(existing.activation_level, activation.activation_level)
 
@@ -246,7 +248,9 @@ class SpreadingActivation:
                         neuron_id=neuron_id,
                         activation_level=new_level,
                         hop_distance=min(existing.hop_distance, activation.hop_distance),
-                        path=existing.path if existing.hop_distance <= activation.hop_distance else activation.path,
+                        path=existing.path
+                        if existing.hop_distance <= activation.hop_distance
+                        else activation.path,
                         source_anchor=existing.source_anchor,
                     )
 

@@ -133,9 +133,7 @@ class Synapse:
         # Auto-detect direction based on type
         if direction is None:
             direction = (
-                Direction.BIDIRECTIONAL
-                if type in BIDIRECTIONAL_TYPES
-                else Direction.UNIDIRECTIONAL
+                Direction.BIDIRECTIONAL if type in BIDIRECTIONAL_TYPES else Direction.UNIDIRECTIONAL
             )
 
         return cls(

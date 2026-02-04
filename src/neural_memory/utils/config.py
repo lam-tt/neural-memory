@@ -73,9 +73,7 @@ class Config:
             neo4j_user=os.getenv("NEURAL_MEMORY_NEO4J_USER"),
             neo4j_password=os.getenv("NEURAL_MEMORY_NEO4J_PASSWORD"),
             default_decay_rate=get_float("NEURAL_MEMORY_DECAY_RATE", 0.1),
-            default_activation_threshold=get_float(
-                "NEURAL_MEMORY_ACTIVATION_THRESHOLD", 0.2
-            ),
+            default_activation_threshold=get_float("NEURAL_MEMORY_ACTIVATION_THRESHOLD", 0.2),
             default_max_spread_hops=get_int("NEURAL_MEMORY_MAX_SPREAD_HOPS", 4),
             default_max_context_tokens=get_int("NEURAL_MEMORY_MAX_CONTEXT_TOKENS", 1500),
             cors_origins=get_list("NEURAL_MEMORY_CORS_ORIGINS", ["*"]),

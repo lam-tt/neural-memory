@@ -141,9 +141,7 @@ class TestEncodingFlow:
         assert result.fiber.metadata.get("source") == "test"
 
     @pytest.mark.asyncio
-    async def test_multiple_encodes_link_temporally(
-        self, storage: InMemoryStorage
-    ) -> None:
+    async def test_multiple_encodes_link_temporally(self, storage: InMemoryStorage) -> None:
         """Test that multiple encodings link to nearby memories."""
         brain = await storage.get_brain(storage._current_brain_id)  # type: ignore
         assert brain is not None
@@ -200,9 +198,7 @@ class TestEncodingFlow:
         assert result.fiber.time_end is not None
 
     @pytest.mark.asyncio
-    async def test_fiber_retrievable_after_encode(
-        self, storage: InMemoryStorage
-    ) -> None:
+    async def test_fiber_retrievable_after_encode(self, storage: InMemoryStorage) -> None:
         """Test that fiber can be retrieved after encoding."""
         brain = await storage.get_brain(storage._current_brain_id)  # type: ignore
         assert brain is not None

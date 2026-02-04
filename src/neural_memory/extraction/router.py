@@ -79,54 +79,148 @@ class QueryRouter:
     """
 
     # Keywords that strongly indicate query types
-    SEMANTIC_SIGNALS = frozenset([
-        # English
-        "about", "related", "concept", "idea", "understand", "explain",
-        "knowledge", "information", "details", "overview",
-        # Vietnamese
-        "về", "liên quan", "khái niệm", "hiểu", "giải thích", "thông tin",
-    ])
+    SEMANTIC_SIGNALS = frozenset(
+        [
+            # English
+            "about",
+            "related",
+            "concept",
+            "idea",
+            "understand",
+            "explain",
+            "knowledge",
+            "information",
+            "details",
+            "overview",
+            # Vietnamese
+            "về",
+            "liên quan",
+            "khái niệm",
+            "hiểu",
+            "giải thích",
+            "thông tin",
+        ]
+    )
 
-    TEMPORAL_SIGNALS = frozenset([
-        # English
-        "when", "yesterday", "today", "last week", "ago", "before", "after",
-        "morning", "afternoon", "evening", "night", "recently", "earlier",
-        # Vietnamese
-        "khi nào", "hôm qua", "hôm nay", "tuần trước", "trước", "sau",
-        "sáng", "chiều", "tối", "gần đây", "lúc",
-    ])
+    TEMPORAL_SIGNALS = frozenset(
+        [
+            # English
+            "when",
+            "yesterday",
+            "today",
+            "last week",
+            "ago",
+            "before",
+            "after",
+            "morning",
+            "afternoon",
+            "evening",
+            "night",
+            "recently",
+            "earlier",
+            # Vietnamese
+            "khi nào",
+            "hôm qua",
+            "hôm nay",
+            "tuần trước",
+            "trước",
+            "sau",
+            "sáng",
+            "chiều",
+            "tối",
+            "gần đây",
+            "lúc",
+        ]
+    )
 
-    CAUSAL_SIGNALS = frozenset([
-        # English
-        "why", "because", "cause", "reason", "result", "led to",
-        "caused", "effect", "consequence", "how come",
-        # Vietnamese
-        "tại sao", "vì sao", "lý do", "nguyên nhân", "kết quả", "dẫn đến",
-    ])
+    CAUSAL_SIGNALS = frozenset(
+        [
+            # English
+            "why",
+            "because",
+            "cause",
+            "reason",
+            "result",
+            "led to",
+            "caused",
+            "effect",
+            "consequence",
+            "how come",
+            # Vietnamese
+            "tại sao",
+            "vì sao",
+            "lý do",
+            "nguyên nhân",
+            "kết quả",
+            "dẫn đến",
+        ]
+    )
 
-    DIRECT_SIGNALS = frozenset([
-        # English
-        "what is", "what's", "exact", "specific", "precisely", "tell me the",
-        "give me", "show me", "find",
-        # Vietnamese
-        "là gì", "chính xác", "cụ thể", "cho tôi", "tìm",
-    ])
+    DIRECT_SIGNALS = frozenset(
+        [
+            # English
+            "what is",
+            "what's",
+            "exact",
+            "specific",
+            "precisely",
+            "tell me the",
+            "give me",
+            "show me",
+            "find",
+            # Vietnamese
+            "là gì",
+            "chính xác",
+            "cụ thể",
+            "cho tôi",
+            "tìm",
+        ]
+    )
 
-    PATTERN_SIGNALS = frozenset([
-        # English
-        "usually", "typically", "always", "often", "habit", "routine",
-        "every", "pattern", "tend to", "normally",
-        # Vietnamese
-        "thường", "hay", "luôn", "thói quen", "mỗi", "xu hướng",
-    ])
+    PATTERN_SIGNALS = frozenset(
+        [
+            # English
+            "usually",
+            "typically",
+            "always",
+            "often",
+            "habit",
+            "routine",
+            "every",
+            "pattern",
+            "tend to",
+            "normally",
+            # Vietnamese
+            "thường",
+            "hay",
+            "luôn",
+            "thói quen",
+            "mỗi",
+            "xu hướng",
+        ]
+    )
 
-    COMPARATIVE_SIGNALS = frozenset([
-        # English
-        "compare", "versus", "vs", "difference", "different", "similar",
-        "better", "worse", "same", "like",
-        # Vietnamese
-        "so sánh", "khác", "giống", "hơn", "như",
-    ])
+    COMPARATIVE_SIGNALS = frozenset(
+        [
+            # English
+            "compare",
+            "versus",
+            "vs",
+            "difference",
+            "different",
+            "similar",
+            "better",
+            "worse",
+            "same",
+            "like",
+            # Vietnamese
+            "so sánh",
+            "khác",
+            "giống",
+            "hơn",
+            "như",
+        ]
+    )
 
     def route(self, stimulus: Stimulus) -> RouteDecision:
         """Determine the optimal route for a query.

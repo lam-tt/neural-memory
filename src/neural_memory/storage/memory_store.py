@@ -705,9 +705,13 @@ class InMemoryStorage(NeuralStorage):
                     "source": tm.provenance.source,
                     "confidence": tm.provenance.confidence.value,
                     "verified": tm.provenance.verified,
-                    "verified_at": tm.provenance.verified_at.isoformat() if tm.provenance.verified_at else None,
+                    "verified_at": tm.provenance.verified_at.isoformat()
+                    if tm.provenance.verified_at
+                    else None,
                     "created_by": tm.provenance.created_by,
-                    "last_confirmed": tm.provenance.last_confirmed.isoformat() if tm.provenance.last_confirmed else None,
+                    "last_confirmed": tm.provenance.last_confirmed.isoformat()
+                    if tm.provenance.last_confirmed
+                    else None,
                 },
                 "expires_at": tm.expires_at.isoformat() if tm.expires_at else None,
                 "project_id": tm.project_id,

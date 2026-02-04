@@ -231,9 +231,7 @@ class TestMCPToolCalls:
             patch.object(server, "get_storage", return_value=mock_storage),
             patch("neural_memory.mcp.server.ReflexPipeline", return_value=mock_pipeline),
         ):
-            result = await server.call_tool(
-                "nmem_recall", {"query": "test", "min_confidence": 0.5}
-            )
+            result = await server.call_tool("nmem_recall", {"query": "test", "min_confidence": 0.5})
 
         assert result["answer"] is None
         assert "No memories found" in result["message"]
@@ -289,9 +287,7 @@ class TestMCPToolCalls:
             patch.object(server, "get_storage", return_value=mock_storage),
             patch("neural_memory.mcp.server.MemoryEncoder", return_value=mock_encoder),
         ):
-            result = await server.call_tool(
-                "nmem_todo", {"task": "Review code", "priority": 8}
-            )
+            result = await server.call_tool("nmem_todo", {"task": "Review code", "priority": 8})
 
         assert result["success"] is True
         assert result["memory_type"] == "todo"
@@ -386,9 +382,7 @@ class TestMCPProtocol:
     @pytest.mark.asyncio
     async def test_tools_call_error(self, server: MCPServer) -> None:
         """Test MCP tools/call error handling."""
-        with patch.object(
-            server, "call_tool", side_effect=Exception("Test error")
-        ):
+        with patch.object(server, "call_tool", side_effect=Exception("Test error")):
             message = {
                 "jsonrpc": "2.0",
                 "id": 4,

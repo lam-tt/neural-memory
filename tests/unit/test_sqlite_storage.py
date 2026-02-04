@@ -528,6 +528,7 @@ class TestSQLiteExportImport:
             await storage.close()
             # Explicit close to release file handle on Windows
             import gc
+
             gc.collect()
 
 

@@ -131,7 +131,7 @@ def output_result(data: dict, as_json: bool = False) -> None:
                 typer.secho(
                     f"\n[routing: {r['query_type']}, depth: {r['suggested_depth']}, "
                     f"confidence: {r['confidence']}]",
-                    fg=typer.colors.BRIGHT_BLACK
+                    fg=typer.colors.BRIGHT_BLACK,
                 )
 
         elif "message" in data:
@@ -182,9 +182,7 @@ def remember(
     ] = None,
     priority: Annotated[
         int | None,
-        typer.Option(
-            "--priority", "-p", help="Priority 0-10 (0=lowest, 5=normal, 10=critical)"
-        ),
+        typer.Option("--priority", "-p", help="Priority 0-10 (0=lowest, 5=normal, 10=critical)"),
     ] = None,
     expires: Annotated[
         int | None,
@@ -203,9 +201,7 @@ def remember(
     redact: Annotated[
         bool, typer.Option("--redact", "-r", help="Auto-redact sensitive content before storing")
     ] = False,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Store a new memory.
 
@@ -267,7 +263,11 @@ def remember(
         config = get_config()
         storage = await get_storage(config, force_shared=shared)
 
-        brain_id = storage._current_brain_id if hasattr(storage, "_current_brain_id") else config.current_brain
+        brain_id = (
+            storage._current_brain_id
+            if hasattr(storage, "_current_brain_id")
+            else config.current_brain
+        )
         brain = await storage.get_brain(brain_id)
         if not brain:
             return {"error": "No brain configured"}
@@ -277,7 +277,9 @@ def remember(
         if project:
             proj = await storage.get_project_by_name(project)
             if not proj:
-                return {"error": f"Project '{project}' not found. Create it with: nmem project create \"{project}\""}
+                return {
+                    "error": f"Project '{project}' not found. Create it with: nmem project create \"{project}\""
+                }
             project_id = proj.id
 
         encoder = MemoryEncoder(storage, brain.config)
@@ -327,7 +329,9 @@ def remember(
         # Add warnings
         warnings = []
         if force and sensitive_matches:
-            warnings.append(f"[!] Stored with {len(sensitive_matches)} sensitive item(s) - consider using --redact")
+            warnings.append(
+                f"[!] Stored with {len(sensitive_matches)} sensitive item(s) - consider using --redact"
+            )
         if warnings:
             response["warnings"] = warnings
 
@@ -342,7 +346,9 @@ def todo(
     task: Annotated[str, typer.Argument(help="Task to remember")],
     priority: Annotated[
         int,
-        typer.Option("--priority", "-p", help="Priority 0-10 (default: 5=normal, 7=high, 10=critical)"),
+        typer.Option(
+            "--priority", "-p", help="Priority 0-10 (default: 5=normal, 7=high, 10=critical)"
+        ),
     ] = 5,
     project: Annotated[
         str | None,
@@ -356,9 +362,7 @@ def todo(
         list[str] | None,
         typer.Option("--tag", "-t", help="Tags for the task"),
     ] = None,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Quick shortcut to add a TODO memory.
 
@@ -387,7 +391,9 @@ def todo(
         if project:
             proj = await storage.get_project_by_name(project)
             if not proj:
-                return {"error": f"Project '{project}' not found. Create it with: nmem project create \"{project}\""}
+                return {
+                    "error": f"Project '{project}' not found. Create it with: nmem project create \"{project}\""
+                }
             project_id = proj.id
 
         encoder = MemoryEncoder(storage, brain.config)
@@ -451,9 +457,7 @@ def recall(
     show_routing: Annotated[
         bool, typer.Option("--show-routing", "-R", help="Show query routing info")
     ] = False,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Query memories with intelligent routing.
 
@@ -477,7 +481,11 @@ def recall(
         config = get_config()
         storage = await get_storage(config, force_shared=shared)
 
-        brain_id = storage._current_brain_id if hasattr(storage, "_current_brain_id") else config.current_brain
+        brain_id = (
+            storage._current_brain_id
+            if hasattr(storage, "_current_brain_id")
+            else config.current_brain
+        )
         brain = await storage.get_brain(brain_id)
         if not brain:
             return {"error": "No brain configured"}
@@ -562,15 +570,11 @@ def recall(
 
 @app.command()
 def context(
-    limit: Annotated[
-        int, typer.Option("--limit", "-l", help="Number of recent memories")
-    ] = 10,
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Number of recent memories")] = 10,
     fresh_only: Annotated[
         bool, typer.Option("--fresh-only", help="Only include memories < 30 days old")
     ] = False,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Get recent context (for injecting into AI conversations).
 
@@ -617,13 +621,15 @@ def context(
 
             if content:
                 context_parts.append(f"{indicator} [{age_str}] {content}")
-                fiber_data.append({
-                    "id": fiber.id,
-                    "summary": content,
-                    "created_at": fiber.created_at.isoformat(),
-                    "age": age_str,
-                    "freshness": freshness.level.value,
-                })
+                fiber_data.append(
+                    {
+                        "id": fiber.id,
+                        "summary": content,
+                        "created_at": fiber.created_at.isoformat(),
+                        "age": age_str,
+                        "freshness": freshness.level.value,
+                    }
+                )
 
         context_str = "\n".join(context_parts) if context_parts else "No context available."
 
@@ -670,12 +676,8 @@ def list_memories(
         bool,
         typer.Option("--include-expired", help="Include expired memories in results"),
     ] = False,
-    limit: Annotated[
-        int, typer.Option("--limit", "-l", help="Maximum number of results")
-    ] = 20,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 20,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """List memories with filtering by type, priority, project, and status.
 
@@ -735,14 +737,18 @@ def list_memories(
                         if anchor:
                             content = anchor.content
 
-                memories_data.append({
-                    "fiber_id": tm.fiber_id,
-                    "type": tm.memory_type.value,
-                    "priority": tm.priority.name.lower(),
-                    "content": content[:100] + "..." if len(content) > 100 else content,
-                    "expired_days_ago": abs(tm.days_until_expiry) if tm.days_until_expiry else 0,
-                    "created_at": tm.created_at.isoformat(),
-                })
+                memories_data.append(
+                    {
+                        "fiber_id": tm.fiber_id,
+                        "type": tm.memory_type.value,
+                        "priority": tm.priority.name.lower(),
+                        "content": content[:100] + "..." if len(content) > 100 else content,
+                        "expired_days_ago": abs(tm.days_until_expiry)
+                        if tm.days_until_expiry
+                        else 0,
+                        "created_at": tm.created_at.isoformat(),
+                    }
+                )
 
             return {
                 "memories": memories_data,
@@ -772,14 +778,18 @@ def list_memories(
                         content = anchor.content
 
                 freshness = evaluate_freshness(fiber.created_at)
-                memories_data.append({
-                    "fiber_id": fiber.id,
-                    "type": "unknown",
-                    "priority": "normal",
-                    "content": content[:100] + "..." if content and len(content) > 100 else content or "",
-                    "age": format_age(freshness.age_days),
-                    "created_at": fiber.created_at.isoformat(),
-                })
+                memories_data.append(
+                    {
+                        "fiber_id": fiber.id,
+                        "type": "unknown",
+                        "priority": "normal",
+                        "content": content[:100] + "..."
+                        if content and len(content) > 100
+                        else content or "",
+                        "age": format_age(freshness.age_days),
+                        "created_at": fiber.created_at.isoformat(),
+                    }
+                )
 
             return {
                 "memories": memories_data,
@@ -807,16 +817,18 @@ def list_memories(
                 if days is not None:
                     expiry_info = f"{days}d" if days > 0 else "EXPIRED"
 
-            memories_data.append({
-                "fiber_id": tm.fiber_id,
-                "type": tm.memory_type.value,
-                "priority": tm.priority.name.lower(),
-                "content": content[:100] + "..." if len(content) > 100 else content,
-                "age": format_age(freshness.age_days),
-                "expires": expiry_info,
-                "verified": tm.provenance.verified,
-                "created_at": tm.created_at.isoformat(),
-            })
+            memories_data.append(
+                {
+                    "fiber_id": tm.fiber_id,
+                    "type": tm.memory_type.value,
+                    "priority": tm.priority.name.lower(),
+                    "content": content[:100] + "..." if len(content) > 100 else content,
+                    "age": format_age(freshness.age_days),
+                    "expires": expiry_info,
+                    "verified": tm.provenance.verified,
+                    "created_at": tm.created_at.isoformat(),
+                }
+            )
 
         return {
             "memories": memories_data,
@@ -930,9 +942,7 @@ def cleanup(
         bool,
         typer.Option("--force", "-f", help="Skip confirmation"),
     ] = False,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Clean up expired or old memories.
 
@@ -978,12 +988,14 @@ def cleanup(
                     if anchor:
                         content = anchor.content[:50]
 
-            to_delete.append({
-                "fiber_id": tm.fiber_id,
-                "type": tm.memory_type.value,
-                "content": content,
-                "expired_at": tm.expires_at.isoformat() if tm.expires_at else None,
-            })
+            to_delete.append(
+                {
+                    "fiber_id": tm.fiber_id,
+                    "type": tm.memory_type.value,
+                    "content": content,
+                    "expired_at": tm.expires_at.isoformat() if tm.expires_at else None,
+                }
+            )
 
         if dry_run:
             return {
@@ -1054,9 +1066,7 @@ def cleanup(
 
 @app.command()
 def stats(
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Show brain statistics including freshness and memory type analysis.
 
@@ -1086,7 +1096,13 @@ def stats(
 
         # Count by type
         type_counts: dict[str, int] = {}
-        priority_counts: dict[str, int] = {"critical": 0, "high": 0, "normal": 0, "low": 0, "lowest": 0}
+        priority_counts: dict[str, int] = {
+            "critical": 0,
+            "high": 0,
+            "normal": 0,
+            "low": 0,
+            "lowest": 0,
+        }
 
         for tm in typed_memories:
             type_name = tm.memory_type.value
@@ -1148,7 +1164,7 @@ def stats(
             if result.get("expired_count", 0) > 0:
                 typer.secho(
                     f"\n  [!] {result['expired_count']} expired memories - run 'nmem cleanup' to remove",
-                    fg=typer.colors.YELLOW
+                    fg=typer.colors.YELLOW,
                 )
 
         if result.get("freshness") and result["fiber_count"] > 0:
@@ -1165,9 +1181,7 @@ def stats(
 @app.command()
 def check(
     content: Annotated[str, typer.Argument(help="Content to check for sensitive data")],
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Check content for sensitive information without storing.
 
@@ -1178,18 +1192,21 @@ def check(
     matches = check_sensitive_content(content)
 
     if json_output:
-        output_result({
-            "sensitive": len(matches) > 0,
-            "matches": [
-                {
-                    "type": m.type.value,
-                    "pattern": m.pattern_name,
-                    "severity": m.severity,
-                    "redacted": m.redacted(),
-                }
-                for m in matches
-            ],
-        }, True)
+        output_result(
+            {
+                "sensitive": len(matches) > 0,
+                "matches": [
+                    {
+                        "type": m.type.value,
+                        "pattern": m.pattern_name,
+                        "severity": m.severity,
+                        "redacted": m.redacted(),
+                    }
+                    for m in matches
+                ],
+            },
+            True,
+        )
     else:
         if matches:
             typer.echo(format_sensitive_warning(matches))
@@ -1204,9 +1221,7 @@ def check(
 
 @brain_app.command("list")
 def brain_list(
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """List available brains.
 
@@ -1244,7 +1259,10 @@ def brain_use(
     config = get_config()
 
     if name not in config.list_brains():
-        typer.secho(f"Brain '{name}' not found. Create it with: nmem brain create {name}", fg=typer.colors.RED)
+        typer.secho(
+            f"Brain '{name}' not found. Create it with: nmem brain create {name}",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     config.current_brain = name
@@ -1290,14 +1308,13 @@ def brain_create(
 
 @brain_app.command("export")
 def brain_export(
-    output: Annotated[
-        str | None, typer.Option("--output", "-o", help="Output file path")
-    ] = None,
+    output: Annotated[str | None, typer.Option("--output", "-o", help="Output file path")] = None,
     name: Annotated[
         str | None, typer.Option("--name", "-n", help="Brain name (default: current)")
     ] = None,
     exclude_sensitive: Annotated[
-        bool, typer.Option("--exclude-sensitive", "-s", help="Exclude memories with sensitive content")
+        bool,
+        typer.Option("--exclude-sensitive", "-s", help="Exclude memories with sensitive content"),
     ] = False,
 ) -> None:
     """Export brain to JSON file.
@@ -1341,7 +1358,8 @@ def brain_export(
 
             # Also filter synapses connected to excluded neurons
             synapses = [
-                s for s in snapshot.synapses
+                s
+                for s in snapshot.synapses
                 if s["source_id"] not in excluded_neuron_ids
                 and s["target_id"] not in excluded_neuron_ids
             ]
@@ -1373,7 +1391,10 @@ def brain_export(
                 json.dump(export_data, f, indent=2, default=str)
             typer.secho(f"Exported to: {output}", fg=typer.colors.GREEN)
             if excluded_count > 0:
-                typer.secho(f"Excluded {excluded_count} neurons with sensitive content", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"Excluded {excluded_count} neurons with sensitive content",
+                    fg=typer.colors.YELLOW,
+                )
         else:
             typer.echo(json.dumps(export_data, indent=2, default=str))
 
@@ -1386,9 +1407,7 @@ def brain_import(
     name: Annotated[
         str | None, typer.Option("--name", "-n", help="Name for imported brain")
     ] = None,
-    use: Annotated[
-        bool, typer.Option("--use", "-u", help="Switch to imported brain")
-    ] = True,
+    use: Annotated[bool, typer.Option("--use", "-u", help="Switch to imported brain")] = True,
     scan_sensitive: Annotated[
         bool, typer.Option("--scan", help="Scan for sensitive content before importing")
     ] = True,
@@ -1416,7 +1435,10 @@ def brain_import(
                     sensitive_count += 1
 
             if sensitive_count > 0:
-                typer.secho(f"[!] Found {sensitive_count} neurons with potentially sensitive content", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"[!] Found {sensitive_count} neurons with potentially sensitive content",
+                    fg=typer.colors.YELLOW,
+                )
                 if not typer.confirm("Continue importing?"):
                     raise typer.Exit(0)
 
@@ -1424,7 +1446,10 @@ def brain_import(
         config = get_config()
 
         if brain_name in config.list_brains():
-            typer.secho(f"Brain '{brain_name}' already exists. Use --name to specify different name.", fg=typer.colors.RED)
+            typer.secho(
+                f"Brain '{brain_name}' already exists. Use --name to specify different name.",
+                fg=typer.colors.RED,
+            )
             raise typer.Exit(1)
 
         # Create snapshot
@@ -1461,9 +1486,7 @@ def brain_import(
 @brain_app.command("delete")
 def brain_delete(
     name: Annotated[str, typer.Argument(help="Brain name to delete")],
-    force: Annotated[
-        bool, typer.Option("--force", "-f", help="Skip confirmation")
-    ] = False,
+    force: Annotated[bool, typer.Option("--force", "-f", help="Skip confirmation")] = False,
 ) -> None:
     """Delete a brain.
 
@@ -1478,7 +1501,9 @@ def brain_delete(
         raise typer.Exit(1)
 
     if name == config.current_brain:
-        typer.secho("Cannot delete current brain. Switch to another brain first.", fg=typer.colors.RED)
+        typer.secho(
+            "Cannot delete current brain. Switch to another brain first.", fg=typer.colors.RED
+        )
         raise typer.Exit(1)
 
     if not force:
@@ -1497,9 +1522,7 @@ def brain_health(
     name: Annotated[
         str | None, typer.Option("--name", "-n", help="Brain name (default: current)")
     ] = None,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Check brain health (freshness, sensitive content).
 
@@ -1531,11 +1554,13 @@ def brain_health(
         for neuron in neurons:
             matches = check_sensitive_content(neuron.content, min_severity=2)
             if matches:
-                sensitive_neurons.append({
-                    "id": neuron.id,
-                    "type": neuron.type.value,
-                    "sensitive_types": [m.type.value for m in matches],
-                })
+                sensitive_neurons.append(
+                    {
+                        "id": neuron.id,
+                        "type": neuron.type.value,
+                        "sensitive_types": [m.type.value for m in matches],
+                    }
+                )
 
         # Analyze freshness
         created_dates = [f.created_at for f in fibers]
@@ -1552,13 +1577,15 @@ def brain_health(
             issues.append(f"{len(sensitive_neurons)} neurons with sensitive content")
 
         # Penalize for stale memories
-        stale_ratio = (freshness_report.stale + freshness_report.ancient) / max(1, freshness_report.total)
+        stale_ratio = (freshness_report.stale + freshness_report.ancient) / max(
+            1, freshness_report.total
+        )
         if stale_ratio > 0.5:
             health_score -= 20
-            issues.append(f"{stale_ratio*100:.0f}% of memories are stale/ancient")
+            issues.append(f"{stale_ratio * 100:.0f}% of memories are stale/ancient")
         elif stale_ratio > 0.2:
             health_score -= 10
-            issues.append(f"{stale_ratio*100:.0f}% of memories are stale/ancient")
+            issues.append(f"{stale_ratio * 100:.0f}% of memories are stale/ancient")
 
         health_score = max(0, health_score)
 
@@ -1610,7 +1637,10 @@ def brain_health(
 
         if result["sensitive_content"]["count"] > 0:
             typer.echo(f"\nSensitive content: {result['sensitive_content']['count']} neurons")
-            typer.secho("  Run 'nmem brain export --exclude-sensitive' for safe export", fg=typer.colors.BRIGHT_BLACK)
+            typer.secho(
+                "  Run 'nmem brain export --exclude-sensitive' for safe export",
+                fg=typer.colors.BRIGHT_BLACK,
+            )
 
         f = result["freshness"]
         if f["total"] > 0:
@@ -1644,9 +1674,7 @@ def project_create(
         float,
         typer.Option("--priority", "-p", help="Project priority (default: 1.0)"),
     ] = 1.0,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Create a new project for organizing memories.
 
@@ -1716,9 +1744,7 @@ def project_list(
         bool,
         typer.Option("--active", "-a", help="Show only active projects"),
     ] = False,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """List all projects.
 
@@ -1803,9 +1829,7 @@ def project_list(
 @project_app.command("show")
 def project_show(
     name: Annotated[str, typer.Argument(help="Project name")],
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Show project details and its memories.
 
@@ -1837,12 +1861,14 @@ def project_show(
                     if anchor:
                         content = anchor.content
 
-            memories_data.append({
-                "type": tm.memory_type.value,
-                "priority": tm.priority.name.lower(),
-                "content": content[:80] + "..." if len(content) > 80 else content,
-                "created_at": tm.created_at.isoformat(),
-            })
+            memories_data.append(
+                {
+                    "type": tm.memory_type.value,
+                    "priority": tm.priority.name.lower(),
+                    "content": content[:80] + "..." if len(content) > 80 else content,
+                    "created_at": tm.created_at.isoformat(),
+                }
+            )
 
         # Count by type
         type_counts: dict[str, int] = {}
@@ -1925,9 +1951,7 @@ def project_show(
 @project_app.command("delete")
 def project_delete(
     name: Annotated[str, typer.Argument(help="Project name to delete")],
-    force: Annotated[
-        bool, typer.Option("--force", "-f", help="Skip confirmation")
-    ] = False,
+    force: Annotated[bool, typer.Option("--force", "-f", help="Skip confirmation")] = False,
 ) -> None:
     """Delete a project (memories are preserved but unlinked).
 
@@ -1959,6 +1983,7 @@ def project_delete(
 
     # Confirmation
     if not force:
+
         async def _preview() -> int:
             config = get_config()
             storage = await get_storage(config)
@@ -1989,7 +2014,7 @@ def project_delete(
         if result.get("memories_preserved", 0) > 0:
             typer.secho(
                 f"  {result['memories_preserved']} memories preserved (use 'nmem list' to see them)",
-                fg=typer.colors.BRIGHT_BLACK
+                fg=typer.colors.BRIGHT_BLACK,
             )
 
 
@@ -1997,9 +2022,7 @@ def project_delete(
 def project_extend(
     name: Annotated[str, typer.Argument(help="Project name")],
     days: Annotated[int, typer.Argument(help="Days to extend by")],
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Extend a project's deadline.
 
@@ -2043,7 +2066,7 @@ def project_extend(
             if result.get("days_remaining") is not None:
                 typer.secho(
                     f"  New deadline: {result['new_end_date'][:10]} ({result['days_remaining']} days remaining)",
-                    fg=typer.colors.BRIGHT_BLACK
+                    fg=typer.colors.BRIGHT_BLACK,
                 )
 
 
@@ -2088,7 +2111,9 @@ def shared_enable(
     typer.echo(f"  Timeout: {timeout}s")
     typer.echo("")
     typer.secho("All memory commands will now use the remote server.", fg=typer.colors.BRIGHT_BLACK)
-    typer.secho("Use 'nmem shared disable' to switch back to local storage.", fg=typer.colors.BRIGHT_BLACK)
+    typer.secho(
+        "Use 'nmem shared disable' to switch back to local storage.", fg=typer.colors.BRIGHT_BLACK
+    )
 
 
 @shared_app.command("disable")
@@ -2108,9 +2133,7 @@ def shared_disable() -> None:
 
 @shared_app.command("status")
 def shared_status(
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Show shared mode status and configuration.
 
@@ -2150,7 +2173,9 @@ def shared_test() -> None:
     config = get_config()
 
     if not config.shared.server_url:
-        typer.secho("No server URL configured. Use 'nmem shared enable <url>' first.", fg=typer.colors.RED)
+        typer.secho(
+            "No server URL configured. Use 'nmem shared enable <url>' first.", fg=typer.colors.RED
+        )
         raise typer.Exit(1)
 
     async def _test() -> dict:
@@ -2200,9 +2225,7 @@ def shared_sync(
     direction: Annotated[
         str, typer.Option("--direction", "-d", help="Sync direction: push, pull, or both")
     ] = "both",
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Manually sync local brain with remote server.
 
@@ -2219,7 +2242,9 @@ def shared_sync(
     config = get_config()
 
     if not config.shared.server_url:
-        typer.secho("No server URL configured. Use 'nmem shared enable <url>' first.", fg=typer.colors.RED)
+        typer.secho(
+            "No server URL configured. Use 'nmem shared enable <url>' first.", fg=typer.colors.RED
+        )
         raise typer.Exit(1)
 
     async def _sync() -> dict:
@@ -2278,14 +2303,20 @@ def shared_sync(
         typer.echo(json.dumps(result, indent=2))
     else:
         if result.get("pushed"):
-            typer.secho(f"[PUSHED] {result.get('neurons_pushed', 0)} neurons, "
-                       f"{result.get('synapses_pushed', 0)} synapses, "
-                       f"{result.get('fibers_pushed', 0)} fibers", fg=typer.colors.GREEN)
+            typer.secho(
+                f"[PUSHED] {result.get('neurons_pushed', 0)} neurons, "
+                f"{result.get('synapses_pushed', 0)} synapses, "
+                f"{result.get('fibers_pushed', 0)} fibers",
+                fg=typer.colors.GREEN,
+            )
 
         if result.get("pulled"):
-            typer.secho(f"[PULLED] {result.get('neurons_pulled', 0)} neurons, "
-                       f"{result.get('synapses_pulled', 0)} synapses, "
-                       f"{result.get('fibers_pulled', 0)} fibers", fg=typer.colors.GREEN)
+            typer.secho(
+                f"[PULLED] {result.get('neurons_pulled', 0)} neurons, "
+                f"{result.get('synapses_pulled', 0)} synapses, "
+                f"{result.get('fibers_pulled', 0)} fibers",
+                fg=typer.colors.GREEN,
+            )
         elif result.get("pull_error"):
             typer.secho(f"[PULL FAILED] {result['pull_error']}", fg=typer.colors.YELLOW)
 

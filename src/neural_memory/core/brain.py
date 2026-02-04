@@ -33,16 +33,10 @@ class BrainConfig:
         """Create a new config with updated values."""
         return BrainConfig(
             decay_rate=kwargs.get("decay_rate", self.decay_rate),
-            reinforcement_delta=kwargs.get(
-                "reinforcement_delta", self.reinforcement_delta
-            ),
-            activation_threshold=kwargs.get(
-                "activation_threshold", self.activation_threshold
-            ),
+            reinforcement_delta=kwargs.get("reinforcement_delta", self.reinforcement_delta),
+            activation_threshold=kwargs.get("activation_threshold", self.activation_threshold),
             max_spread_hops=kwargs.get("max_spread_hops", self.max_spread_hops),
-            max_context_tokens=kwargs.get(
-                "max_context_tokens", self.max_context_tokens
-            ),
+            max_context_tokens=kwargs.get("max_context_tokens", self.max_context_tokens),
             default_synapse_weight=kwargs.get(
                 "default_synapse_weight", self.default_synapse_weight
             ),

@@ -68,9 +68,7 @@ class TestQueryFlow:
         assert result.context  # Should have some context
 
     @pytest.mark.asyncio
-    async def test_query_with_time_constraint(
-        self, storage_with_memories: InMemoryStorage
-    ) -> None:
+    async def test_query_with_time_constraint(self, storage_with_memories: InMemoryStorage) -> None:
         """Test query with temporal constraint."""
         brain = await storage_with_memories.get_brain(
             storage_with_memories._current_brain_id  # type: ignore
@@ -90,9 +88,7 @@ class TestQueryFlow:
         assert result.depth_used is not None
 
     @pytest.mark.asyncio
-    async def test_query_with_entity(
-        self, storage_with_memories: InMemoryStorage
-    ) -> None:
+    async def test_query_with_entity(self, storage_with_memories: InMemoryStorage) -> None:
         """Test query mentioning a specific entity."""
         brain = await storage_with_memories.get_brain(
             storage_with_memories._current_brain_id  # type: ignore
@@ -109,9 +105,7 @@ class TestQueryFlow:
         assert result.neurons_activated > 0
 
     @pytest.mark.asyncio
-    async def test_query_depth_levels(
-        self, storage_with_memories: InMemoryStorage
-    ) -> None:
+    async def test_query_depth_levels(self, storage_with_memories: InMemoryStorage) -> None:
         """Test different depth levels."""
         brain = await storage_with_memories.get_brain(
             storage_with_memories._current_brain_id  # type: ignore
@@ -133,9 +127,7 @@ class TestQueryFlow:
         assert deep.depth_used == DepthLevel.DEEP
 
     @pytest.mark.asyncio
-    async def test_query_returns_context(
-        self, storage_with_memories: InMemoryStorage
-    ) -> None:
+    async def test_query_returns_context(self, storage_with_memories: InMemoryStorage) -> None:
         """Test that query returns formatted context."""
         brain = await storage_with_memories.get_brain(
             storage_with_memories._current_brain_id  # type: ignore
@@ -155,9 +147,7 @@ class TestQueryFlow:
         assert len(result.context) > 0
 
     @pytest.mark.asyncio
-    async def test_query_subgraph_extraction(
-        self, storage_with_memories: InMemoryStorage
-    ) -> None:
+    async def test_query_subgraph_extraction(self, storage_with_memories: InMemoryStorage) -> None:
         """Test that query extracts relevant subgraph."""
         brain = await storage_with_memories.get_brain(
             storage_with_memories._current_brain_id  # type: ignore

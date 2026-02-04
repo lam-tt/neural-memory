@@ -621,9 +621,7 @@ class SharedStorage(NeuralStorage):
             time_start=datetime.fromisoformat(data["time_start"])
             if data.get("time_start")
             else None,
-            time_end=datetime.fromisoformat(data["time_end"])
-            if data.get("time_end")
-            else None,
+            time_end=datetime.fromisoformat(data["time_end"]) if data.get("time_end") else None,
             coherence=data.get("coherence", 0.0),
             salience=data.get("salience", 0.0),
             frequency=data.get("frequency", 0),

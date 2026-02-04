@@ -188,10 +188,10 @@ class TestFreshnessEvaluation:
         """Test analyze_freshness with mixed ages."""
         now = datetime.now()
         dates = [
-            now - timedelta(days=2),   # Fresh
+            now - timedelta(days=2),  # Fresh
             now - timedelta(days=20),  # Recent
             now - timedelta(days=50),  # Aging
-            now - timedelta(days=200), # Stale
+            now - timedelta(days=200),  # Stale
         ]
         report = analyze_freshness(dates, now)
 

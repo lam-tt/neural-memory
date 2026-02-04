@@ -14,11 +14,11 @@ from enum import StrEnum
 class FreshnessLevel(StrEnum):
     """Freshness levels for memories."""
 
-    FRESH = "fresh"          # < 7 days
-    RECENT = "recent"        # 7-30 days
-    AGING = "aging"          # 30-90 days
-    STALE = "stale"          # 90-365 days
-    ANCIENT = "ancient"      # > 365 days
+    FRESH = "fresh"  # < 7 days
+    RECENT = "recent"  # 7-30 days
+    AGING = "aging"  # 30-90 days
+    STALE = "stale"  # 90-365 days
+    ANCIENT = "ancient"  # > 365 days
 
 
 @dataclass

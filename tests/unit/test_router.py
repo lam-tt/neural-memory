@@ -182,14 +182,18 @@ class TestQueryRouter:
         temporal_signals = [s for s in decision.signals if "temporal" in s]
         assert len(temporal_signals) > 0
 
-    def test_confidence_high_for_clear_query(self, router: QueryRouter, parser: QueryParser) -> None:
+    def test_confidence_high_for_clear_query(
+        self, router: QueryRouter, parser: QueryParser
+    ) -> None:
         """Test high confidence for clear queries."""
         stimulus = parser.parse("Why did this happen? What was the reason?")
         decision = router.route(stimulus)
 
         assert decision.confidence >= RouteConfidence.HIGH
 
-    def test_confidence_lower_for_ambiguous_query(self, router: QueryRouter, parser: QueryParser) -> None:
+    def test_confidence_lower_for_ambiguous_query(
+        self, router: QueryRouter, parser: QueryParser
+    ) -> None:
         """Test lower confidence for ambiguous queries."""
         stimulus = parser.parse("stuff")
         decision = router.route(stimulus)

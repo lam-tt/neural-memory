@@ -294,7 +294,10 @@ class TestSuggestMemoryType:
         """Test suggesting WORKFLOW type."""
         assert suggest_memory_type("Deploy flow: test -> stage -> prod") == MemoryType.WORKFLOW
         assert suggest_memory_type("CI/CD pipeline runs on push") == MemoryType.WORKFLOW
-        assert suggest_memory_type("Review process: create PR, get approval, merge") == MemoryType.WORKFLOW
+        assert (
+            suggest_memory_type("Review process: create PR, get approval, merge")
+            == MemoryType.WORKFLOW
+        )
 
     def test_suggests_instruction(self) -> None:
         """Test suggesting INSTRUCTION type."""
@@ -304,7 +307,9 @@ class TestSuggestMemoryType:
 
     def test_suggests_reference(self) -> None:
         """Test suggesting REFERENCE type."""
-        assert suggest_memory_type("Documentation at https://docs.example.com") == MemoryType.REFERENCE
+        assert (
+            suggest_memory_type("Documentation at https://docs.example.com") == MemoryType.REFERENCE
+        )
         assert suggest_memory_type("See docs for more info") == MemoryType.REFERENCE
 
     def test_suggests_insight(self) -> None:

@@ -53,7 +53,9 @@ class TestTypedMemoryStorage:
     """Tests for TypedMemory CRUD operations."""
 
     @pytest.mark.asyncio
-    async def test_add_typed_memory(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_add_typed_memory(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test adding a typed memory."""
         storage, fiber = storage_with_fiber
 
@@ -78,7 +80,9 @@ class TestTypedMemoryStorage:
             await storage.add_typed_memory(typed_mem)
 
     @pytest.mark.asyncio
-    async def test_get_typed_memory(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_get_typed_memory(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test getting a typed memory."""
         storage, fiber = storage_with_fiber
 
@@ -102,7 +106,9 @@ class TestTypedMemoryStorage:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_find_typed_memories_by_type(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_find_typed_memories_by_type(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test finding typed memories by type."""
         storage, fiber = storage_with_fiber
 
@@ -122,7 +128,9 @@ class TestTypedMemoryStorage:
         assert len(results) == 0
 
     @pytest.mark.asyncio
-    async def test_find_typed_memories_by_priority(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_find_typed_memories_by_priority(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test finding typed memories by minimum priority."""
         storage, fiber = storage_with_fiber
 
@@ -142,7 +150,9 @@ class TestTypedMemoryStorage:
         assert len(results) == 0
 
     @pytest.mark.asyncio
-    async def test_find_typed_memories_excludes_expired(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_find_typed_memories_excludes_expired(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test that find excludes expired memories by default."""
         storage, fiber = storage_with_fiber
 
@@ -163,7 +173,9 @@ class TestTypedMemoryStorage:
         assert len(results) == 1
 
     @pytest.mark.asyncio
-    async def test_update_typed_memory(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_update_typed_memory(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test updating a typed memory."""
         storage, fiber = storage_with_fiber
 
@@ -183,7 +195,9 @@ class TestTypedMemoryStorage:
         assert result.priority == Priority.CRITICAL
 
     @pytest.mark.asyncio
-    async def test_delete_typed_memory(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_delete_typed_memory(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test deleting a typed memory."""
         storage, fiber = storage_with_fiber
 
@@ -207,7 +221,9 @@ class TestTypedMemoryStorage:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_get_expired_memories(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_get_expired_memories(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test getting expired memories."""
         storage, fiber = storage_with_fiber
 
@@ -228,7 +244,9 @@ class TestTypedMemoryExportImport:
     """Tests for TypedMemory export/import."""
 
     @pytest.mark.asyncio
-    async def test_export_includes_typed_memories(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_export_includes_typed_memories(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test that export includes typed memories."""
         storage, fiber = storage_with_fiber
 
@@ -250,7 +268,9 @@ class TestTypedMemoryExportImport:
         assert tm_data[0]["priority"] == Priority.HIGH.value
 
     @pytest.mark.asyncio
-    async def test_import_restores_typed_memories(self, storage_with_fiber: tuple[InMemoryStorage, Fiber]) -> None:
+    async def test_import_restores_typed_memories(
+        self, storage_with_fiber: tuple[InMemoryStorage, Fiber]
+    ) -> None:
         """Test that import restores typed memories."""
         storage, fiber = storage_with_fiber
 

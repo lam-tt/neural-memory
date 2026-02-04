@@ -109,7 +109,10 @@ class TestSpreadingActivation:
         assert "b" in results or "e" in results
 
         # D is 3 hops away, should not be reached
-        assert "d" not in results or results.get("d", ActivationResult("", 0, 0, [], "")).hop_distance <= 1
+        assert (
+            "d" not in results
+            or results.get("d", ActivationResult("", 0, 0, [], "")).hop_distance <= 1
+        )
 
     @pytest.mark.asyncio
     async def test_activate_multiple_anchors(
@@ -134,9 +137,7 @@ class TestSpreadingActivation:
         """Test that activating from multiple sets finds intersections."""
         activator = SpreadingActivation(storage_with_graph, config)
 
-        results, intersections = await activator.activate_from_multiple(
-            [["a"], ["d"]], max_hops=4
-        )
+        results, intersections = await activator.activate_from_multiple([["a"], ["d"]], max_hops=4)
 
         # C is reachable from both A and D
         assert "c" in intersections or len(intersections) > 0

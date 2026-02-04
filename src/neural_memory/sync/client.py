@@ -275,9 +275,7 @@ class SyncClient:
         if handler is None:
             del self._handlers[event_type]
         else:
-            self._handlers[event_type] = [
-                h for h in self._handlers[event_type] if h != handler
-            ]
+            self._handlers[event_type] = [h for h in self._handlers[event_type] if h != handler]
 
     async def push_event(
         self,

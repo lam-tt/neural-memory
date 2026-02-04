@@ -255,7 +255,9 @@ class TemporalExtractor:
     }
 
     # Vietnamese time patterns with numbers
-    VI_NUMBERED_PATTERNS: list[tuple[str, Callable[[datetime, re.Match[str]], tuple[datetime, datetime]], TimeGranularity]] = [
+    VI_NUMBERED_PATTERNS: list[
+        tuple[str, Callable[[datetime, re.Match[str]], tuple[datetime, datetime]], TimeGranularity]
+    ] = [
         # Hour patterns: "3 giờ", "15h", "3h chiều"
         (
             r"(\d{1,2})\s*(?:giờ|h|g)(?:\s*(sáng|chiều|tối))?",

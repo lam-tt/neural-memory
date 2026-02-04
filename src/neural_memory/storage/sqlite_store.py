@@ -192,8 +192,7 @@ class SQLiteStorage(NeuralStorage):
             row = await cursor.fetchone()
             if row is None:
                 await self._conn.execute(
-                    "INSERT INTO schema_version (version) VALUES (?)",
-                    (SCHEMA_VERSION,)
+                    "INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,)
                 )
 
         await self._conn.commit()
@@ -391,9 +390,7 @@ class SQLiteStorage(NeuralStorage):
             activation_level=row["activation_level"],
             access_frequency=row["access_frequency"],
             last_activated=(
-                datetime.fromisoformat(row["last_activated"])
-                if row["last_activated"]
-                else None
+                datetime.fromisoformat(row["last_activated"]) if row["last_activated"] else None
             ),
             decay_rate=row["decay_rate"],
             created_at=datetime.fromisoformat(row["created_at"]),
@@ -538,9 +535,7 @@ class SQLiteStorage(NeuralStorage):
             metadata=json.loads(row["metadata"]),
             reinforced_count=row["reinforced_count"],
             last_activated=(
-                datetime.fromisoformat(row["last_activated"])
-                if row["last_activated"]
-                else None
+                datetime.fromisoformat(row["last_activated"]) if row["last_activated"] else None
             ),
             created_at=datetime.fromisoformat(row["created_at"]),
         )
@@ -694,9 +689,7 @@ class SQLiteStorage(NeuralStorage):
 
         return None
 
-    async def _build_path_result(
-        self, path: list[tuple[str, str]]
-    ) -> list[tuple[Neuron, Synapse]]:
+    async def _build_path_result(self, path: list[tuple[str, str]]) -> list[tuple[Neuron, Synapse]]:
         """Build path result from neuron/synapse IDs."""
         result: list[tuple[Neuron, Synapse]] = []
         for neuron_id, synapse_id in path:
@@ -864,14 +857,8 @@ class SQLiteStorage(NeuralStorage):
             neuron_ids=set(json.loads(row["neuron_ids"])),
             synapse_ids=set(json.loads(row["synapse_ids"])),
             anchor_neuron_id=row["anchor_neuron_id"],
-            time_start=(
-                datetime.fromisoformat(row["time_start"])
-                if row["time_start"]
-                else None
-            ),
-            time_end=(
-                datetime.fromisoformat(row["time_end"]) if row["time_end"] else None
-            ),
+            time_start=(datetime.fromisoformat(row["time_start"]) if row["time_start"] else None),
+            time_end=(datetime.fromisoformat(row["time_end"]) if row["time_end"] else None),
             coherence=row["coherence"],
             salience=row["salience"],
             frequency=row["frequency"],
@@ -1030,9 +1017,7 @@ class SQLiteStorage(NeuralStorage):
         )
 
         if cursor.rowcount == 0:
-            raise ValueError(
-                f"TypedMemory for fiber {typed_memory.fiber_id} does not exist"
-            )
+            raise ValueError(f"TypedMemory for fiber {typed_memory.fiber_id} does not exist")
 
         await conn.commit()
 
@@ -1085,11 +1070,7 @@ class SQLiteStorage(NeuralStorage):
             memory_type=MemoryType(row["memory_type"]),
             priority=Priority(row["priority"]),
             provenance=provenance,
-            expires_at=(
-                datetime.fromisoformat(row["expires_at"])
-                if row["expires_at"]
-                else None
-            ),
+            expires_at=(datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None),
             project_id=row["project_id"],
             tags=frozenset(json.loads(row["tags"])),
             metadata=json.loads(row["metadata"]),
@@ -1238,9 +1219,7 @@ class SQLiteStorage(NeuralStorage):
             name=row["name"],
             description=row["description"],
             start_date=datetime.fromisoformat(row["start_date"]),
-            end_date=(
-                datetime.fromisoformat(row["end_date"]) if row["end_date"] else None
-            ),
+            end_date=(datetime.fromisoformat(row["end_date"]) if row["end_date"] else None),
             tags=frozenset(json.loads(row["tags"])),
             priority=row["priority"],
             metadata=json.loads(row["metadata"]),
@@ -1259,13 +1238,15 @@ class SQLiteStorage(NeuralStorage):
             (
                 brain.id,
                 brain.name,
-                json.dumps({
-                    "decay_rate": brain.config.decay_rate,
-                    "reinforcement_delta": brain.config.reinforcement_delta,
-                    "activation_threshold": brain.config.activation_threshold,
-                    "max_spread_hops": brain.config.max_spread_hops,
-                    "max_context_tokens": brain.config.max_context_tokens,
-                }),
+                json.dumps(
+                    {
+                        "decay_rate": brain.config.decay_rate,
+                        "reinforcement_delta": brain.config.reinforcement_delta,
+                        "activation_threshold": brain.config.activation_threshold,
+                        "max_spread_hops": brain.config.max_spread_hops,
+                        "max_context_tokens": brain.config.max_context_tokens,
+                    }
+                ),
                 brain.owner_id,
                 1 if brain.is_public else 0,
                 json.dumps(brain.shared_with),
@@ -1278,9 +1259,7 @@ class SQLiteStorage(NeuralStorage):
     async def get_brain(self, brain_id: str) -> Brain | None:
         conn = self._ensure_conn()
 
-        async with conn.execute(
-            "SELECT * FROM brains WHERE id = ?", (brain_id,)
-        ) as cursor:
+        async with conn.execute("SELECT * FROM brains WHERE id = ?", (brain_id,)) as cursor:
             row = await cursor.fetchone()
             if row is None:
                 return None
@@ -1317,57 +1296,57 @@ class SQLiteStorage(NeuralStorage):
 
         # Export neurons
         neurons = []
-        async with conn.execute(
-            "SELECT * FROM neurons WHERE brain_id = ?", (brain_id,)
-        ) as cursor:
+        async with conn.execute("SELECT * FROM neurons WHERE brain_id = ?", (brain_id,)) as cursor:
             async for row in cursor:
-                neurons.append({
-                    "id": row["id"],
-                    "type": row["type"],
-                    "content": row["content"],
-                    "metadata": json.loads(row["metadata"]),
-                    "created_at": row["created_at"],
-                })
+                neurons.append(
+                    {
+                        "id": row["id"],
+                        "type": row["type"],
+                        "content": row["content"],
+                        "metadata": json.loads(row["metadata"]),
+                        "created_at": row["created_at"],
+                    }
+                )
 
         # Export synapses
         synapses = []
-        async with conn.execute(
-            "SELECT * FROM synapses WHERE brain_id = ?", (brain_id,)
-        ) as cursor:
+        async with conn.execute("SELECT * FROM synapses WHERE brain_id = ?", (brain_id,)) as cursor:
             async for row in cursor:
-                synapses.append({
-                    "id": row["id"],
-                    "source_id": row["source_id"],
-                    "target_id": row["target_id"],
-                    "type": row["type"],
-                    "weight": row["weight"],
-                    "direction": row["direction"],
-                    "metadata": json.loads(row["metadata"]),
-                    "reinforced_count": row["reinforced_count"],
-                    "created_at": row["created_at"],
-                })
+                synapses.append(
+                    {
+                        "id": row["id"],
+                        "source_id": row["source_id"],
+                        "target_id": row["target_id"],
+                        "type": row["type"],
+                        "weight": row["weight"],
+                        "direction": row["direction"],
+                        "metadata": json.loads(row["metadata"]),
+                        "reinforced_count": row["reinforced_count"],
+                        "created_at": row["created_at"],
+                    }
+                )
 
         # Export fibers
         fibers = []
-        async with conn.execute(
-            "SELECT * FROM fibers WHERE brain_id = ?", (brain_id,)
-        ) as cursor:
+        async with conn.execute("SELECT * FROM fibers WHERE brain_id = ?", (brain_id,)) as cursor:
             async for row in cursor:
-                fibers.append({
-                    "id": row["id"],
-                    "neuron_ids": json.loads(row["neuron_ids"]),
-                    "synapse_ids": json.loads(row["synapse_ids"]),
-                    "anchor_neuron_id": row["anchor_neuron_id"],
-                    "time_start": row["time_start"],
-                    "time_end": row["time_end"],
-                    "coherence": row["coherence"],
-                    "salience": row["salience"],
-                    "frequency": row["frequency"],
-                    "summary": row["summary"],
-                    "tags": json.loads(row["tags"]),
-                    "metadata": json.loads(row["metadata"]),
-                    "created_at": row["created_at"],
-                })
+                fibers.append(
+                    {
+                        "id": row["id"],
+                        "neuron_ids": json.loads(row["neuron_ids"]),
+                        "synapse_ids": json.loads(row["synapse_ids"]),
+                        "anchor_neuron_id": row["anchor_neuron_id"],
+                        "time_start": row["time_start"],
+                        "time_end": row["time_end"],
+                        "coherence": row["coherence"],
+                        "salience": row["salience"],
+                        "frequency": row["frequency"],
+                        "summary": row["summary"],
+                        "tags": json.loads(row["tags"]),
+                        "metadata": json.loads(row["metadata"]),
+                        "created_at": row["created_at"],
+                    }
+                )
 
         # Export typed memories
         typed_memories = []
@@ -1375,35 +1354,37 @@ class SQLiteStorage(NeuralStorage):
             "SELECT * FROM typed_memories WHERE brain_id = ?", (brain_id,)
         ) as cursor:
             async for row in cursor:
-                typed_memories.append({
-                    "fiber_id": row["fiber_id"],
-                    "memory_type": row["memory_type"],
-                    "priority": row["priority"],
-                    "provenance": json.loads(row["provenance"]),
-                    "expires_at": row["expires_at"],
-                    "project_id": row["project_id"],
-                    "tags": json.loads(row["tags"]),
-                    "metadata": json.loads(row["metadata"]),
-                    "created_at": row["created_at"],
-                })
+                typed_memories.append(
+                    {
+                        "fiber_id": row["fiber_id"],
+                        "memory_type": row["memory_type"],
+                        "priority": row["priority"],
+                        "provenance": json.loads(row["provenance"]),
+                        "expires_at": row["expires_at"],
+                        "project_id": row["project_id"],
+                        "tags": json.loads(row["tags"]),
+                        "metadata": json.loads(row["metadata"]),
+                        "created_at": row["created_at"],
+                    }
+                )
 
         # Export projects
         projects = []
-        async with conn.execute(
-            "SELECT * FROM projects WHERE brain_id = ?", (brain_id,)
-        ) as cursor:
+        async with conn.execute("SELECT * FROM projects WHERE brain_id = ?", (brain_id,)) as cursor:
             async for row in cursor:
-                projects.append({
-                    "id": row["id"],
-                    "name": row["name"],
-                    "description": row["description"],
-                    "start_date": row["start_date"],
-                    "end_date": row["end_date"],
-                    "tags": json.loads(row["tags"]),
-                    "priority": row["priority"],
-                    "metadata": json.loads(row["metadata"]),
-                    "created_at": row["created_at"],
-                })
+                projects.append(
+                    {
+                        "id": row["id"],
+                        "name": row["name"],
+                        "description": row["description"],
+                        "start_date": row["start_date"],
+                        "end_date": row["end_date"],
+                        "tags": json.loads(row["tags"]),
+                        "priority": row["priority"],
+                        "metadata": json.loads(row["metadata"]),
+                        "created_at": row["created_at"],
+                    }
+                )
 
         return BrainSnapshot(
             brain_id=brain_id,
@@ -1602,15 +1583,11 @@ class SQLiteStorage(NeuralStorage):
         conn = self._ensure_conn()
 
         # Delete in order to respect foreign keys
-        await conn.execute(
-            "DELETE FROM typed_memories WHERE brain_id = ?", (brain_id,)
-        )
+        await conn.execute("DELETE FROM typed_memories WHERE brain_id = ?", (brain_id,))
         await conn.execute("DELETE FROM projects WHERE brain_id = ?", (brain_id,))
         await conn.execute("DELETE FROM fibers WHERE brain_id = ?", (brain_id,))
         await conn.execute("DELETE FROM synapses WHERE brain_id = ?", (brain_id,))
-        await conn.execute(
-            "DELETE FROM neuron_states WHERE brain_id = ?", (brain_id,)
-        )
+        await conn.execute("DELETE FROM neuron_states WHERE brain_id = ?", (brain_id,))
         await conn.execute("DELETE FROM neurons WHERE brain_id = ?", (brain_id,))
         await conn.execute("DELETE FROM brains WHERE id = ?", (brain_id,))
 

@@ -14,12 +14,8 @@ class EncodeRequest(BaseModel):
     """Request to encode a new memory."""
 
     content: str = Field(..., description="The content to encode as a memory")
-    timestamp: datetime | None = Field(
-        None, description="When this memory occurred (default: now)"
-    )
-    metadata: dict[str, Any] | None = Field(
-        None, description="Additional metadata to attach"
-    )
+    timestamp: datetime | None = Field(None, description="When this memory occurred (default: now)")
+    metadata: dict[str, Any] | None = Field(None, description="Additional metadata to attach")
     tags: list[str] | None = Field(None, description="Tags for categorization")
 
 
@@ -39,9 +35,7 @@ class QueryRequest(BaseModel):
         le=5000,
         description="Maximum tokens in returned context",
     )
-    include_subgraph: bool = Field(
-        False, description="Whether to include subgraph details"
-    )
+    include_subgraph: bool = Field(False, description="Whether to include subgraph details")
     reference_time: datetime | None = Field(
         None, description="Reference time for temporal parsing (default: now)"
     )
@@ -96,9 +90,7 @@ class QueryResponse(BaseModel):
     fibers_matched: list[str] = Field(..., description="IDs of matched fibers")
     context: str = Field(..., description="Formatted context for injection")
     latency_ms: float = Field(..., description="Retrieval latency in milliseconds")
-    subgraph: SubgraphResponse | None = Field(
-        None, description="Subgraph details (if requested)"
-    )
+    subgraph: SubgraphResponse | None = Field(None, description="Subgraph details (if requested)")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
