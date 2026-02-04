@@ -2768,6 +2768,150 @@ def prompt(
         typer.echo(text)
 
 
+@app.command(name="export")
+def export_brain_cmd(
+    output: Annotated[
+        str, typer.Argument(help="Output file path (e.g., my-brain.json)")
+    ],
+    brain: Annotated[
+        str | None, typer.Option("--brain", "-b", help="Brain to export (default: current)")
+    ] = None,
+) -> None:
+    """Export brain to JSON file for backup or sharing.
+
+    Examples:
+        nmem export backup.json           # Export current brain
+        nmem export work.json -b work     # Export specific brain
+    """
+    from pathlib import Path
+
+    from neural_memory.unified_config import get_config, get_shared_storage
+
+    async def _export() -> None:
+        config = get_config()
+        brain_name = brain or config.current_brain
+        storage = await get_shared_storage(brain_name)
+
+        snapshot = await storage.export_brain(brain_name)
+
+        output_path = Path(output)
+        export_data = {
+            "brain_id": snapshot.brain_id,
+            "brain_name": snapshot.brain_name,
+            "exported_at": snapshot.exported_at.isoformat(),
+            "version": snapshot.version,
+            "neurons": snapshot.neurons,
+            "synapses": snapshot.synapses,
+            "fibers": snapshot.fibers,
+            "config": snapshot.config,
+            "metadata": snapshot.metadata,
+        }
+
+        output_path.write_text(json.dumps(export_data, indent=2, default=str))
+
+        typer.echo(f"Exported brain '{brain_name}' to {output_path}")
+        typer.echo(f"  Neurons: {len(snapshot.neurons)}")
+        typer.echo(f"  Synapses: {len(snapshot.synapses)}")
+        typer.echo(f"  Fibers: {len(snapshot.fibers)}")
+
+    asyncio.run(_export())
+
+
+@app.command(name="import")
+def import_brain_cmd(
+    input_file: Annotated[
+        str, typer.Argument(help="Input file path (e.g., my-brain.json)")
+    ],
+    brain: Annotated[
+        str | None, typer.Option("--brain", "-b", help="Target brain name (default: from file)")
+    ] = None,
+    merge: Annotated[
+        bool, typer.Option("--merge", "-m", help="Merge with existing brain")
+    ] = False,
+) -> None:
+    """Import brain from JSON file.
+
+    Examples:
+        nmem import backup.json           # Import as original brain name
+        nmem import backup.json -b new    # Import as 'new' brain
+        nmem import backup.json --merge   # Merge into existing brain
+    """
+    from pathlib import Path
+
+    from neural_memory.core.brain import BrainSnapshot
+    from neural_memory.unified_config import get_shared_storage
+
+    async def _import() -> None:
+        input_path = Path(input_file)
+        if not input_path.exists():
+            typer.echo(f"Error: File not found: {input_path}", err=True)
+            raise typer.Exit(1)
+
+        data = json.loads(input_path.read_text())
+
+        brain_name = brain or data.get("brain_name", "imported")
+        storage = await get_shared_storage(brain_name)
+
+        snapshot = BrainSnapshot(
+            brain_id=data.get("brain_id", brain_name),
+            brain_name=data["brain_name"],
+            exported_at=datetime.fromisoformat(data["exported_at"]),
+            version=data["version"],
+            neurons=data["neurons"],
+            synapses=data["synapses"],
+            fibers=data["fibers"],
+            config=data["config"],
+            metadata=data.get("metadata", {}),
+        )
+
+        imported_id = await storage.import_brain(snapshot, brain_name)
+
+        typer.echo(f"Imported brain '{brain_name}' from {input_path}")
+        typer.echo(f"  Neurons: {len(snapshot.neurons)}")
+        typer.echo(f"  Synapses: {len(snapshot.synapses)}")
+        typer.echo(f"  Fibers: {len(snapshot.fibers)}")
+
+    asyncio.run(_import())
+
+
+@app.command()
+def serve(
+    host: Annotated[
+        str, typer.Option("--host", "-h", help="Host to bind to")
+    ] = "127.0.0.1",
+    port: Annotated[
+        int, typer.Option("--port", "-p", help="Port to bind to")
+    ] = 8000,
+    reload: Annotated[
+        bool, typer.Option("--reload", "-r", help="Enable auto-reload for development")
+    ] = False,
+) -> None:
+    """Run the NeuralMemory API server.
+
+    Examples:
+        nmem serve                    # Run on localhost:8000
+        nmem serve -p 9000            # Run on port 9000
+        nmem serve --host 0.0.0.0     # Expose to network
+        nmem serve --reload           # Development mode
+    """
+    try:
+        import uvicorn
+    except ImportError:
+        typer.echo("Error: uvicorn not installed. Run: pip install neural-memory[server]", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"Starting NeuralMemory API server on http://{host}:{port}")
+    typer.echo("API docs: http://{host}:{port}/docs")
+
+    uvicorn.run(
+        "neural_memory.server.app:create_app",
+        host=host,
+        port=port,
+        reload=reload,
+        factory=True,
+    )
+
+
 @app.command()
 def version() -> None:
     """Show version information."""
