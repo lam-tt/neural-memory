@@ -4,14 +4,20 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from neural_memory import __version__
 from neural_memory.server.models import HealthResponse
 from neural_memory.server.routes import brain_router, memory_router, sync_router
 from neural_memory.storage.memory_store import InMemoryStorage
+
+# Static files directory
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 @asynccontextmanager
@@ -90,7 +96,69 @@ def create_app(
             "version": __version__,
             "docs": "/docs",
             "health": "/health",
+            "ui": "/ui",
         }
+
+    # Graph visualization API
+    @app.get("/api/graph", tags=["visualization"])
+    async def get_graph_data() -> dict:
+        """Get graph data for visualization."""
+        from neural_memory.unified_config import get_shared_storage
+
+        storage = await get_shared_storage()
+
+        # Get all data
+        neurons = await storage.find_neurons()
+        synapses = await storage.get_all_synapses()
+        fibers = await storage.get_fibers(limit=1000)
+
+        stats = {
+            "neuron_count": len(neurons),
+            "synapse_count": len(synapses),
+            "fiber_count": len(fibers),
+        }
+
+        return {
+            "neurons": [
+                {
+                    "id": n.id,
+                    "type": n.type.value,
+                    "content": n.content,
+                    "metadata": n.metadata,
+                }
+                for n in neurons
+            ],
+            "synapses": [
+                {
+                    "id": s.id,
+                    "source_id": s.source_id,
+                    "target_id": s.target_id,
+                    "type": s.type.value,
+                    "weight": s.weight,
+                    "direction": s.direction.value,
+                }
+                for s in synapses
+            ],
+            "fibers": [
+                {
+                    "id": f.id,
+                    "summary": f.summary,
+                    "neuron_count": len(f.neuron_ids) if f.neuron_ids else 0,
+                }
+                for f in fibers
+            ],
+            "stats": stats,
+        }
+
+    # UI endpoint
+    @app.get("/ui", tags=["visualization"])
+    async def ui() -> FileResponse:
+        """Serve the visualization UI."""
+        return FileResponse(STATIC_DIR / "index.html")
+
+    # Mount static files (for potential future assets)
+    if STATIC_DIR.exists():
+        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     return app
 

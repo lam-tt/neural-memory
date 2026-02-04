@@ -603,7 +603,7 @@ async def handle_message(server: MCPServer, message: dict[str, Any]) -> dict[str
             "id": msg_id,
             "result": {
                 "protocolVersion": "2024-11-05",
-                "serverInfo": {"name": "neural-memory", "version": "0.3.0"},
+                "serverInfo": {"name": "neural-memory", "version": "0.4.0"},
                 "capabilities": {"tools": {}, "resources": {}},
             },
         }

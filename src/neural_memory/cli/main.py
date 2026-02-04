@@ -2901,7 +2901,8 @@ def serve(
         raise typer.Exit(1)
 
     typer.echo(f"Starting NeuralMemory API server on http://{host}:{port}")
-    typer.echo("API docs: http://{host}:{port}/docs")
+    typer.echo(f"  UI:   http://{host}:{port}/ui")
+    typer.echo(f"  Docs: http://{host}:{port}/docs")
 
     uvicorn.run(
         "neural_memory.server.app:create_app",
