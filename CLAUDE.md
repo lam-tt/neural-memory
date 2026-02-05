@@ -38,11 +38,62 @@ vscode-extension/
 └── test/                   # Unit, integration, perf tests
 ```
 
-## File Size Rules (ENFORCED)
+---
+
+## 1. Risk Classification
+
+Every code change MUST be classified before execution.
+
+### Type A — Safe (Apply Immediately)
+
+- New files or functions with no dependencies
+- Comments, documentation, docstrings
+- Test files
+- Configuration files in isolated scopes
+
+### Type B — Caution (Show Diff + Verify)
+
+- Logic changes to existing functions
+- Refactoring of working code
+- Parameter additions with defaults
+- Bug fixes in non-core modules
+
+**Protocol:**
+1. Show diff clearly
+2. Verify no regression in related functions
+3. Identify all callers of modified functions
+
+### Type C — Critical (Full Impact Analysis + User Approval)
+
+- Core logic (storage layer, engine, encoder, retrieval)
+- Database schema changes (SQLite migrations)
+- API signature changes (MCP tools, REST endpoints)
+- Global configuration changes
+- Breaking public API changes
+
+**Protocol:**
+1. Document potential side effects BEFORE coding
+2. Provide fallback/rollback plan
+3. Present alternatives (safer vs current approach)
+4. Get explicit user approval
+
+### Protocol Rules
+
+| Rule | Description |
+|------|-------------|
+| **Burden of Proof** | Modifying working code requires evidence (error, performance, security) — "looks better" is NOT valid |
+| **One Change Per Edit** | Never mix refactoring with bug fixes — isolate changes for clean debugging |
+| **Syntax Verification** | Run `python -m py_compile <file>` after EVERY Python edit |
+| **Complete Bodies** | NEVER use placeholder comments like `# ... (skipping)` — always write FULL function bodies |
+
+---
+
+## 2. File Size Rules (ENFORCED)
 
 ### Hard Limits
 - **Python files: 500 lines max**
 - **TypeScript files: 500 lines max**
+- **Functions: 50 lines max**
 - **No exceptions.** If a file approaches 400 lines and you need to add >50 lines, split first.
 
 ### Before Adding Code
@@ -56,7 +107,9 @@ vscode-extension/
 - Move tests accordingly
 - Verify all imports resolve after split
 
-## Module Boundaries
+---
+
+## 3. Module Boundaries
 
 ### CLI Commands (`cli/commands/`)
 Each file registers commands on the main `app` or a sub-`Typer`:
@@ -84,7 +137,9 @@ Each file registers commands on the main `app` or a sub-`Typer`:
 - `activation.py` — Neuron activation spreading
 - `lifecycle.py` — Decay and lifecycle management
 
-## Adding New CLI Commands
+---
+
+## 4. Adding New CLI Commands
 
 1. Identify which command group the new command belongs to
 2. Check the target file's line count
@@ -108,7 +163,9 @@ Each file registers commands on the main `app` or a sub-`Typer`:
    ```
 5. Register in `main.py` if it's a new module
 
-## Coding Standards (Python)
+---
+
+## 5. Coding Standards (Python)
 
 ### Required
 - Type hints on ALL function signatures
@@ -117,36 +174,117 @@ Each file registers commands on the main `app` or a sub-`Typer`:
 - `snake_case` functions/variables, `PascalCase` classes, `SCREAMING_SNAKE` constants
 - Parameterized SQL queries only (never f-strings in SQL)
 - No hardcoded secrets — use environment variables
+- Functions under 50 lines
+- One class per file for major classes
+- Organize by feature/domain, not by type
 
 ### Forbidden
 - Files over 500 lines
+- Functions over 50 lines
 - Bare `except:` clauses
 - `print()` statements (use `typer.echo` in CLI, `logger` elsewhere)
-- Mutable default arguments
+- Mutable default arguments (`def f(items=[])` → use `def f(items: list | None = None)`)
 - Global mutable state
 - `# type: ignore` without explanation
+- Blocking calls in async functions (`requests.get` → use `httpx` or `aiohttp`)
+- Placeholder comments (`# ... rest of code ...`, `# skipping`)
+
+### Security
+- Parameterized SQL queries — NEVER `f"SELECT ... {user_input}"`
+- No hardcoded secrets — use `os.getenv()` with validation
+- Validate external input at system boundaries
+- Path traversal prevention — resolve paths and check `is_relative_to(base_dir)`
+- No sensitive data in logs — mask or omit API keys, passwords, tokens
 
 ### Patterns
 - Async inner function pattern for CLI commands (see above)
 - Config/storage access via `get_config()` / `get_storage(config)`
 - JSON or human-readable output via `output_result(data, as_json)`
 - Error returns as `{"error": "message"}` dicts
+- Frozen dataclasses for immutable data models (`@dataclass(frozen=True)`)
 
-## Coding Standards (TypeScript)
+---
+
+## 6. Coding Standards (TypeScript)
 
 ### Required
 - Strict TypeScript (`strict: true` in tsconfig)
 - Immutable patterns — spread operators, no mutation
 - Error handling with try/catch on all async operations
 - VS Code API disposal pattern (`context.subscriptions.push(...)`)
+- Functions under 50 lines
 
 ### Forbidden
 - Files over 500 lines
+- Functions over 50 lines
 - `console.log` (use `OutputChannel` for VS Code extension logging)
 - `any` type without justification
 - Direct DOM manipulation in webviews (use message passing)
 
-## Testing
+---
+
+## 7. Validation & Verification
+
+### After EVERY Python Edit
+
+```bash
+# 1. Syntax check
+python -m py_compile <filename>
+
+# 2. Import check
+python -c "from neural_memory.<module> import <name>; print('OK')"
+```
+
+### After Type B/C Changes
+
+```bash
+# 3. Full test suite
+pytest tests/
+
+# 4. Lint + type check
+ruff check src/
+mypy src/ --ignore-missing-imports
+```
+
+### After TypeScript Edits
+
+```bash
+cd vscode-extension
+npx tsc --noEmit                   # Type check
+npm run test:unit                  # Unit tests
+```
+
+---
+
+## 8. Code Quality Checklist
+
+Run before completing ANY task:
+
+### Correctness
+- [ ] Risk classified (Type A/B/C) and protocol followed
+- [ ] `python -m py_compile <file>` passed (Python) or `tsc --noEmit` passed (TypeScript)
+- [ ] No placeholder comments left in code
+- [ ] Import verification passed
+- [ ] All callers of modified functions identified
+
+### Style
+- [ ] Type hints on ALL functions
+- [ ] Immutable patterns used (no mutation)
+- [ ] Specific exceptions (no bare `except`)
+- [ ] No blocking calls in async functions
+- [ ] Functions < 50 lines
+- [ ] Files < 500 lines
+
+### Security
+- [ ] No hardcoded secrets
+- [ ] Parameterized SQL queries (no f-strings in SQL)
+- [ ] External input validated at system boundaries
+- [ ] No sensitive data in logs
+- [ ] No path traversal vulnerabilities
+
+---
+
+## 9. Testing
 
 - Unit tests: `test/unit/` — pure logic, no VS Code dependency
 - Integration tests: `test/suite/` — requires VS Code test runner
@@ -154,7 +292,9 @@ Each file registers commands on the main `app` or a sub-`Typer`:
 - CLI tests: `tests/cli/` — pytest
 - Run unit tests: `npm run test:unit` (extension), `pytest` (Python)
 
-## Build & Verify
+---
+
+## 10. Build & Verify
 
 ### Python
 ```bash
@@ -171,9 +311,12 @@ npx tsc --noEmit                   # Type check
 npm run test:unit                  # Unit tests
 ```
 
-## Git Conventions
+---
+
+## 11. Git Conventions
 
 - Commit format: `<type>: <description>` (feat, fix, refactor, docs, test, chore, perf, ci)
 - No `Co-Authored-By` attribution (disabled in settings)
 - Commit only when explicitly asked
 - Never force push to main
+- One change per commit — never mix refactoring with bug fixes

@@ -12,17 +12,15 @@ from neural_memory.core.fiber import Fiber
 from neural_memory.core.neuron import Neuron, NeuronState, NeuronType
 from neural_memory.core.synapse import Direction, Synapse, SynapseType
 from neural_memory.storage.base import NeuralStorage
+from neural_memory.storage.shared_store_collections import SharedFiberBrainMixin, SharedStorageError
+from neural_memory.storage.shared_store_mappers import (
+    dict_to_neuron,
+    dict_to_neuron_state,
+    dict_to_synapse,
+)
 
 
-class SharedStorageError(Exception):
-    """Error from shared storage operations."""
-
-    def __init__(self, message: str, status_code: int | None = None) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-
-
-class SharedStorage(NeuralStorage):
+class SharedStorage(SharedFiberBrainMixin, NeuralStorage):
     """
     HTTP-based storage client that connects to a remote NeuralMemory server.
 
@@ -179,7 +177,7 @@ class SharedStorage(NeuralStorage):
         """Get a neuron by ID."""
         try:
             result = await self._request("GET", f"/memory/neurons/{neuron_id}")
-            return self._dict_to_neuron(result)
+            return dict_to_neuron(result)
         except SharedStorageError as e:
             if e.status_code == 404:
                 return None
@@ -206,7 +204,7 @@ class SharedStorage(NeuralStorage):
             params["time_end"] = time_range[1].isoformat()
 
         result = await self._request("GET", "/memory/neurons", params=params)
-        return [self._dict_to_neuron(n) for n in result.get("neurons", [])]
+        return [dict_to_neuron(n) for n in result.get("neurons", [])]
 
     async def update_neuron(self, neuron: Neuron) -> None:
         """Update an existing neuron."""
@@ -233,7 +231,7 @@ class SharedStorage(NeuralStorage):
         """Get neuron activation state."""
         try:
             result = await self._request("GET", f"/memory/neurons/{neuron_id}/state")
-            return self._dict_to_neuron_state(result)
+            return dict_to_neuron_state(result)
         except SharedStorageError as e:
             if e.status_code == 404:
                 return None
@@ -275,7 +273,7 @@ class SharedStorage(NeuralStorage):
         """Get a synapse by ID."""
         try:
             result = await self._request("GET", f"/memory/synapses/{synapse_id}")
-            return self._dict_to_synapse(result)
+            return dict_to_synapse(result)
         except SharedStorageError as e:
             if e.status_code == 404:
                 return None
@@ -300,7 +298,7 @@ class SharedStorage(NeuralStorage):
             params["min_weight"] = min_weight
 
         result = await self._request("GET", "/memory/synapses", params=params)
-        return [self._dict_to_synapse(s) for s in result.get("synapses", [])]
+        return [dict_to_synapse(s) for s in result.get("synapses", [])]
 
     async def update_synapse(self, synapse: Synapse) -> None:
         """Update an existing synapse."""
@@ -344,8 +342,8 @@ class SharedStorage(NeuralStorage):
 
         neighbors = []
         for item in result.get("neighbors", []):
-            neuron = self._dict_to_neuron(item["neuron"])
-            synapse = self._dict_to_synapse(item["synapse"])
+            neuron = dict_to_neuron(item["neuron"])
+            synapse = dict_to_synapse(item["synapse"])
             neighbors.append((neuron, synapse))
         return neighbors
 
@@ -368,185 +366,14 @@ class SharedStorage(NeuralStorage):
 
             path = []
             for item in result["path"]:
-                neuron = self._dict_to_neuron(item["neuron"])
-                synapse = self._dict_to_synapse(item["synapse"])
+                neuron = dict_to_neuron(item["neuron"])
+                synapse = dict_to_synapse(item["synapse"])
                 path.append((neuron, synapse))
             return path
         except SharedStorageError as e:
             if e.status_code == 404:
                 return None
             raise
-
-    # ========== Fiber Operations ==========
-
-    async def add_fiber(self, fiber: Fiber) -> str:
-        """Add a fiber."""
-        data = {
-            "id": fiber.id,
-            "neuron_ids": list(fiber.neuron_ids),
-            "synapse_ids": list(fiber.synapse_ids),
-            "anchor_neuron_id": fiber.anchor_neuron_id,
-            "time_start": fiber.time_start.isoformat() if fiber.time_start else None,
-            "time_end": fiber.time_end.isoformat() if fiber.time_end else None,
-            "coherence": fiber.coherence,
-            "salience": fiber.salience,
-            "frequency": fiber.frequency,
-            "summary": fiber.summary,
-            "tags": list(fiber.tags),
-            "created_at": fiber.created_at.isoformat(),
-        }
-        result = await self._request("POST", "/memory/fibers", json_data=data)
-        return result.get("id", fiber.id)
-
-    async def get_fiber(self, fiber_id: str) -> Fiber | None:
-        """Get a fiber by ID."""
-        try:
-            result = await self._request("GET", f"/memory/fiber/{fiber_id}")
-            return self._dict_to_fiber(result)
-        except SharedStorageError as e:
-            if e.status_code == 404:
-                return None
-            raise
-
-    async def find_fibers(
-        self,
-        contains_neuron: str | None = None,
-        time_overlaps: tuple[datetime, datetime] | None = None,
-        tags: set[str] | None = None,
-        min_salience: float | None = None,
-        limit: int = 100,
-    ) -> list[Fiber]:
-        """Find fibers matching criteria."""
-        params: dict[str, Any] = {"limit": limit}
-        if contains_neuron:
-            params["contains_neuron"] = contains_neuron
-        if time_overlaps:
-            params["time_start"] = time_overlaps[0].isoformat()
-            params["time_end"] = time_overlaps[1].isoformat()
-        if tags:
-            params["tags"] = ",".join(tags)
-        if min_salience is not None:
-            params["min_salience"] = min_salience
-
-        result = await self._request("GET", "/memory/fibers", params=params)
-        return [self._dict_to_fiber(f) for f in result.get("fibers", [])]
-
-    async def update_fiber(self, fiber: Fiber) -> None:
-        """Update an existing fiber."""
-        data = {
-            "neuron_ids": list(fiber.neuron_ids),
-            "synapse_ids": list(fiber.synapse_ids),
-            "coherence": fiber.coherence,
-            "salience": fiber.salience,
-            "frequency": fiber.frequency,
-            "summary": fiber.summary,
-            "tags": list(fiber.tags),
-        }
-        await self._request("PUT", f"/memory/fibers/{fiber.id}", json_data=data)
-
-    async def delete_fiber(self, fiber_id: str) -> bool:
-        """Delete a fiber."""
-        try:
-            await self._request("DELETE", f"/memory/fibers/{fiber_id}")
-            return True
-        except SharedStorageError as e:
-            if e.status_code == 404:
-                return False
-            raise
-
-    async def get_fibers(
-        self,
-        limit: int = 10,
-        order_by: Literal["created_at", "salience", "frequency"] = "created_at",
-        descending: bool = True,
-    ) -> list[Fiber]:
-        """Get fibers with ordering."""
-        params = {
-            "limit": limit,
-            "order_by": order_by,
-            "descending": descending,
-        }
-        result = await self._request("GET", "/memory/fibers", params=params)
-        return [self._dict_to_fiber(f) for f in result.get("fibers", [])]
-
-    # ========== Brain Operations ==========
-
-    async def save_brain(self, brain: Brain) -> None:
-        """Save brain metadata."""
-        # Check if brain exists
-        existing = await self.get_brain(brain.id)
-        if existing:
-            # Update
-            data = {
-                "name": brain.name,
-                "is_public": brain.is_public,
-            }
-            await self._request("PUT", f"/brain/{brain.id}", json_data=data)
-        else:
-            # Create
-            data = {
-                "name": brain.name,
-                "owner_id": brain.owner_id,
-                "is_public": brain.is_public,
-                "config": {
-                    "decay_rate": brain.config.decay_rate,
-                    "reinforcement_delta": brain.config.reinforcement_delta,
-                    "activation_threshold": brain.config.activation_threshold,
-                    "max_spread_hops": brain.config.max_spread_hops,
-                    "max_context_tokens": brain.config.max_context_tokens,
-                },
-            }
-            await self._request("POST", "/brain/create", json_data=data)
-
-    async def get_brain(self, brain_id: str) -> Brain | None:
-        """Get brain metadata."""
-        try:
-            result = await self._request("GET", f"/brain/{brain_id}")
-            return self._dict_to_brain(result)
-        except SharedStorageError as e:
-            if e.status_code == 404:
-                return None
-            raise
-
-    async def export_brain(self, brain_id: str) -> BrainSnapshot:
-        """Export brain as snapshot."""
-        result = await self._request("GET", f"/brain/{brain_id}/export")
-        return BrainSnapshot(
-            brain_id=result["brain_id"],
-            brain_name=result["brain_name"],
-            exported_at=datetime.fromisoformat(result["exported_at"]),
-            version=result["version"],
-            neurons=result["neurons"],
-            synapses=result["synapses"],
-            fibers=result["fibers"],
-            config=result["config"],
-            metadata=result.get("metadata", {}),
-        )
-
-    async def import_brain(
-        self,
-        snapshot: BrainSnapshot,
-        target_brain_id: str | None = None,
-    ) -> str:
-        """Import a brain snapshot."""
-        brain_id = target_brain_id or snapshot.brain_id
-        data = {
-            "brain_id": snapshot.brain_id,
-            "brain_name": snapshot.brain_name,
-            "exported_at": snapshot.exported_at.isoformat(),
-            "version": snapshot.version,
-            "neurons": snapshot.neurons,
-            "synapses": snapshot.synapses,
-            "fibers": snapshot.fibers,
-            "config": snapshot.config,
-            "metadata": snapshot.metadata,
-        }
-        result = await self._request(
-            "POST",
-            f"/brain/{brain_id}/import",
-            json_data=data,
-        )
-        return result.get("id", brain_id)
 
     # ========== Statistics ==========
 
@@ -564,87 +391,3 @@ class SharedStorage(NeuralStorage):
     async def clear(self, brain_id: str) -> None:
         """Clear all data for a brain."""
         await self._request("DELETE", f"/brain/{brain_id}")
-
-    # ========== Conversion Helpers ==========
-
-    def _dict_to_neuron(self, data: dict[str, Any]) -> Neuron:
-        """Convert API response dict to Neuron."""
-        return Neuron(
-            id=data["id"],
-            type=NeuronType(data["type"]),
-            content=data["content"],
-            metadata=data.get("metadata", {}),
-            created_at=datetime.fromisoformat(data["created_at"]),
-        )
-
-    def _dict_to_neuron_state(self, data: dict[str, Any]) -> NeuronState:
-        """Convert API response dict to NeuronState."""
-        return NeuronState(
-            neuron_id=data["neuron_id"],
-            activation_level=data.get("activation_level", 0.0),
-            access_frequency=data.get("access_frequency", 0),
-            last_activated=datetime.fromisoformat(data["last_activated"])
-            if data.get("last_activated")
-            else None,
-            decay_rate=data.get("decay_rate", 0.1),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else datetime.now(),
-        )
-
-    def _dict_to_synapse(self, data: dict[str, Any]) -> Synapse:
-        """Convert API response dict to Synapse."""
-        return Synapse(
-            id=data["id"],
-            source_id=data["source_id"],
-            target_id=data["target_id"],
-            type=SynapseType(data["type"]),
-            weight=data.get("weight", 0.5),
-            direction=Direction(data.get("direction", "uni")),
-            metadata=data.get("metadata", {}),
-            reinforced_count=data.get("reinforced_count", 0),
-            last_activated=datetime.fromisoformat(data["last_activated"])
-            if data.get("last_activated")
-            else None,
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else datetime.now(),
-        )
-
-    def _dict_to_fiber(self, data: dict[str, Any]) -> Fiber:
-        """Convert API response dict to Fiber."""
-        return Fiber(
-            id=data["id"],
-            neuron_ids=frozenset(data.get("neuron_ids", [])),
-            synapse_ids=frozenset(data.get("synapse_ids", [])),
-            anchor_neuron_id=data["anchor_neuron_id"],
-            time_start=datetime.fromisoformat(data["time_start"])
-            if data.get("time_start")
-            else None,
-            time_end=datetime.fromisoformat(data["time_end"]) if data.get("time_end") else None,
-            coherence=data.get("coherence", 0.0),
-            salience=data.get("salience", 0.0),
-            frequency=data.get("frequency", 0),
-            summary=data.get("summary"),
-            tags=frozenset(data.get("tags", [])),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else datetime.now(),
-        )
-
-    def _dict_to_brain(self, data: dict[str, Any]) -> Brain:
-        """Convert API response dict to Brain."""
-        return Brain(
-            id=data["id"],
-            name=data["name"],
-            config=BrainConfig(),  # Default config, actual config fetched from server
-            owner_id=data.get("owner_id"),
-            is_public=data.get("is_public", False),
-            shared_with=data.get("shared_with", []),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else datetime.now(),
-            updated_at=datetime.fromisoformat(data["updated_at"])
-            if data.get("updated_at")
-            else datetime.now(),
-        )

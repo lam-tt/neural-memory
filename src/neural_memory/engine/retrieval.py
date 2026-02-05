@@ -3,83 +3,20 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
 from datetime import datetime
-from enum import IntEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from neural_memory.core.fiber import Fiber
 from neural_memory.core.neuron import NeuronType
-from neural_memory.engine.activation import (
-    ActivationResult,
-    CoActivation,
-    ReflexActivation,
-    SpreadingActivation,
-)
+from neural_memory.engine.activation import ActivationResult, SpreadingActivation
+from neural_memory.engine.reflex_activation import CoActivation, ReflexActivation
+from neural_memory.engine.retrieval_context import format_context, reconstitute_answer
+from neural_memory.engine.retrieval_types import DepthLevel, RetrievalResult, Subgraph
 from neural_memory.extraction.parser import QueryIntent, QueryParser, Stimulus
 
 if TYPE_CHECKING:
     from neural_memory.core.brain import BrainConfig
     from neural_memory.storage.base import NeuralStorage
-
-
-class DepthLevel(IntEnum):
-    """
-    Depth levels for retrieval queries.
-
-    Higher depth = more exploration but slower retrieval.
-    """
-
-    INSTANT = 0  # Who, where, what (1 hop) - Simple fact retrieval
-    CONTEXT = 1  # Before/after (2-3 hops) - Contextual information
-    HABIT = 2  # Patterns (cross-time) - Recurring patterns
-    DEEP = 3  # Emotions, causality (full) - Deep analysis
-
-
-@dataclass
-class Subgraph:
-    """
-    Extracted subgraph from activation.
-
-    Attributes:
-        neuron_ids: IDs of neurons in the subgraph
-        synapse_ids: IDs of synapses connecting neurons
-        anchor_ids: IDs of the anchor neurons that started activation
-    """
-
-    neuron_ids: list[str]
-    synapse_ids: list[str]
-    anchor_ids: list[str]
-
-
-@dataclass
-class RetrievalResult:
-    """
-    Result of a retrieval query.
-
-    Attributes:
-        answer: Reconstructed answer text (if determinable)
-        confidence: Confidence in the answer (0.0 - 1.0)
-        depth_used: Which depth level was used
-        neurons_activated: Number of neurons that were activated
-        fibers_matched: IDs of fibers that matched the query
-        subgraph: The extracted relevant subgraph
-        context: Formatted context for injection into agent prompts
-        latency_ms: Time taken for retrieval in milliseconds
-        co_activations: Neurons that co-activated (Hebbian binding)
-        metadata: Additional retrieval metadata
-    """
-
-    answer: str | None
-    confidence: float
-    depth_used: DepthLevel
-    neurons_activated: int
-    fibers_matched: list[str]
-    subgraph: Subgraph
-    context: str
-    latency_ms: float
-    co_activations: list[CoActivation] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ReflexPipeline:
@@ -200,13 +137,15 @@ class ReflexPipeline:
             n for n in intersections if n not in co_activated_ids
         ]
 
-        answer, confidence = await self._reconstitute_answer(
+        answer, confidence = await reconstitute_answer(
+            self._storage,
             activations,
             all_intersections,
             stimulus,
         )
 
-        context = await self._format_context(
+        context = await format_context(
+            self._storage,
             activations,
             fibers_matched,
             max_tokens,
@@ -278,16 +217,6 @@ class ReflexPipeline:
         1. Run reflex trail activation through fiber pathways (fast, focused)
         2. Run limited classic BFS to discover neurons outside fibers (coverage)
         3. Merge results: reflex activations are primary, classic fills gaps
-
-        This avoids the low-recall problem where reflex mode misses neurons
-        connected through synapses that aren't in any fiber pathway.
-
-        Args:
-            anchor_sets: Anchor neuron lists (time-first)
-            reference_time: Reference time for time factor
-
-        Returns:
-            Tuple of (activations, intersection IDs, co-activations)
         """
         # Get all fibers containing any anchor neurons
         all_anchors = [a for anchors in anchor_sets for a in anchors]
@@ -322,8 +251,6 @@ class ReflexPipeline:
         )
 
         # --- Phase 2: Limited classic BFS (discovery) ---
-        # Use reduced hops (half of max) so classic is fast and
-        # only fills nearby coverage gaps, not dominating results.
         discovery_hops = max(1, self._config.max_spread_hops // 2)
         classic_activations, classic_intersections = (
             await self._activator.activate_from_multiple(
@@ -333,8 +260,6 @@ class ReflexPipeline:
         )
 
         # --- Phase 3: Merge results ---
-        # Reflex results are primary; classic fills gaps with a dampening
-        # factor so fiber-conducted signals rank higher than BFS discovery.
         discovery_dampen = 0.6
         activations = dict(reflex_activations)
 
@@ -343,7 +268,6 @@ class ReflexPipeline:
             dampened_level = classic_result.activation_level * discovery_dampen
 
             if existing is None:
-                # New discovery: add with dampened activation
                 activations[neuron_id] = ActivationResult(
                     neuron_id=neuron_id,
                     activation_level=dampened_level,
@@ -352,7 +276,6 @@ class ReflexPipeline:
                     source_anchor=classic_result.source_anchor,
                 )
             elif dampened_level > existing.activation_level:
-                # Classic found a stronger path (rare but possible)
                 activations[neuron_id] = ActivationResult(
                     neuron_id=neuron_id,
                     activation_level=dampened_level,
@@ -361,7 +284,7 @@ class ReflexPipeline:
                     source_anchor=classic_result.source_anchor,
                 )
 
-        # Merge intersections: co-activated neurons first, then classic intersections
+        # Merge intersections
         co_intersection_ids = [
             neuron_id
             for co in co_activations
@@ -382,17 +305,11 @@ class ReflexPipeline:
         """
         Find anchor neurons with time as primary signal.
 
-        Time-first activation means temporal context constrains
-        all other signals. Time anchors get priority weight.
-
         Priority order:
         1. Time neurons (weight 1.0) - temporal context
         2. Entity neurons (weight 0.8) - who/what
         3. Action neurons (weight 0.6) - verbs
         4. Concept neurons (weight 0.4) - abstract
-
-        Returns:
-            List of anchor neuron lists, with time anchors first
         """
         anchor_sets: list[list[str]] = []
 
@@ -509,112 +426,6 @@ class ReflexPipeline:
 
         return fibers[:10]  # Limit to top 10
 
-    async def _reconstitute_answer(
-        self,
-        activations: dict[str, ActivationResult],
-        intersections: list[str],
-        stimulus: Stimulus,
-    ) -> tuple[str | None, float]:
-        """
-        Attempt to reconstitute an answer from activated neurons.
-
-        Returns (answer_text, confidence)
-        """
-        if not activations:
-            return None, 0.0
-
-        # Find the most relevant neurons
-        candidates: list[tuple[str, float]] = []
-
-        # Prioritize intersection neurons
-        for neuron_id in intersections:
-            if neuron_id in activations:
-                candidates.append((neuron_id, activations[neuron_id].activation_level * 1.5))
-
-        # Add highly activated neurons
-        for neuron_id, result in activations.items():
-            if neuron_id not in intersections:
-                candidates.append((neuron_id, result.activation_level))
-
-        # Sort by score
-        candidates.sort(key=lambda x: x[1], reverse=True)
-
-        if not candidates:
-            return None, 0.0
-
-        # Get the top neuron's content as answer
-        top_neuron_id = candidates[0][0]
-        top_neuron = await self._storage.get_neuron(top_neuron_id)
-
-        if top_neuron is None:
-            return None, 0.0
-
-        # Confidence based on activation and intersection count
-        confidence = min(1.0, candidates[0][1])
-        if intersections:
-            confidence = min(1.0, confidence + 0.1 * len(intersections))
-
-        return top_neuron.content, confidence
-
-    async def _format_context(
-        self,
-        activations: dict[str, ActivationResult],
-        fibers: list[Fiber],
-        max_tokens: int,
-    ) -> str:
-        """Format activated memories into context for agent injection."""
-        lines: list[str] = []
-        token_estimate = 0
-
-        # Add fiber summaries first
-        if fibers:
-            lines.append("## Relevant Memories\n")
-
-            for fiber in fibers[:5]:
-                if fiber.summary:
-                    line = f"- {fiber.summary}"
-                else:
-                    anchor = await self._storage.get_neuron(fiber.anchor_neuron_id)
-                    if anchor:
-                        line = f"- {anchor.content}"
-                    else:
-                        continue
-
-                token_estimate += len(line.split())
-                if token_estimate > max_tokens:
-                    break
-
-                lines.append(line)
-
-        # Add individual activated neurons
-        if token_estimate < max_tokens:
-            lines.append("\n## Related Information\n")
-
-            sorted_activations = sorted(
-                activations.values(),
-                key=lambda a: a.activation_level,
-                reverse=True,
-            )
-
-            for result in sorted_activations[:20]:
-                neuron = await self._storage.get_neuron(result.neuron_id)
-                if neuron is None:
-                    continue
-
-                # Skip time neurons in context (they're implicit)
-                if neuron.type == NeuronType.TIME:
-                    continue
-
-                line = f"- [{neuron.type.value}] {neuron.content}"
-                token_estimate += len(line.split())
-
-                if token_estimate > max_tokens:
-                    break
-
-                lines.append(line)
-
-        return "\n".join(lines)
-
     async def query_with_stimulus(
         self,
         stimulus: Stimulus,
@@ -625,16 +436,7 @@ class ReflexPipeline:
         Execute retrieval with a pre-parsed stimulus.
 
         Useful when you want to control the parsing or reuse a stimulus.
-
-        Args:
-            stimulus: Pre-parsed stimulus
-            depth: Retrieval depth
-            max_tokens: Maximum tokens in context
-
-        Returns:
-            RetrievalResult
         """
-        # Reconstruct query string for the main method
         return await self.query(
             stimulus.raw_query,
             depth=depth,

@@ -256,7 +256,8 @@ class TestHybridFallback:
         assert brain is not None
 
         # Test the activation engine directly to avoid parser dependency
-        from neural_memory.engine.activation import ReflexActivation, SpreadingActivation
+        from neural_memory.engine.activation import SpreadingActivation
+        from neural_memory.engine.reflex_activation import ReflexActivation
 
         reflex = ReflexActivation(storage_with_partial_fibers, brain.config)
         classic = SpreadingActivation(storage_with_partial_fibers, brain.config)

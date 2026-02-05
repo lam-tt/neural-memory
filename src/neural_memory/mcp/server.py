@@ -34,7 +34,9 @@ from typing import TYPE_CHECKING, Any
 from neural_memory.core.memory_types import MemoryType, Priority, TypedMemory, suggest_memory_type
 from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
+from neural_memory.mcp.auto_capture import analyze_text_for_memories
 from neural_memory.mcp.prompt import get_prompt_for_mcp, get_system_prompt
+from neural_memory.mcp.tool_schemas import get_tool_schemas
 from neural_memory.unified_config import get_config, get_shared_storage
 
 if TYPE_CHECKING:
@@ -86,139 +88,7 @@ class MCPServer:
 
     def get_tools(self) -> list[dict[str, Any]]:
         """Return list of available MCP tools."""
-        return [
-            {
-                "name": "nmem_remember",
-                "description": "Store a memory in NeuralMemory. Use this to remember facts, decisions, insights, todos, errors, and other information that should persist across sessions.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "content": {"type": "string", "description": "The content to remember"},
-                        "type": {
-                            "type": "string",
-                            "enum": [
-                                "fact",
-                                "decision",
-                                "preference",
-                                "todo",
-                                "insight",
-                                "context",
-                                "instruction",
-                                "error",
-                                "workflow",
-                                "reference",
-                            ],
-                            "description": "Memory type (auto-detected if not specified)",
-                        },
-                        "priority": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 10,
-                            "description": "Priority 0-10 (5=normal, 10=critical)",
-                        },
-                        "tags": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Tags for categorization",
-                        },
-                        "expires_days": {
-                            "type": "integer",
-                            "description": "Days until memory expires",
-                        },
-                    },
-                    "required": ["content"],
-                },
-            },
-            {
-                "name": "nmem_recall",
-                "description": "Query memories from NeuralMemory. Use this to recall past information, decisions, patterns, or context relevant to the current task.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "The query to search memories"},
-                        "depth": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 3,
-                            "description": "Search depth: 0=instant, 1=context, 2=habit, 3=deep",
-                        },
-                        "max_tokens": {
-                            "type": "integer",
-                            "description": "Maximum tokens in response (default: 500)",
-                        },
-                        "min_confidence": {
-                            "type": "number",
-                            "minimum": 0,
-                            "maximum": 1,
-                            "description": "Minimum confidence threshold",
-                        },
-                    },
-                    "required": ["query"],
-                },
-            },
-            {
-                "name": "nmem_context",
-                "description": "Get recent context from NeuralMemory. Use this at the start of tasks to inject relevant recent memories.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "limit": {
-                            "type": "integer",
-                            "description": "Number of recent memories (default: 10)",
-                        },
-                        "fresh_only": {
-                            "type": "boolean",
-                            "description": "Only include memories < 30 days old",
-                        },
-                    },
-                },
-            },
-            {
-                "name": "nmem_todo",
-                "description": "Quick shortcut to add a TODO memory with 30-day expiry.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "task": {"type": "string", "description": "The task to remember"},
-                        "priority": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 10,
-                            "description": "Priority 0-10 (default: 5)",
-                        },
-                    },
-                    "required": ["task"],
-                },
-            },
-            {
-                "name": "nmem_stats",
-                "description": "Get brain statistics including memory counts and freshness.",
-                "inputSchema": {"type": "object", "properties": {}},
-            },
-            {
-                "name": "nmem_auto",
-                "description": "Auto-capture memories from text. Use 'process' to analyze and save in one call. Call this after important conversations to capture decisions, errors, todos, and facts automatically.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "action": {
-                            "type": "string",
-                            "enum": ["status", "enable", "disable", "analyze", "process"],
-                            "description": "Action: 'process' analyzes and saves, 'analyze' only detects",
-                        },
-                        "text": {
-                            "type": "string",
-                            "description": "Text to analyze (required for 'analyze' and 'process')",
-                        },
-                        "save": {
-                            "type": "boolean",
-                            "description": "Force save even if auto-capture disabled (for 'analyze')",
-                        },
-                    },
-                    "required": ["action"],
-                },
-            },
-        ]
+        return get_tool_schemas()
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Execute an MCP tool call."""
@@ -417,13 +287,17 @@ class MCPServer:
             if not text:
                 return {"error": "Text required for analyze action"}
 
-            # Analyze text for potential memories
-            detected = self._analyze_text_for_memories(text)
+            detected = analyze_text_for_memories(
+                text,
+                capture_decisions=self.config.auto.capture_decisions,
+                capture_errors=self.config.auto.capture_errors,
+                capture_todos=self.config.auto.capture_todos,
+                capture_facts=self.config.auto.capture_facts,
+            )
 
             if not detected:
                 return {"detected": [], "message": "No memorable content detected"}
 
-            # Optionally save detected memories (save=true forces save regardless of auto setting)
             should_save = args.get("save", False)
             if should_save:
                 saved = await self._save_detected_memories(detected)
@@ -439,17 +313,21 @@ class MCPServer:
             }
 
         elif action == "process":
-            # Process = analyze + auto-save (simpler API for AI tools)
             text = args.get("text", "")
             if not text:
                 return {"error": "Text required for process action"}
 
-            detected = self._analyze_text_for_memories(text)
+            detected = analyze_text_for_memories(
+                text,
+                capture_decisions=self.config.auto.capture_decisions,
+                capture_errors=self.config.auto.capture_errors,
+                capture_todos=self.config.auto.capture_todos,
+                capture_facts=self.config.auto.capture_facts,
+            )
 
             if not detected:
                 return {"saved": 0, "message": "No memorable content detected"}
 
-            # Auto-save all detected memories above confidence threshold
             saved = await self._save_detected_memories(detected)
 
             return {
@@ -461,10 +339,7 @@ class MCPServer:
         return {"error": f"Unknown action: {action}"}
 
     async def _save_detected_memories(self, detected: list[dict[str, Any]]) -> list[str]:
-        """Save detected memories that meet confidence threshold.
-
-        Returns list of saved memory summaries.
-        """
+        """Save detected memories that meet confidence threshold."""
         saved = []
         for item in detected:
             if item["confidence"] >= self.config.auto.min_confidence:
@@ -478,112 +353,6 @@ class MCPServer:
                 if "error" not in result:
                     saved.append(item["content"][:50])
         return saved
-
-    def _analyze_text_for_memories(self, text: str) -> list[dict[str, Any]]:
-        """Analyze text and detect potential memories.
-
-        Returns list of detected memories with type, content, and confidence.
-        """
-        import re
-
-        detected: list[dict[str, Any]] = []
-        text_lower = text.lower()
-
-        # Decision patterns
-        decision_patterns = [
-            r"(?:we |I )(?:decided|chose|selected|picked|opted)(?: to)?[:\s]+(.+?)(?:\.|$)",
-            r"(?:the )?decision(?: is)?[:\s]+(.+?)(?:\.|$)",
-            r"(?:we\'re |I\'m )going (?:to|with)[:\s]+(.+?)(?:\.|$)",
-            r"let\'s (?:go with|use|choose)[:\s]+(.+?)(?:\.|$)",
-        ]
-        if self.config.auto.capture_decisions:
-            for pattern in decision_patterns:
-                matches = re.findall(pattern, text_lower, re.IGNORECASE)
-                for match in matches:
-                    if len(match) > 10:
-                        detected.append(
-                            {
-                                "type": "decision",
-                                "content": f"Decision: {match.strip()}",
-                                "confidence": 0.8,
-                                "priority": 6,
-                            }
-                        )
-
-        # Error patterns
-        error_patterns = [
-            r"error[:\s]+(.+?)(?:\.|$)",
-            r"failed[:\s]+(.+?)(?:\.|$)",
-            r"bug[:\s]+(.+?)(?:\.|$)",
-            r"(?:the )?issue (?:is|was)[:\s]+(.+?)(?:\.|$)",
-            r"problem[:\s]+(.+?)(?:\.|$)",
-        ]
-        if self.config.auto.capture_errors:
-            for pattern in error_patterns:
-                matches = re.findall(pattern, text_lower, re.IGNORECASE)
-                for match in matches:
-                    if len(match) > 10:
-                        detected.append(
-                            {
-                                "type": "error",
-                                "content": f"Error: {match.strip()}",
-                                "confidence": 0.85,
-                                "priority": 7,
-                            }
-                        )
-
-        # TODO patterns
-        todo_patterns = [
-            r"(?:TODO|FIXME|HACK|XXX)[:\s]+(.+?)(?:\.|$)",
-            r"(?:we |I )?(?:need to|should|must|have to)[:\s]+(.+?)(?:\.|$)",
-            r"(?:remember to|don\'t forget to)[:\s]+(.+?)(?:\.|$)",
-            r"(?:later|next)[:\s]+(.+?)(?:\.|$)",
-        ]
-        if self.config.auto.capture_todos:
-            for pattern in todo_patterns:
-                matches = re.findall(pattern, text, re.IGNORECASE)
-                for match in matches:
-                    if len(match) > 5:
-                        detected.append(
-                            {
-                                "type": "todo",
-                                "content": f"TODO: {match.strip()}",
-                                "confidence": 0.75,
-                                "priority": 5,
-                            }
-                        )
-
-        # Fact patterns (more conservative)
-        fact_patterns = [
-            r"(?:the |a )?(?:answer|solution|fix) (?:is|was)[:\s]+(.+?)(?:\.|$)",
-            r"(?:it |this )(?:works|worked) because[:\s]+(.+?)(?:\.|$)",
-            r"(?:the )?(?:key|important|note)[:\s]+(.+?)(?:\.|$)",
-            r"(?:learned|discovered|found out)[:\s]+(.+?)(?:\.|$)",
-        ]
-        if self.config.auto.capture_facts:
-            for pattern in fact_patterns:
-                matches = re.findall(pattern, text_lower, re.IGNORECASE)
-                for match in matches:
-                    if len(match) > 15:
-                        detected.append(
-                            {
-                                "type": "fact",
-                                "content": match.strip(),
-                                "confidence": 0.7,
-                                "priority": 5,
-                            }
-                        )
-
-        # Remove duplicates
-        seen = set()
-        unique_detected = []
-        for item in detected:
-            content_key = item["content"][:50].lower()
-            if content_key not in seen:
-                seen.add(content_key)
-                unique_detected.append(item)
-
-        return unique_detected
 
 
 def create_mcp_server() -> MCPServer:

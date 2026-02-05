@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from neural_memory.extraction.entities import Entity, EntityExtractor, extract_keywords
+from neural_memory.extraction.entities import Entity, EntityExtractor
+from neural_memory.extraction.keywords import extract_keywords
 from neural_memory.extraction.temporal import TemporalExtractor, TimeHint
 
 

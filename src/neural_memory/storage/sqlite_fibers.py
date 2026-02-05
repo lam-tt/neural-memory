@@ -1,0 +1,177 @@
+"""SQLite fiber operations mixin."""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Literal
+
+from neural_memory.core.fiber import Fiber
+from neural_memory.storage.sqlite_row_mappers import row_to_fiber
+
+if TYPE_CHECKING:
+    import aiosqlite
+
+
+class SQLiteFiberMixin:
+    """Mixin providing fiber CRUD operations."""
+
+    def _ensure_conn(self) -> aiosqlite.Connection: ...
+    def _get_brain_id(self) -> str: ...
+
+    async def add_fiber(self, fiber: Fiber) -> str:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
+
+        try:
+            await conn.execute(
+                """INSERT INTO fibers
+                   (id, brain_id, neuron_ids, synapse_ids, anchor_neuron_id,
+                    pathway, conductivity, last_conducted,
+                    time_start, time_end, coherence, salience, frequency,
+                    summary, tags, metadata, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    fiber.id,
+                    brain_id,
+                    json.dumps(list(fiber.neuron_ids)),
+                    json.dumps(list(fiber.synapse_ids)),
+                    fiber.anchor_neuron_id,
+                    json.dumps(fiber.pathway),
+                    fiber.conductivity,
+                    fiber.last_conducted.isoformat() if fiber.last_conducted else None,
+                    fiber.time_start.isoformat() if fiber.time_start else None,
+                    fiber.time_end.isoformat() if fiber.time_end else None,
+                    fiber.coherence,
+                    fiber.salience,
+                    fiber.frequency,
+                    fiber.summary,
+                    json.dumps(list(fiber.tags)),
+                    json.dumps(fiber.metadata),
+                    fiber.created_at.isoformat(),
+                ),
+            )
+            await conn.commit()
+            return fiber.id
+        except sqlite3.IntegrityError:
+            raise ValueError(f"Fiber {fiber.id} already exists")
+
+    async def get_fiber(self, fiber_id: str) -> Fiber | None:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
+
+        async with conn.execute(
+            "SELECT * FROM fibers WHERE id = ? AND brain_id = ?",
+            (fiber_id, brain_id),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row is None:
+                return None
+            return row_to_fiber(row)
+
+    async def find_fibers(
+        self,
+        contains_neuron: str | None = None,
+        time_overlaps: tuple[datetime, datetime] | None = None,
+        tags: set[str] | None = None,
+        min_salience: float | None = None,
+        limit: int = 100,
+    ) -> list[Fiber]:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
+
+        query = "SELECT * FROM fibers WHERE brain_id = ?"
+        params: list[Any] = [brain_id]
+
+        if contains_neuron is not None:
+            query += " AND neuron_ids LIKE ?"
+            params.append(f'%"{contains_neuron}"%')
+
+        if time_overlaps is not None:
+            start, end = time_overlaps
+            query += " AND (time_start IS NULL OR time_start <= ?)"
+            query += " AND (time_end IS NULL OR time_end >= ?)"
+            params.append(end.isoformat())
+            params.append(start.isoformat())
+
+        if min_salience is not None:
+            query += " AND salience >= ?"
+            params.append(min_salience)
+
+        query += " ORDER BY salience DESC LIMIT ?"
+        params.append(limit)
+
+        async with conn.execute(query, params) as cursor:
+            rows = await cursor.fetchall()
+            fibers = [row_to_fiber(row) for row in rows]
+
+        # Filter by tags in Python (JSON array doesn't support efficient set operations)
+        if tags is not None:
+            fibers = [f for f in fibers if tags.issubset(f.tags)]
+
+        return fibers
+
+    async def update_fiber(self, fiber: Fiber) -> None:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
+
+        cursor = await conn.execute(
+            """UPDATE fibers SET neuron_ids = ?, synapse_ids = ?,
+               anchor_neuron_id = ?, pathway = ?, conductivity = ?,
+               last_conducted = ?, time_start = ?, time_end = ?,
+               coherence = ?, salience = ?, frequency = ?,
+               summary = ?, tags = ?, metadata = ?
+               WHERE id = ? AND brain_id = ?""",
+            (
+                json.dumps(list(fiber.neuron_ids)),
+                json.dumps(list(fiber.synapse_ids)),
+                fiber.anchor_neuron_id,
+                json.dumps(fiber.pathway),
+                fiber.conductivity,
+                fiber.last_conducted.isoformat() if fiber.last_conducted else None,
+                fiber.time_start.isoformat() if fiber.time_start else None,
+                fiber.time_end.isoformat() if fiber.time_end else None,
+                fiber.coherence,
+                fiber.salience,
+                fiber.frequency,
+                fiber.summary,
+                json.dumps(list(fiber.tags)),
+                json.dumps(fiber.metadata),
+                fiber.id,
+                brain_id,
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"Fiber {fiber.id} does not exist")
+
+        await conn.commit()
+
+    async def delete_fiber(self, fiber_id: str) -> bool:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
+
+        cursor = await conn.execute(
+            "DELETE FROM fibers WHERE id = ? AND brain_id = ?",
+            (fiber_id, brain_id),
+        )
+        await conn.commit()
+
+        return cursor.rowcount > 0
+
+    async def get_fibers(
+        self,
+        limit: int = 10,
+        order_by: Literal["created_at", "salience", "frequency"] = "created_at",
+        descending: bool = True,
+    ) -> list[Fiber]:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
+
+        order_dir = "DESC" if descending else "ASC"
+        query = f"SELECT * FROM fibers WHERE brain_id = ? ORDER BY {order_by} {order_dir} LIMIT ?"
+
+        async with conn.execute(query, (brain_id, limit)) as cursor:
+            rows = await cursor.fetchall()
+            return [row_to_fiber(row) for row in rows]

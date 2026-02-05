@@ -24,7 +24,8 @@ from neural_memory.core.brain import Brain, BrainConfig
 from neural_memory.core.fiber import Fiber
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
-from neural_memory.engine.activation import ReflexActivation, SpreadingActivation
+from neural_memory.engine.activation import SpreadingActivation
+from neural_memory.engine.reflex_activation import ReflexActivation
 from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
 from neural_memory.storage.memory_store import InMemoryStorage
