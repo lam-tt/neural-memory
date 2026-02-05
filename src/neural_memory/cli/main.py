@@ -43,6 +43,17 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+
+@app.callback(invoke_without_command=True)
+def _app_callback(ctx: typer.Context) -> None:
+    """Global callback: runs before every command."""
+    if ctx.invoked_subcommand is None:
+        return
+
+    from neural_memory.cli.update_check import run_update_check_background
+
+    run_update_check_background()
+
 # Brain subcommand
 brain_app = typer.Typer(help="Brain management commands")
 app.add_typer(brain_app, name="brain")
