@@ -91,6 +91,12 @@ $(brain) my-brain | N:512 S:1024 F:256
 - Click to switch brains
 - Updates every 30 seconds (or instantly via WebSocket)
 
+## Support
+
+If you find NeuralMemory useful, consider buying me a coffee:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/vietnamit)
+
 ## License
 
 MIT

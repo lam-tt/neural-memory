@@ -6,6 +6,10 @@
 </p>
 
 <p align="center">
+  <a href="https://buymeacoffee.com/vietnamit"><img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee"></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/nhadaututtheky/neural-memory/actions"><img src="https://github.com/nhadaututtheky/neural-memory/workflows/CI/badge.svg" alt="CI"></a>
   <a href="https://pypi.org/project/neural-memory/"><img src="https://img.shields.io/pypi/v/neural-memory.svg" alt="PyPI"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
