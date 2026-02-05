@@ -5,6 +5,18 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-02-05
+
+### Added
+
+- **Zero-config `nmem init`** — One command sets up everything:
+  - Creates `~/.neuralmemory/config.toml` and default brain
+  - Auto-configures MCP for Claude Code (`~/.claude/mcp_servers.json`)
+  - Auto-configures MCP for Cursor (`~/.cursor/mcp.json`)
+  - Safe JSON merging (never overwrites existing MCP entries)
+  - `--skip-mcp` flag to opt out of auto-configuration
+  - Formatted summary output with [OK]/[--]/[!!] status icons
+
 ## [0.7.0] - 2026-02-05
 
 ### Added
