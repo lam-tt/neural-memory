@@ -11,7 +11,12 @@ from neural_memory.storage.sqlite_brain_ops import SQLiteBrainMixin
 from neural_memory.storage.sqlite_fibers import SQLiteFiberMixin
 from neural_memory.storage.sqlite_neurons import SQLiteNeuronMixin
 from neural_memory.storage.sqlite_projects import SQLiteProjectMixin
-from neural_memory.storage.sqlite_schema import SCHEMA, SCHEMA_VERSION, run_migrations
+from neural_memory.storage.sqlite_schema import (
+    SCHEMA,
+    SCHEMA_VERSION,
+    ensure_fts_tables,
+    run_migrations,
+)
 from neural_memory.storage.sqlite_synapses import SQLiteSynapseMixin
 from neural_memory.storage.sqlite_typed import SQLiteTypedMemoryMixin
 
@@ -35,6 +40,7 @@ class SQLiteStorage(
         self._db_path = Path(db_path)
         self._conn: aiosqlite.Connection | None = None
         self._current_brain_id: str | None = None
+        self._has_fts: bool = False
 
     async def initialize(self) -> None:
         """Initialize database connection and schema.
@@ -67,6 +73,10 @@ class SQLiteStorage(
         # Full schema: CREATE TABLE/INDEX IF NOT EXISTS (safe after migration)
         await self._conn.executescript(SCHEMA)
 
+        # FTS5 virtual table + sync triggers (individual execute, not executescript)
+        await ensure_fts_tables(self._conn)
+        self._has_fts = await self._check_fts_available()
+
         # Stamp version for brand-new databases
         async with self._conn.execute("SELECT version FROM schema_version") as cursor:
             row = await cursor.fetchone()
@@ -97,6 +107,19 @@ class SQLiteStorage(
         if self._conn is None:
             raise RuntimeError("Database not initialized. Call initialize() first.")
         return self._conn
+
+    async def _check_fts_available(self) -> bool:
+        """Check whether the neurons_fts table is usable.
+
+        Returns False if FTS5 is not compiled into the SQLite build
+        (rare, but possible on some minimal distributions).
+        """
+        conn = self._ensure_conn()
+        try:
+            await conn.execute("SELECT * FROM neurons_fts LIMIT 0")
+            return True
+        except Exception:
+            return False
 
     # ========== Statistics ==========
 

@@ -654,3 +654,178 @@ class TestSQLitePersistence:
             assert retrieved.content == "Persistent"
 
             await storage2.close()
+
+
+class TestFTS:
+    """Tests for FTS5 full-text search."""
+
+    @pytest.mark.asyncio
+    async def test_fts_basic_search(self, storage: SQLiteStorage) -> None:
+        """Test basic keyword search via FTS5."""
+        n1 = Neuron.create(type=NeuronType.CONCEPT, content="PostgreSQL is a great database")
+        n2 = Neuron.create(type=NeuronType.CONCEPT, content="Python is a programming language")
+        await storage.add_neuron(n1)
+        await storage.add_neuron(n2)
+
+        results = await storage.find_neurons(content_contains="database")
+        assert len(results) == 1
+        assert results[0].content == "PostgreSQL is a great database"
+
+    @pytest.mark.asyncio
+    async def test_fts_stemming(self, storage: SQLiteStorage) -> None:
+        """Test that Porter stemming matches word variants."""
+        n1 = Neuron.create(type=NeuronType.CONCEPT, content="The team is running the tests")
+        n2 = Neuron.create(type=NeuronType.CONCEPT, content="She decided to refactor the code")
+        await storage.add_neuron(n1)
+        await storage.add_neuron(n2)
+
+        # "run" should stem-match "running" (both stem to "run")
+        results = await storage.find_neurons(content_contains="run")
+        assert len(results) == 1
+        assert "running" in results[0].content
+
+        # "runs" should also stem-match "running"
+        results = await storage.find_neurons(content_contains="runs")
+        assert len(results) == 1
+        assert "running" in results[0].content
+
+        # "decide" should stem-match "decided" (both stem to "decid")
+        results = await storage.find_neurons(content_contains="decide")
+        assert len(results) == 1
+        assert "decided" in results[0].content
+
+    @pytest.mark.asyncio
+    async def test_fts_bm25_ranking(self, storage: SQLiteStorage) -> None:
+        """Test that results are ranked by BM25 relevance."""
+        # n1 mentions "database" once among other words
+        n1 = Neuron.create(
+            type=NeuronType.CONCEPT,
+            content="We use a database for storage along with caching",
+        )
+        # n2 mentions "database" multiple times — should rank higher
+        n2 = Neuron.create(
+            type=NeuronType.CONCEPT,
+            content="The database schema and database migrations are critical for database performance",
+        )
+        await storage.add_neuron(n1)
+        await storage.add_neuron(n2)
+
+        results = await storage.find_neurons(content_contains="database")
+        assert len(results) == 2
+        # More relevant result (more occurrences) should come first
+        assert "schema" in results[0].content
+
+    @pytest.mark.asyncio
+    async def test_fts_multiword(self, storage: SQLiteStorage) -> None:
+        """Test multi-word search (implicit AND)."""
+        n1 = Neuron.create(type=NeuronType.CONCEPT, content="API design patterns for REST")
+        n2 = Neuron.create(type=NeuronType.CONCEPT, content="API rate limiting")
+        n3 = Neuron.create(type=NeuronType.CONCEPT, content="UI design system")
+        await storage.add_neuron(n1)
+        await storage.add_neuron(n2)
+        await storage.add_neuron(n3)
+
+        # Both "API" AND "design" must match
+        results = await storage.find_neurons(content_contains="API design")
+        assert len(results) == 1
+        assert results[0].content == "API design patterns for REST"
+
+    @pytest.mark.asyncio
+    async def test_fts_unicode_vietnamese(self, storage: SQLiteStorage) -> None:
+        """Test that Vietnamese diacritics are preserved (remove_diacritics=0)."""
+        n1 = Neuron.create(type=NeuronType.CONCEPT, content="Tôi thích uống cà phê buổi sáng")
+        n2 = Neuron.create(type=NeuronType.CONCEPT, content="Ca phe is coffee in Vietnamese")
+        await storage.add_neuron(n1)
+        await storage.add_neuron(n2)
+
+        # Exact diacritics should match
+        results = await storage.find_neurons(content_contains="cà phê")
+        assert len(results) == 1
+        assert "cà phê" in results[0].content
+
+    @pytest.mark.asyncio
+    async def test_fts_sync_on_update(self, storage: SQLiteStorage) -> None:
+        """Test that FTS index updates when neuron content is edited."""
+        neuron = Neuron.create(type=NeuronType.CONCEPT, content="Original alpha content")
+        await storage.add_neuron(neuron)
+
+        # Should find by original content
+        results = await storage.find_neurons(content_contains="alpha")
+        assert len(results) == 1
+
+        # Update neuron content
+        updated = Neuron(
+            id=neuron.id,
+            type=neuron.type,
+            content="Updated beta content",
+            metadata=neuron.metadata,
+            created_at=neuron.created_at,
+        )
+        await storage.update_neuron(updated)
+
+        # Old term should not match
+        results = await storage.find_neurons(content_contains="alpha")
+        assert len(results) == 0
+
+        # New term should match
+        results = await storage.find_neurons(content_contains="beta")
+        assert len(results) == 1
+
+    @pytest.mark.asyncio
+    async def test_fts_sync_on_delete(self, storage: SQLiteStorage) -> None:
+        """Test that FTS index cleans up when neuron is deleted."""
+        neuron = Neuron.create(type=NeuronType.CONCEPT, content="Ephemeral data point")
+        await storage.add_neuron(neuron)
+
+        results = await storage.find_neurons(content_contains="Ephemeral")
+        assert len(results) == 1
+
+        await storage.delete_neuron(neuron.id)
+
+        results = await storage.find_neurons(content_contains="Ephemeral")
+        assert len(results) == 0
+
+    @pytest.mark.asyncio
+    async def test_fts_with_type_filter(self, storage: SQLiteStorage) -> None:
+        """Test FTS search combined with type filter."""
+        n1 = Neuron.create(type=NeuronType.CONCEPT, content="Database migration strategy")
+        n2 = Neuron.create(type=NeuronType.ACTION, content="Run database migration script")
+        await storage.add_neuron(n1)
+        await storage.add_neuron(n2)
+
+        # Search for "database" but only CONCEPT type
+        results = await storage.find_neurons(content_contains="database", type=NeuronType.CONCEPT)
+        assert len(results) == 1
+        assert results[0].type == NeuronType.CONCEPT
+
+    @pytest.mark.asyncio
+    async def test_fts_brain_isolation(self, storage: SQLiteStorage) -> None:
+        """Test that FTS results are scoped to the current brain."""
+        # Add neuron in current brain
+        n1 = Neuron.create(type=NeuronType.CONCEPT, content="Isolated secret data")
+        await storage.add_neuron(n1)
+
+        # Create a second brain and add a neuron with overlapping content
+        brain2 = Brain.create(name="other_brain")
+        await storage.save_brain(brain2)
+        storage.set_brain(brain2.id)
+
+        n2 = Neuron.create(type=NeuronType.CONCEPT, content="Isolated secret data copy")
+        await storage.add_neuron(n2)
+
+        # Search in brain2 — should only find brain2's neuron
+        results = await storage.find_neurons(content_contains="Isolated secret")
+        assert len(results) == 1
+        assert results[0].id == n2.id
+
+    @pytest.mark.asyncio
+    async def test_fts_content_exact_unchanged(self, storage: SQLiteStorage) -> None:
+        """Test that content_exact still uses direct equality, not FTS."""
+        n1 = Neuron.create(type=NeuronType.CONCEPT, content="Exact match test")
+        n2 = Neuron.create(type=NeuronType.CONCEPT, content="Exact match test extended")
+        await storage.add_neuron(n1)
+        await storage.add_neuron(n2)
+
+        results = await storage.find_neurons(content_exact="Exact match test")
+        assert len(results) == 1
+        assert results[0].content == "Exact match test"

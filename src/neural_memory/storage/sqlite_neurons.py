@@ -14,11 +14,26 @@ if TYPE_CHECKING:
     import aiosqlite
 
 
+def _build_fts_query(search_term: str) -> str:
+    """Build an FTS5 MATCH expression from a user search string.
+
+    Splits on whitespace, quotes each token to escape FTS5 operators
+    (AND, OR, NOT, NEAR, *, etc.), and joins with implicit AND.
+    Example: 'API design' → '"API" "design"'
+    """
+    tokens = search_term.split()
+    if not tokens:
+        return '""'
+    return " ".join(f'"{token}"' for token in tokens)
+
+
 class SQLiteNeuronMixin:
     """Mixin providing neuron and neuron state CRUD operations."""
 
     def _ensure_conn(self) -> aiosqlite.Connection: ...
     def _get_brain_id(self) -> str: ...
+
+    _has_fts: bool
 
     # ========== Neuron Operations ==========
 
@@ -76,29 +91,55 @@ class SQLiteNeuronMixin:
         conn = self._ensure_conn()
         brain_id = self._get_brain_id()
 
-        query = "SELECT * FROM neurons WHERE brain_id = ?"
-        params: list[Any] = [brain_id]
+        use_fts = self._has_fts and content_contains is not None and content_exact is None
 
-        if type is not None:
-            query += " AND type = ?"
-            params.append(type.value)
+        if use_fts:
+            # FTS5 path: JOIN for ranked full-text search with BM25
+            fts_terms = _build_fts_query(content_contains)  # type: ignore[arg-type]
+            query = (
+                "SELECT n.* FROM neurons n "
+                "JOIN neurons_fts fts ON n.rowid = fts.rowid "
+                "WHERE fts.neurons_fts MATCH ? AND fts.brain_id = ?"
+            )
+            params: list[Any] = [fts_terms, brain_id]
 
-        if content_contains is not None:
-            query += " AND content LIKE ?"
-            params.append(f"%{content_contains}%")
+            if type is not None:
+                query += " AND n.type = ?"
+                params.append(type.value)
 
-        if content_exact is not None:
-            query += " AND content = ?"
-            params.append(content_exact)
+            if time_range is not None:
+                start, end = time_range
+                query += " AND n.created_at >= ? AND n.created_at <= ?"
+                params.append(start.isoformat())
+                params.append(end.isoformat())
 
-        if time_range is not None:
-            start, end = time_range
-            query += " AND created_at >= ? AND created_at <= ?"
-            params.append(start.isoformat())
-            params.append(end.isoformat())
+            query += " ORDER BY fts.rank LIMIT ?"
+            params.append(limit)
+        else:
+            # Fallback: original LIKE query (or exact match / no content filter)
+            query = "SELECT * FROM neurons WHERE brain_id = ?"
+            params = [brain_id]
 
-        query += " LIMIT ?"
-        params.append(limit)
+            if type is not None:
+                query += " AND type = ?"
+                params.append(type.value)
+
+            if content_contains is not None:
+                query += " AND content LIKE ?"
+                params.append(f"%{content_contains}%")
+
+            if content_exact is not None:
+                query += " AND content = ?"
+                params.append(content_exact)
+
+            if time_range is not None:
+                start, end = time_range
+                query += " AND created_at >= ? AND created_at <= ?"
+                params.append(start.isoformat())
+                params.append(end.isoformat())
+
+            query += " LIMIT ?"
+            params.append(limit)
 
         async with conn.execute(query, params) as cursor:
             rows = await cursor.fetchall()

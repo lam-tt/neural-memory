@@ -8,11 +8,44 @@ if TYPE_CHECKING:
     import aiosqlite
 
 # Schema version for migrations
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # ── Migrations ──────────────────────────────────────────────────────
 # Each entry maps (from_version -> to_version) with a list of SQL statements.
 # Migrations run sequentially in initialize() when db version < SCHEMA_VERSION.
+
+# FTS5 setup statements — must be executed via individual execute() calls,
+# NOT executescript(), because trigger bodies contain semicolons inside
+# BEGIN...END blocks that executescript() would incorrectly split on.
+FTS_SETUP_STATEMENTS: list[str] = [
+    # FTS5 virtual table (external content → neurons table).
+    # Only index 'content' for searching; 'brain_id' is UNINDEXED (filter only).
+    # We join on rowid to retrieve the full neuron row, so no neuron_id column needed.
+    """CREATE VIRTUAL TABLE IF NOT EXISTS neurons_fts USING fts5(
+        content,
+        brain_id UNINDEXED,
+        content='neurons',
+        content_rowid='rowid',
+        tokenize='porter unicode61 remove_diacritics 0'
+    )""",
+    # Auto-sync: insert
+    """CREATE TRIGGER IF NOT EXISTS neurons_ai AFTER INSERT ON neurons BEGIN
+        INSERT INTO neurons_fts(rowid, content, brain_id)
+        VALUES (new.rowid, new.content, new.brain_id);
+    END""",
+    # Auto-sync: delete
+    """CREATE TRIGGER IF NOT EXISTS neurons_ad AFTER DELETE ON neurons BEGIN
+        INSERT INTO neurons_fts(neurons_fts, rowid, content, brain_id)
+        VALUES ('delete', old.rowid, old.content, old.brain_id);
+    END""",
+    # Auto-sync: update
+    """CREATE TRIGGER IF NOT EXISTS neurons_au AFTER UPDATE ON neurons BEGIN
+        INSERT INTO neurons_fts(neurons_fts, rowid, content, brain_id)
+        VALUES ('delete', old.rowid, old.content, old.brain_id);
+        INSERT INTO neurons_fts(rowid, content, brain_id)
+        VALUES (new.rowid, new.content, new.brain_id);
+    END""",
+]
 
 MIGRATIONS: dict[tuple[int, int], list[str]] = {
     (1, 2): [
@@ -21,7 +54,26 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
         "ALTER TABLE fibers ADD COLUMN last_conducted TEXT",
         "CREATE INDEX IF NOT EXISTS idx_fibers_conductivity ON fibers(brain_id, conductivity)",
     ],
+    (2, 3): [
+        # FTS table + triggers are created by ensure_fts_tables() in run_migrations.
+        # Backfill FTS index from existing neurons.
+        (
+            "INSERT OR IGNORE INTO neurons_fts(rowid, content, brain_id) "
+            "SELECT rowid, content, brain_id FROM neurons"
+        ),
+    ],
 }
+
+
+async def ensure_fts_tables(conn: aiosqlite.Connection) -> None:
+    """Create FTS5 virtual table and sync triggers if they don't exist.
+
+    Uses individual execute() calls (not executescript) because trigger
+    bodies contain semicolons inside BEGIN...END blocks.
+    """
+    for sql in FTS_SETUP_STATEMENTS:
+        await conn.execute(sql)
+    await conn.commit()
 
 
 async def run_migrations(conn: aiosqlite.Connection, current_version: int) -> int:
@@ -34,6 +86,11 @@ async def run_migrations(conn: aiosqlite.Connection, current_version: int) -> in
     while version < SCHEMA_VERSION:
         next_version = version + 1
         key = (version, next_version)
+
+        # FTS tables must exist before the v2→v3 backfill INSERT runs
+        if key == (2, 3):
+            await ensure_fts_tables(conn)
+
         statements = MIGRATIONS.get(key, [])
 
         for sql in statements:
