@@ -98,6 +98,7 @@ nav:
   - Architecture:
     - Overview: architecture/overview.md
     - Scalability: architecture/scalability.md
+  - Benchmarks: benchmarks.md
   - Contributing: contributing.md
   - Changelog: changelog.md
 

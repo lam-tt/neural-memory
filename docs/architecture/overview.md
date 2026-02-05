@@ -48,6 +48,8 @@ Core processing components:
 
 - **MemoryEncoder** - Converts text to neural structures
 - **ReflexPipeline** - Query processing with spreading activation
+- **ReflexActivation** - Trail-based activation through fiber pathways (v0.6.0+)
+- **SpreadingActivation** - Classic distance-based activation
 - **LifecycleManager** - Decay, reinforcement, compression
 
 ### Extraction Layer
@@ -72,7 +74,7 @@ Fundamental data structures:
 
 - **Neuron** - Atomic information unit
 - **Synapse** - Typed connection between neurons
-- **Fiber** - Memory cluster
+- **Fiber** - Signal pathway with conductivity
 - **Brain** - Container with configuration
 - **TypedMemory** - Metadata layer for memories
 
@@ -116,24 +118,46 @@ Query
          │
          ▼
 ┌─────────────────┐
-│  Find Anchors   │  Locate entry neurons
+│  Find Anchors   │  Time-first anchor selection
+│  (Time-First)   │  Time(1.0) → Entity(0.8) → Action(0.6)
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  Spread         │  Activate connected neurons
-│  Activation     │
+│  Find Fibers    │  Get fiber pathways for anchors
 └────────┬────────┘
          │
-         ▼
-┌─────────────────┐
-│  Intersection   │  Find convergence points
-└────────┬────────┘
+         ├─── reflex mode ──┐
+         │                   ▼
+         │          ┌─────────────────┐
+         │          │  Trail          │  Activate along fiber
+         │          │  Activation     │  pathways with decay
+         │          └────────┬────────┘
+         │                   │
+         │                   ▼
+         │          ┌─────────────────┐
+         │          │  Co-Activation  │  Hebbian binding
+         │          └────────┬────────┘
+         │                   │
+         ├─── classic mode ──┤
+         │                   │
+         │          ┌─────────────────┐
+         │          │  Spreading      │  BFS with decay
+         │          │  Activation     │
+         │          └────────┬────────┘
+         │                   │
+         ├───────────────────┘
          │
          ▼
 ┌─────────────────┐
 │  Extract        │  Build response context
 │  Subgraph       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Reinforce      │  Update fiber conductivity
+│  Fibers         │
 └─────────────────┘
 ```
 
@@ -232,7 +256,7 @@ src/neural_memory/
 ├── engine/
 │   ├── encoder.py        # MemoryEncoder
 │   ├── retrieval.py      # ReflexPipeline, DepthLevel
-│   ├── activation.py     # SpreadingActivation
+│   ├── activation.py     # SpreadingActivation, ReflexActivation, CoActivation
 │   └── lifecycle.py      # DecayManager, ReinforcementManager
 ├── extraction/
 │   ├── parser.py         # QueryParser, Stimulus

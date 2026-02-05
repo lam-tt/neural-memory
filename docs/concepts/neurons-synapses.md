@@ -171,6 +171,55 @@ nmem remember "Met Alice at coffee shop. She suggested using JWT for auth."
                                         └──────────────┘
 ```
 
+## Fibers
+
+Fibers group related neurons into coherent memories and serve as **signal pathways** for reflex activation.
+
+### Fiber Structure
+
+```python
+@dataclass
+class Fiber:
+    id: str                           # Unique identifier
+    neuron_ids: set[str]              # Neurons in this fiber
+    synapse_ids: set[str]             # Synapses in this fiber
+    anchor_neuron_id: str             # Primary entry point
+
+    # Signal pathway (v0.6.0+)
+    pathway: list[str]                # Ordered neuron sequence
+    conductivity: float               # Signal quality (0.0-1.0)
+    last_conducted: datetime | None   # When last activated
+
+    # Metadata
+    summary: str | None               # Human-readable summary
+    salience: float                   # Importance (0.0-1.0)
+    tags: set[str]                    # Labels
+    frequency: int                    # Access count
+```
+
+### Conductivity
+
+Conductivity controls how well signals pass through a fiber pathway:
+
+| Conductivity | Meaning |
+|-------------|---------|
+| **1.0** | Full signal (new or frequently-used fiber) |
+| **0.7-0.9** | Good signal (regularly accessed) |
+| **0.3-0.6** | Weak signal (rarely used) |
+| **0.0** | Dead pathway (no signal passes) |
+
+Each time a fiber is activated with `reinforce=True`, conductivity increases by +0.02 (capped at 1.0).
+
+### Pathway
+
+The pathway defines the ordered sequence of neurons that signals travel through:
+
+```
+Pathway: [time_neuron] → [entity_neuron] → [action_neuron] → [concept_neuron]
+```
+
+Signals propagate forward and backward along the pathway during reflex activation.
+
 ## Creating Custom Neurons
 
 Using the Python API:

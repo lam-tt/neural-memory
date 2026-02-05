@@ -28,7 +28,7 @@ Check server health.
 ```json
 {
   "status": "healthy",
-  "version": "0.4.0"
+  "version": "0.6.0"
 }
 ```
 
@@ -44,7 +44,7 @@ API information.
 {
   "name": "NeuralMemory",
   "description": "Reflex-based memory system for AI agents",
-  "version": "0.4.0",
+  "version": "0.6.0",
   "docs": "/docs",
   "health": "/health",
   "ui": "/ui"
@@ -119,7 +119,9 @@ Query memories using spreading activation.
   "confidence": 0.85,
   "neurons_activated": 12,
   "depth_used": 1,
-  "fibers_matched": ["fiber-abc123"]
+  "fibers_matched": ["fiber-abc123"],
+  "co_activations": 3,
+  "use_reflex": true
 }
 ```
 
@@ -165,6 +167,9 @@ Get a specific fiber.
   "id": "fiber-abc123",
   "neuron_ids": ["n1", "n2", "n3"],
   "synapse_ids": ["s1", "s2"],
+  "pathway": ["n1", "n2", "n3"],
+  "conductivity": 0.95,
+  "last_conducted": "2026-02-05T09:30:00Z",
   "summary": "Meeting with Alice about API",
   "created_at": "2026-02-05T10:00:00Z"
 }
@@ -277,7 +282,7 @@ Export brain as JSON snapshot.
 {
   "brain_id": "brain-xyz789",
   "exported_at": "2026-02-05T10:00:00Z",
-  "version": "0.4.0",
+  "version": "0.6.0",
   "neurons": [...],
   "synapses": [...],
   "fibers": [...]

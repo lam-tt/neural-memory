@@ -158,7 +158,10 @@ nmem serve
 
 ## Features
 
-- **Spreading Activation** - Neural graph-based retrieval
+- **Reflex Activation** - Trail-based retrieval through fiber pathways with conductivity (v0.6.0+)
+- **Co-Activation** - Hebbian binding detects neurons activated by multiple sources (v0.6.0+)
+- **Time-First Anchoring** - Time neurons as primary anchors for temporally-aware recall (v0.6.0+)
+- **Spreading Activation** - Neural graph-based retrieval (classic mode)
 - **Multi-language** - English + Vietnamese support
 - **Typed Memories** - fact, decision, todo, insight, etc.
 - **Priority System** - 0-10 priority levels

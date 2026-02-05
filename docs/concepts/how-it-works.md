@@ -67,15 +67,18 @@ Synapses are typed connections between neurons:
 
 ### Fibers
 
-Fibers are clusters of related neurons - a coherent "memory":
+Fibers are **signal pathways** through the neural graph - ordered sequences of neurons that form a coherent memory. Each fiber has a **conductivity** (0.0-1.0) that determines how well signals travel through it:
 
 ```
-Fiber: "Meeting with Alice"
+Fiber: "Meeting with Alice" (conductivity: 0.95)
+Pathway: [Tuesday 3pm] → [Alice] → [Meeting] → [API design] → [Rate limiting]
 ├── [Alice] ←DISCUSSED→ [API design]
 ├── [Coffee shop] ←AT_LOCATION→ [Meeting]
 ├── [Tuesday 3pm] ←HAPPENED_AT→ [Meeting]
 └── [Rate limiting] ←SUGGESTED_BY→ [Alice]
 ```
+
+Frequently-accessed fibers develop higher conductivity, making their memories easier to recall - similar to how neural pathways strengthen with use in the biological brain.
 
 ## Encoding Process
 
@@ -99,33 +102,46 @@ NeuralMemory:
 When you query:
 
 ```bash
-nmem recall "What did Alice suggest?"
+nmem recall "What did Alice suggest last Tuesday?"
 ```
 
-NeuralMemory:
+NeuralMemory (reflex mode, default in v0.6.0+):
 
-1. **Parses query** - Identifies "Alice" as entity, "suggest" as action hint
-2. **Finds anchor neurons** - Locates "Alice" neuron in graph
-3. **Spreads activation** - Activates connected neurons with decay
-4. **Finds intersections** - Multiple query terms converge on same neurons
-5. **Extracts subgraph** - Gets most activated cluster
-6. **Reconstructs answer** - "Alice suggested rate limiting"
+1. **Parses query** - Identifies "last Tuesday" as time hint, "Alice" as entity, "suggest" as action hint
+2. **Finds anchors (time-first)** - Locates time neurons first (weight 1.0), then entities (0.8), then actions (0.6)
+3. **Finds fibers** - Gets fiber pathways containing anchor neurons
+4. **Trail activation** - Spreads signals along fiber pathways with conductivity and time decay
+5. **Co-activation detection** - Neurons reached by multiple anchor sets get binding strength boost
+6. **Extracts subgraph** - Gets highest-scoring connected cluster
+7. **Reinforces fibers** - Accessed fibers get conductivity boost (+0.02)
+8. **Reconstructs answer** - "Alice suggested rate limiting"
 
 ## Activation Dynamics
 
-Activation spreads through the graph with decay:
+### Reflex Mode (v0.6.0+, default)
+
+Activation spreads along **fiber pathways** with trail decay:
+
+```
+activation(next) = current * (1 - decay) * synapse_weight * conductivity * time_factor
+```
+
+Neurons co-activated by multiple anchor sets receive Hebbian binding boost:
+
+```
+[Tuesday] ──fiber──► [Meeting] ◄──fiber── [Alice]
+                         │
+              co-activated (binding=1.0)
+                         │
+                    [BEST RESULT]
+```
+
+### Classic Mode
+
+Distance-based decay through BFS:
 
 ```
 activation(hop) = initial * decay_factor^hop
-```
-
-Neurons with high activation from multiple sources rank higher:
-
-```
-Alice ──→ [API design] ←── suggest
-   \          ↑         /
-    \         |        /
-     └───> [RESULT] <─┘
 ```
 
 ## Depth Levels
@@ -157,6 +173,7 @@ Frequently accessed memories strengthen (Hebbian learning):
 
 ```
 When recalled: synapse.weight += reinforcement_delta
+When fiber activated: fiber.conductivity += 0.02  (capped at 1.0)
 ```
 
 ### Compression

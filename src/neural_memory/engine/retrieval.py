@@ -272,7 +272,15 @@ class ReflexPipeline:
         reference_time: datetime,
     ) -> tuple[dict[str, ActivationResult], list[str], list[CoActivation]]:
         """
-        Execute reflex-based activation through fiber pathways.
+        Execute hybrid reflex + classic activation.
+
+        Strategy:
+        1. Run reflex trail activation through fiber pathways (fast, focused)
+        2. Run limited classic BFS to discover neurons outside fibers (coverage)
+        3. Merge results: reflex activations are primary, classic fills gaps
+
+        This avoids the low-recall problem where reflex mode misses neurons
+        connected through synapses that aren't in any fiber pathway.
 
         Args:
             anchor_sets: Anchor neuron lists (time-first)
@@ -296,7 +304,7 @@ class ReflexPipeline:
                     fibers.append(fiber)
                     seen_fiber_ids.add(fiber.id)
 
-        # If no fibers found, fall back to classic activation
+        # If no fibers found, fall back entirely to classic activation
         if not fibers:
             activations, intersections = await self._activator.activate_from_multiple(
                 anchor_sets,
@@ -304,18 +312,63 @@ class ReflexPipeline:
             )
             return activations, intersections, []
 
-        # Use reflex activation with co-binding
-        activations, co_activations = await self._reflex_activator.activate_with_co_binding(
-            anchor_sets=anchor_sets,
-            fibers=fibers,
-            reference_time=reference_time,
+        # --- Phase 1: Reflex activation (primary) ---
+        reflex_activations, co_activations = (
+            await self._reflex_activator.activate_with_co_binding(
+                anchor_sets=anchor_sets,
+                fibers=fibers,
+                reference_time=reference_time,
+            )
         )
 
-        # Extract intersection IDs from co-activations
-        intersections = [
+        # --- Phase 2: Limited classic BFS (discovery) ---
+        # Use reduced hops (half of max) so classic is fast and
+        # only fills nearby coverage gaps, not dominating results.
+        discovery_hops = max(1, self._config.max_spread_hops // 2)
+        classic_activations, classic_intersections = (
+            await self._activator.activate_from_multiple(
+                anchor_sets,
+                max_hops=discovery_hops,
+            )
+        )
+
+        # --- Phase 3: Merge results ---
+        # Reflex results are primary; classic fills gaps with a dampening
+        # factor so fiber-conducted signals rank higher than BFS discovery.
+        discovery_dampen = 0.6
+        activations = dict(reflex_activations)
+
+        for neuron_id, classic_result in classic_activations.items():
+            existing = activations.get(neuron_id)
+            dampened_level = classic_result.activation_level * discovery_dampen
+
+            if existing is None:
+                # New discovery: add with dampened activation
+                activations[neuron_id] = ActivationResult(
+                    neuron_id=neuron_id,
+                    activation_level=dampened_level,
+                    hop_distance=classic_result.hop_distance,
+                    path=classic_result.path,
+                    source_anchor=classic_result.source_anchor,
+                )
+            elif dampened_level > existing.activation_level:
+                # Classic found a stronger path (rare but possible)
+                activations[neuron_id] = ActivationResult(
+                    neuron_id=neuron_id,
+                    activation_level=dampened_level,
+                    hop_distance=classic_result.hop_distance,
+                    path=classic_result.path,
+                    source_anchor=classic_result.source_anchor,
+                )
+
+        # Merge intersections: co-activated neurons first, then classic intersections
+        co_intersection_ids = [
             neuron_id
             for co in co_activations
             for neuron_id in co.neuron_ids
+        ]
+        intersections = co_intersection_ids + [
+            n for n in classic_intersections if n not in co_intersection_ids
         ]
 
         # Update fiber conductivity for accessed fibers

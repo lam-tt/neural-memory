@@ -129,18 +129,35 @@ Semantic: `IS_A`, `HAS_PROPERTY`, `INVOLVES`
 
 ### Fiber
 
-A cluster of related neurons (a memory).
+A signal pathway through the neural graph (a memory).
 
 ```python
 from neural_memory import Fiber
 
-fiber = Fiber(
-    id="fiber-789",
+# Create with factory method
+fiber = Fiber.create(
     neuron_ids={"n1", "n2", "n3"},
     synapse_ids={"s1", "s2"},
     anchor_neuron_id="n1",
-    summary="Meeting with Alice about API design"
+    pathway=["n1", "n2", "n3"],  # Ordered signal pathway
 )
+
+# Fiber properties
+fiber.conductivity      # 0.0-1.0, signal transmission quality
+fiber.pathway           # Ordered neuron sequence
+fiber.pathway_length    # Number of neurons in pathway
+fiber.last_conducted    # When last activated (datetime or None)
+
+# Immutable operations (return new Fiber)
+fiber = fiber.with_conductivity(0.8)
+fiber = fiber.conduct(reinforce=True)       # +0.02 conductivity
+fiber = fiber.conduct(conducted_at=now)     # Set activation time
+fiber = fiber.with_salience(0.9)
+fiber = fiber.add_tags("important", "reviewed")
+
+# Pathway queries
+fiber.pathway_position("n2")   # Returns 1 (index in pathway)
+fiber.is_in_pathway("n2")      # Returns True
 ```
 
 ## Storage Backends
@@ -220,7 +237,11 @@ Query memories using spreading activation.
 ```python
 from neural_memory.engine.retrieval import ReflexPipeline, DepthLevel
 
-pipeline = ReflexPipeline(storage, brain.config)
+# Hybrid mode (default) - reflex trail + classic BFS discovery
+pipeline = ReflexPipeline(storage, brain.config, use_reflex=True)
+
+# Classic mode - distance-based activation only (pre-v0.6.0 behavior)
+pipeline = ReflexPipeline(storage, brain.config, use_reflex=False)
 
 # Basic query
 result = await pipeline.query("What did Alice say?")
@@ -236,6 +257,7 @@ print(f"Context: {result.context}")
 print(f"Confidence: {result.confidence}")
 print(f"Neurons activated: {result.neurons_activated}")
 print(f"Depth used: {result.depth_used}")
+print(f"Co-activations: {len(result.co_activations)}")
 ```
 
 **Depth Levels:**
@@ -244,6 +266,50 @@ print(f"Depth used: {result.depth_used}")
 - `DepthLevel.CONTEXT` - 2-3 hops, surrounding context
 - `DepthLevel.HABIT` - 4+ hops, patterns
 - `DepthLevel.DEEP` - Full traversal, causal chains
+
+### ReflexActivation :material-new-box:{ .new }
+
+Trail-based activation engine (v0.6.0+).
+
+```python
+from neural_memory.engine.activation import ReflexActivation
+
+reflex = ReflexActivation(storage, brain.config)
+
+# Activate along fiber pathways
+results = await reflex.activate_trail(
+    anchor_neurons=["time_neuron_1", "entity_neuron_2"],
+    fibers=fibers,
+    reference_time=datetime.utcnow(),
+)
+
+# results: dict[str, ActivationResult]
+for neuron_id, result in results.items():
+    print(f"{neuron_id}: level={result.activation_level}, hops={result.hop_distance}")
+
+# Combined activation with co-activation detection
+activations, co_activations = await reflex.activate_with_co_binding(
+    anchor_sets=[["time_1"], ["entity_1"]],
+    fibers=fibers,
+)
+```
+
+### CoActivation :material-new-box:{ .new }
+
+Represents neurons that co-fired from multiple anchor sets (Hebbian binding).
+
+```python
+from neural_memory.engine.activation import CoActivation
+
+# Created by ReflexActivation.find_co_activated()
+co = CoActivation(
+    neuron_ids=frozenset(["n1", "n2"]),
+    temporal_window_ms=500,
+    co_fire_count=3,           # Activated by 3 anchor sets
+    binding_strength=1.0,      # 3/3 = perfect co-activation
+    source_anchors=["time_1", "entity_1", "concept_1"],
+)
+```
 
 ### DecayManager
 
