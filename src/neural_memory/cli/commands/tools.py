@@ -135,52 +135,68 @@ def init(
         bool,
         typer.Option("--force", "-f", help="Overwrite existing config"),
     ] = False,
+    skip_mcp: Annotated[
+        bool,
+        typer.Option("--skip-mcp", help="Skip MCP auto-configuration"),
+    ] = False,
 ) -> None:
-    """Initialize unified config for cross-tool memory sharing.
+    """Set up NeuralMemory in one command.
 
-    This sets up ~/.neuralmemory/ which enables memory sharing between:
-    - CLI (nmem commands)
-    - MCP (Claude Code, Cursor, AntiGravity)
-    - Any other tool using NeuralMemory
-
-    After running this, all tools will share the same brain database.
+    Creates config, default brain, and auto-configures MCP for
+    Claude Code and Cursor. After this, memory tools work everywhere.
 
     Examples:
-        nmem init              # Initialize unified config
+        nmem init              # Full setup
         nmem init --force      # Overwrite existing config
+        nmem init --skip-mcp   # Skip MCP auto-config
     """
-    from neural_memory.unified_config import UnifiedConfig, get_neuralmemory_dir
+    from neural_memory.cli.setup import (
+        print_summary,
+        setup_brain,
+        setup_config,
+        setup_mcp_claude,
+        setup_mcp_cursor,
+    )
+    from neural_memory.unified_config import get_neuralmemory_dir
 
     data_dir = get_neuralmemory_dir()
-    config_path = data_dir / "config.toml"
+    results: dict[str, str] = {}
 
-    if config_path.exists() and not force:
-        typer.secho(f"Config already exists at {config_path}", fg=typer.colors.YELLOW)
-        typer.echo("Use --force to overwrite")
-        return
+    # 1. Config
+    created = setup_config(data_dir, force=force)
+    results["Config"] = f"{data_dir / 'config.toml'} (created)" if created else "already exists"
 
-    # Create unified config
-    config = UnifiedConfig(data_dir=data_dir)
-    config.save()
+    # 2. Brain
+    brain_name = setup_brain(data_dir)
+    results["Brain"] = f"{brain_name} (ready)"
 
-    # Ensure brains directory exists
-    brains_dir = data_dir / "brains"
-    brains_dir.mkdir(parents=True, exist_ok=True)
+    # 3. MCP auto-config
+    if skip_mcp:
+        results["Claude Code"] = "skipped (--skip-mcp)"
+        results["Cursor"] = "skipped (--skip-mcp)"
+    else:
+        claude_status = setup_mcp_claude()
+        status_labels = {
+            "added": "~/.claude/mcp_servers.json (added)",
+            "exists": "~/.claude/mcp_servers.json (already configured)",
+            "not_found": "not detected (~/.claude/ not found)",
+            "failed": "failed to write config",
+        }
+        results["Claude Code"] = status_labels.get(claude_status, claude_status)
 
-    typer.secho(f"Initialized NeuralMemory at {data_dir}", fg=typer.colors.GREEN)
+        cursor_status = setup_mcp_cursor()
+        cursor_labels = {
+            "added": "~/.cursor/mcp.json (added)",
+            "exists": "~/.cursor/mcp.json (already configured)",
+            "not_found": "not detected",
+            "failed": "failed to write config",
+        }
+        results["Cursor"] = cursor_labels.get(cursor_status, cursor_status)
+
+    print_summary(results)
+
+    typer.echo("  Restart your AI tool to activate memory.")
     typer.echo()
-    typer.echo("Directory structure:")
-    typer.echo(f"  {data_dir}/")
-    typer.echo("  +-- config.toml        # Shared configuration")
-    typer.echo("  +-- brains/")
-    typer.echo("      +-- default.db     # SQLite brain database")
-    typer.echo()
-    typer.echo("This enables memory sharing between:")
-    typer.echo("  - CLI: nmem commands")
-    typer.echo("  - MCP: Claude Code, Cursor, AntiGravity")
-    typer.echo()
-    typer.echo("To use a specific brain, set NEURALMEMORY_BRAIN environment variable:")
-    typer.echo("  export NEURALMEMORY_BRAIN=myproject")
 
 
 def serve(
