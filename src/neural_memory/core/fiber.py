@@ -11,17 +11,20 @@ from uuid import uuid4
 @dataclass
 class Fiber:
     """
-    A fiber represents a memory cluster - a subgraph of related neurons.
+    A fiber represents a signal pathway through related neurons.
 
-    Fibers bundle together neurons and synapses that form a coherent
-    memory or concept. They act as retrieval units and can be
-    compressed into summaries over time.
+    Fibers are not just memory clusters - they are ordered pathways
+    that conduct activation signals. Like neural fibers in the brain,
+    they have conductivity that affects signal transmission quality.
 
     Attributes:
         id: Unique identifier
         neuron_ids: Set of neuron IDs in this fiber
         synapse_ids: Set of synapse IDs connecting neurons in this fiber
         anchor_neuron_id: Primary entry point neuron for this fiber
+        pathway: Ordered sequence of neuron IDs forming the signal path
+        conductivity: Signal transmission quality (0.0 - 1.0)
+        last_conducted: When this fiber last conducted a signal
         time_start: Earliest timestamp in this memory
         time_end: Latest timestamp in this memory
         coherence: How tightly connected the neurons are (0.0 - 1.0)
@@ -37,8 +40,14 @@ class Fiber:
     neuron_ids: set[str]
     synapse_ids: set[str]
     anchor_neuron_id: str
+    # Signal pathway fields
+    pathway: list[str] = field(default_factory=list)
+    conductivity: float = 1.0
+    last_conducted: datetime | None = None
+    # Temporal bounds
     time_start: datetime | None = None
     time_end: datetime | None = None
+    # Quality metrics
     coherence: float = 0.0
     salience: float = 0.0
     frequency: int = 0
@@ -53,6 +62,7 @@ class Fiber:
         neuron_ids: set[str],
         synapse_ids: set[str],
         anchor_neuron_id: str,
+        pathway: list[str] | None = None,
         time_start: datetime | None = None,
         time_end: datetime | None = None,
         summary: str | None = None,
@@ -67,6 +77,7 @@ class Fiber:
             neuron_ids: Set of neuron IDs
             synapse_ids: Set of synapse IDs
             anchor_neuron_id: Primary entry point
+            pathway: Ordered sequence of neuron IDs forming signal path
             time_start: Optional start time
             time_end: Optional end time
             summary: Optional text summary
@@ -80,11 +91,18 @@ class Fiber:
         if anchor_neuron_id not in neuron_ids:
             raise ValueError(f"Anchor neuron {anchor_neuron_id} must be in neuron_ids")
 
+        # Default pathway starts with anchor
+        if pathway is None:
+            pathway = [anchor_neuron_id]
+
         return cls(
             id=fiber_id or str(uuid4()),
             neuron_ids=neuron_ids,
             synapse_ids=synapse_ids,
             anchor_neuron_id=anchor_neuron_id,
+            pathway=pathway,
+            conductivity=1.0,
+            last_conducted=None,
             time_start=time_start,
             time_end=time_end,
             summary=summary,
@@ -105,6 +123,9 @@ class Fiber:
             neuron_ids=self.neuron_ids,
             synapse_ids=self.synapse_ids,
             anchor_neuron_id=self.anchor_neuron_id,
+            pathway=self.pathway,
+            conductivity=self.conductivity,
+            last_conducted=self.last_conducted,
             time_start=self.time_start,
             time_end=self.time_end,
             coherence=self.coherence,
@@ -131,6 +152,9 @@ class Fiber:
             neuron_ids=self.neuron_ids,
             synapse_ids=self.synapse_ids,
             anchor_neuron_id=self.anchor_neuron_id,
+            pathway=self.pathway,
+            conductivity=self.conductivity,
+            last_conducted=self.last_conducted,
             time_start=self.time_start,
             time_end=self.time_end,
             coherence=self.coherence,
@@ -157,6 +181,9 @@ class Fiber:
             neuron_ids=self.neuron_ids,
             synapse_ids=self.synapse_ids,
             anchor_neuron_id=self.anchor_neuron_id,
+            pathway=self.pathway,
+            conductivity=self.conductivity,
+            last_conducted=self.last_conducted,
             time_start=self.time_start,
             time_end=self.time_end,
             coherence=self.coherence,
@@ -183,6 +210,9 @@ class Fiber:
             neuron_ids=self.neuron_ids,
             synapse_ids=self.synapse_ids,
             anchor_neuron_id=self.anchor_neuron_id,
+            pathway=self.pathway,
+            conductivity=self.conductivity,
+            last_conducted=self.last_conducted,
             time_start=self.time_start,
             time_end=self.time_end,
             coherence=self.coherence,
@@ -190,6 +220,79 @@ class Fiber:
             frequency=self.frequency,
             summary=self.summary,
             tags=self.tags | set(new_tags),
+            metadata=self.metadata,
+            created_at=self.created_at,
+        )
+
+    def conduct(
+        self,
+        conducted_at: datetime | None = None,
+        reinforce: bool = True,
+    ) -> Fiber:
+        """
+        Create a new Fiber after conducting a signal through it.
+
+        Conducting a fiber:
+        - Updates last_conducted timestamp
+        - Optionally increases conductivity (reinforcement)
+        - Increases frequency
+
+        Args:
+            conducted_at: When the signal was conducted (default: now)
+            reinforce: If True, slightly increase conductivity
+
+        Returns:
+            New Fiber with updated conduction state
+        """
+        new_conductivity = self.conductivity
+        if reinforce:
+            # Reinforce conductivity, max 1.0
+            new_conductivity = min(1.0, self.conductivity + 0.02)
+
+        return Fiber(
+            id=self.id,
+            neuron_ids=self.neuron_ids,
+            synapse_ids=self.synapse_ids,
+            anchor_neuron_id=self.anchor_neuron_id,
+            pathway=self.pathway,
+            conductivity=new_conductivity,
+            last_conducted=conducted_at or datetime.utcnow(),
+            time_start=self.time_start,
+            time_end=self.time_end,
+            coherence=self.coherence,
+            salience=self.salience,
+            frequency=self.frequency + 1,
+            summary=self.summary,
+            tags=self.tags,
+            metadata=self.metadata,
+            created_at=self.created_at,
+        )
+
+    def with_conductivity(self, conductivity: float) -> Fiber:
+        """
+        Create a new Fiber with updated conductivity.
+
+        Args:
+            conductivity: New conductivity value (clamped to 0.0-1.0)
+
+        Returns:
+            New Fiber with updated conductivity
+        """
+        return Fiber(
+            id=self.id,
+            neuron_ids=self.neuron_ids,
+            synapse_ids=self.synapse_ids,
+            anchor_neuron_id=self.anchor_neuron_id,
+            pathway=self.pathway,
+            conductivity=max(0.0, min(1.0, conductivity)),
+            last_conducted=self.last_conducted,
+            time_start=self.time_start,
+            time_end=self.time_end,
+            coherence=self.coherence,
+            salience=self.salience,
+            frequency=self.frequency,
+            summary=self.summary,
+            tags=self.tags,
             metadata=self.metadata,
             created_at=self.created_at,
         )
@@ -234,3 +337,27 @@ class Fiber:
             return False
 
         return self.time_start <= end and self.time_end >= start
+
+    @property
+    def pathway_length(self) -> int:
+        """Number of neurons in the signal pathway."""
+        return len(self.pathway)
+
+    def pathway_position(self, neuron_id: str) -> int | None:
+        """
+        Get the position of a neuron in the pathway.
+
+        Args:
+            neuron_id: The neuron to find
+
+        Returns:
+            Position index (0-based) or None if not in pathway
+        """
+        try:
+            return self.pathway.index(neuron_id)
+        except ValueError:
+            return None
+
+    def is_in_pathway(self, neuron_id: str) -> bool:
+        """Check if a neuron is in the signal pathway."""
+        return neuron_id in self.pathway

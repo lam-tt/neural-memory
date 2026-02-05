@@ -8,13 +8,18 @@ from datetime import datetime
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any
 
+from neural_memory.core.fiber import Fiber
 from neural_memory.core.neuron import NeuronType
-from neural_memory.engine.activation import ActivationResult, SpreadingActivation
+from neural_memory.engine.activation import (
+    ActivationResult,
+    CoActivation,
+    ReflexActivation,
+    SpreadingActivation,
+)
 from neural_memory.extraction.parser import QueryIntent, QueryParser, Stimulus
 
 if TYPE_CHECKING:
     from neural_memory.core.brain import BrainConfig
-    from neural_memory.core.fiber import Fiber
     from neural_memory.storage.base import NeuralStorage
 
 
@@ -61,6 +66,7 @@ class RetrievalResult:
         subgraph: The extracted relevant subgraph
         context: Formatted context for injection into agent prompts
         latency_ms: Time taken for retrieval in milliseconds
+        co_activations: Neurons that co-activated (Hebbian binding)
         metadata: Additional retrieval metadata
     """
 
@@ -72,6 +78,7 @@ class RetrievalResult:
     subgraph: Subgraph
     context: str
     latency_ms: float
+    co_activations: list[CoActivation] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -96,6 +103,7 @@ class ReflexPipeline:
         storage: NeuralStorage,
         config: BrainConfig,
         parser: QueryParser | None = None,
+        use_reflex: bool = True,
     ) -> None:
         """
         Initialize the retrieval pipeline.
@@ -104,11 +112,14 @@ class ReflexPipeline:
             storage: Storage backend
             config: Brain configuration
             parser: Custom query parser (creates default if None)
+            use_reflex: If True, use ReflexActivation; else use SpreadingActivation
         """
         self._storage = storage
         self._config = config
         self._parser = parser or QueryParser()
+        self._use_reflex = use_reflex
         self._activator = SpreadingActivation(storage, config)
+        self._reflex_activator = ReflexActivation(storage, config)
 
     async def query(
         self,
@@ -144,14 +155,23 @@ class ReflexPipeline:
         if depth is None:
             depth = self._detect_depth(stimulus)
 
-        # 3. Find anchor neurons
-        anchor_sets = await self._find_anchors(stimulus)
+        # 3. Find anchor neurons (time-first)
+        anchor_sets = await self._find_anchors_time_first(stimulus)
 
-        # 4. Spread activation
-        activations, intersections = await self._activator.activate_from_multiple(
-            anchor_sets,
-            max_hops=self._depth_to_hops(depth),
-        )
+        # Choose activation method
+        if self._use_reflex:
+            # Reflex activation: trail-based through fiber pathways
+            activations, intersections, co_activations = await self._reflex_query(
+                anchor_sets,
+                reference_time,
+            )
+        else:
+            # Classic spreading activation
+            activations, intersections = await self._activator.activate_from_multiple(
+                anchor_sets,
+                max_hops=self._depth_to_hops(depth),
+            )
+            co_activations = []
 
         # 5. Find matching fibers
         fibers_matched = await self._find_matching_fibers(activations)
@@ -170,9 +190,19 @@ class ReflexPipeline:
         )
 
         # 7. Reconstitute answer and context
+        # Use co-activated neurons as priority intersections
+        co_activated_ids = [
+            neuron_id
+            for co in co_activations
+            for neuron_id in co.neuron_ids
+        ]
+        all_intersections = co_activated_ids + [
+            n for n in intersections if n not in co_activated_ids
+        ]
+
         answer, confidence = await self._reconstitute_answer(
             activations,
-            intersections,
+            all_intersections,
             stimulus,
         )
 
@@ -193,10 +223,13 @@ class ReflexPipeline:
             subgraph=subgraph,
             context=context,
             latency_ms=latency_ms,
+            co_activations=co_activations,
             metadata={
                 "query_intent": stimulus.intent.value,
                 "anchors_found": sum(len(a) for a in anchor_sets),
-                "intersections": len(intersections),
+                "intersections": len(all_intersections),
+                "co_activations": len(co_activations),
+                "use_reflex": self._use_reflex,
             },
         )
 
@@ -232,6 +265,122 @@ class ReflexPipeline:
             DepthLevel.DEEP: self._config.max_spread_hops,
         }
         return mapping.get(depth, 2)
+
+    async def _reflex_query(
+        self,
+        anchor_sets: list[list[str]],
+        reference_time: datetime,
+    ) -> tuple[dict[str, ActivationResult], list[str], list[CoActivation]]:
+        """
+        Execute reflex-based activation through fiber pathways.
+
+        Args:
+            anchor_sets: Anchor neuron lists (time-first)
+            reference_time: Reference time for time factor
+
+        Returns:
+            Tuple of (activations, intersection IDs, co-activations)
+        """
+        # Get all fibers containing any anchor neurons
+        all_anchors = [a for anchors in anchor_sets for a in anchors]
+        fibers: list[Fiber] = []
+        seen_fiber_ids: set[str] = set()
+
+        for anchor_id in all_anchors:
+            matching_fibers = await self._storage.find_fibers(
+                contains_neuron=anchor_id,
+                limit=10,
+            )
+            for fiber in matching_fibers:
+                if fiber.id not in seen_fiber_ids:
+                    fibers.append(fiber)
+                    seen_fiber_ids.add(fiber.id)
+
+        # If no fibers found, fall back to classic activation
+        if not fibers:
+            activations, intersections = await self._activator.activate_from_multiple(
+                anchor_sets,
+                max_hops=self._config.max_spread_hops,
+            )
+            return activations, intersections, []
+
+        # Use reflex activation with co-binding
+        activations, co_activations = await self._reflex_activator.activate_with_co_binding(
+            anchor_sets=anchor_sets,
+            fibers=fibers,
+            reference_time=reference_time,
+        )
+
+        # Extract intersection IDs from co-activations
+        intersections = [
+            neuron_id
+            for co in co_activations
+            for neuron_id in co.neuron_ids
+        ]
+
+        # Update fiber conductivity for accessed fibers
+        for fiber in fibers:
+            conducted_fiber = fiber.conduct(conducted_at=reference_time)
+            await self._storage.update_fiber(conducted_fiber)
+
+        return activations, intersections, co_activations
+
+    async def _find_anchors_time_first(self, stimulus: Stimulus) -> list[list[str]]:
+        """
+        Find anchor neurons with time as primary signal.
+
+        Time-first activation means temporal context constrains
+        all other signals. Time anchors get priority weight.
+
+        Priority order:
+        1. Time neurons (weight 1.0) - temporal context
+        2. Entity neurons (weight 0.8) - who/what
+        3. Action neurons (weight 0.6) - verbs
+        4. Concept neurons (weight 0.4) - abstract
+
+        Returns:
+            List of anchor neuron lists, with time anchors first
+        """
+        anchor_sets: list[list[str]] = []
+
+        # 1. TIME ANCHORS FIRST (primary)
+        time_anchors: list[str] = []
+        for hint in stimulus.time_hints:
+            neurons = await self._storage.find_neurons(
+                type=NeuronType.TIME,
+                time_range=(hint.absolute_start, hint.absolute_end),
+                limit=5,
+            )
+            time_anchors.extend(n.id for n in neurons)
+
+        if time_anchors:
+            anchor_sets.append(time_anchors)
+
+        # 2. Entity anchors (secondary - constrained by time context)
+        entity_anchors: list[str] = []
+        for entity in stimulus.entities:
+            neurons = await self._storage.find_neurons(
+                content_contains=entity.text,
+                limit=3,
+            )
+            entity_anchors.extend(n.id for n in neurons)
+
+        if entity_anchors:
+            anchor_sets.append(entity_anchors)
+
+        # 3. Keyword anchors (tertiary)
+        keyword_anchors: list[str] = []
+        for keyword in stimulus.keywords[:5]:
+            neurons = await self._storage.find_neurons(
+                content_contains=keyword,
+                limit=2,
+            )
+            keyword_anchors.extend(n.id for n in neurons)
+
+        if keyword_anchors:
+            anchor_sets.append(keyword_anchors)
+
+        return anchor_sets
 
     async def _find_anchors(self, stimulus: Stimulus) -> list[list[str]]:
         """Find anchor neurons for each signal type."""

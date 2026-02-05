@@ -5,6 +5,35 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-02-05
+
+### Added
+
+- **Reflex-Based Retrieval** - True neural reflex activation
+  - `ReflexActivation` class with trail decay along fiber pathways
+  - `CoActivation` dataclass for Hebbian binding ("neurons that fire together wire together")
+  - Time-first anchor finding - temporal context constrains all other signals
+  - Co-activation intersection for neurons activated by multiple anchors
+- **Fiber as Signal Pathway**
+  - `pathway` field - ordered neuron sequence for signal conduction
+  - `conductivity` field - signal transmission quality (0.0-1.0)
+  - `last_conducted` field - when fiber last conducted a signal
+  - `conduct()` method - update fiber after signal transmission
+  - `with_conductivity()` method - immutable conductivity update
+  - Pathway helper methods: `pathway_length`, `pathway_position()`, `is_in_pathway()`
+- **Trail Decay Formula** - `level * (1 - decay) * synapse.weight * fiber.conductivity * time_factor`
+- **ReflexPipeline Updates**
+  - `use_reflex` parameter to toggle between reflex and classic activation
+  - `_find_anchors_time_first()` for time-prioritized anchor finding
+  - `_reflex_query()` for fiber-based activation with co-binding
+  - `co_activations` field in `RetrievalResult`
+
+### Changed
+
+- SQLite schema version bumped to 2 (added fiber pathway columns)
+- Fiber model now includes signal pathway fields
+- `RetrievalResult` includes co-activation information
+
 ## [0.5.0] - 2026-02-05
 
 ### Added

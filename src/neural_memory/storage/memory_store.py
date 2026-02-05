@@ -682,6 +682,9 @@ class InMemoryStorage(NeuralStorage):
                 "neuron_ids": list(f.neuron_ids),
                 "synapse_ids": list(f.synapse_ids),
                 "anchor_neuron_id": f.anchor_neuron_id,
+                "pathway": f.pathway,
+                "conductivity": f.conductivity,
+                "last_conducted": f.last_conducted.isoformat() if f.last_conducted else None,
                 "time_start": f.time_start.isoformat() if f.time_start else None,
                 "time_end": f.time_end.isoformat() if f.time_end else None,
                 "coherence": f.coherence,
@@ -795,6 +798,13 @@ class InMemoryStorage(NeuralStorage):
                     neuron_ids=set(f_data["neuron_ids"]),
                     synapse_ids=set(f_data["synapse_ids"]),
                     anchor_neuron_id=f_data["anchor_neuron_id"],
+                    pathway=f_data.get("pathway", []),
+                    conductivity=f_data.get("conductivity", 1.0),
+                    last_conducted=(
+                        datetime.fromisoformat(f_data["last_conducted"])
+                        if f_data.get("last_conducted")
+                        else None
+                    ),
                     time_start=(
                         datetime.fromisoformat(f_data["time_start"])
                         if f_data.get("time_start")

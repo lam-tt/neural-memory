@@ -10,10 +10,11 @@ from neural_memory.core.brain_mode import (
 from neural_memory.core.fiber import Fiber
 from neural_memory.core.neuron import Neuron, NeuronState, NeuronType
 from neural_memory.core.synapse import Direction, Synapse, SynapseType
+from neural_memory.engine.activation import CoActivation, ReflexActivation
 from neural_memory.engine.encoder import EncodingResult, MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline, RetrievalResult
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     "__version__",
@@ -21,6 +22,7 @@ __all__ = [
     "BrainConfig",
     "BrainMode",
     "BrainModeConfig",
+    "CoActivation",
     "DepthLevel",
     "Direction",
     "EncodingResult",
@@ -29,6 +31,7 @@ __all__ = [
     "Neuron",
     "NeuronState",
     "NeuronType",
+    "ReflexActivation",
     "ReflexPipeline",
     "RetrievalResult",
     "SharedConfig",

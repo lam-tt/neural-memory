@@ -25,7 +25,7 @@ from neural_memory.core.synapse import Direction, Synapse, SynapseType
 from neural_memory.storage.base import NeuralStorage
 
 # Schema version for migrations
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 -- Schema version tracking
@@ -100,6 +100,9 @@ CREATE TABLE IF NOT EXISTS fibers (
     neuron_ids TEXT NOT NULL,  -- JSON array
     synapse_ids TEXT NOT NULL,  -- JSON array
     anchor_neuron_id TEXT NOT NULL,
+    pathway TEXT DEFAULT '[]',  -- JSON array: ordered neuron sequence
+    conductivity REAL DEFAULT 1.0,  -- Signal transmission quality (0.0-1.0)
+    last_conducted TEXT,  -- When fiber last conducted a signal
     time_start TEXT,
     time_end TEXT,
     coherence REAL DEFAULT 0.0,
@@ -114,6 +117,7 @@ CREATE TABLE IF NOT EXISTS fibers (
 );
 CREATE INDEX IF NOT EXISTS idx_fibers_created ON fibers(brain_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_fibers_salience ON fibers(brain_id, salience);
+CREATE INDEX IF NOT EXISTS idx_fibers_conductivity ON fibers(brain_id, conductivity);
 
 -- Typed memories table
 CREATE TABLE IF NOT EXISTS typed_memories (
@@ -725,15 +729,19 @@ class SQLiteStorage(NeuralStorage):
             await conn.execute(
                 """INSERT INTO fibers
                    (id, brain_id, neuron_ids, synapse_ids, anchor_neuron_id,
+                    pathway, conductivity, last_conducted,
                     time_start, time_end, coherence, salience, frequency,
                     summary, tags, metadata, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     fiber.id,
                     brain_id,
                     json.dumps(list(fiber.neuron_ids)),
                     json.dumps(list(fiber.synapse_ids)),
                     fiber.anchor_neuron_id,
+                    json.dumps(fiber.pathway),
+                    fiber.conductivity,
+                    fiber.last_conducted.isoformat() if fiber.last_conducted else None,
                     fiber.time_start.isoformat() if fiber.time_start else None,
                     fiber.time_end.isoformat() if fiber.time_end else None,
                     fiber.coherence,
@@ -812,7 +820,8 @@ class SQLiteStorage(NeuralStorage):
 
         cursor = await conn.execute(
             """UPDATE fibers SET neuron_ids = ?, synapse_ids = ?,
-               anchor_neuron_id = ?, time_start = ?, time_end = ?,
+               anchor_neuron_id = ?, pathway = ?, conductivity = ?,
+               last_conducted = ?, time_start = ?, time_end = ?,
                coherence = ?, salience = ?, frequency = ?,
                summary = ?, tags = ?, metadata = ?
                WHERE id = ? AND brain_id = ?""",
@@ -820,6 +829,9 @@ class SQLiteStorage(NeuralStorage):
                 json.dumps(list(fiber.neuron_ids)),
                 json.dumps(list(fiber.synapse_ids)),
                 fiber.anchor_neuron_id,
+                json.dumps(fiber.pathway),
+                fiber.conductivity,
+                fiber.last_conducted.isoformat() if fiber.last_conducted else None,
                 fiber.time_start.isoformat() if fiber.time_start else None,
                 fiber.time_end.isoformat() if fiber.time_end else None,
                 fiber.coherence,
@@ -868,11 +880,29 @@ class SQLiteStorage(NeuralStorage):
 
     def _row_to_fiber(self, row: aiosqlite.Row) -> Fiber:
         """Convert database row to Fiber."""
+        row_keys = row.keys()
+
+        # Handle pathway with fallback for older schema
+        pathway_raw = row["pathway"] if "pathway" in row_keys else "[]"
+        pathway = json.loads(pathway_raw) if pathway_raw else []
+
+        # Handle conductivity with fallback
+        conductivity = row["conductivity"] if "conductivity" in row_keys else 1.0
+
+        # Handle last_conducted with fallback
+        last_conducted_raw = row["last_conducted"] if "last_conducted" in row_keys else None
+        last_conducted = (
+            datetime.fromisoformat(last_conducted_raw) if last_conducted_raw else None
+        )
+
         return Fiber(
             id=row["id"],
             neuron_ids=set(json.loads(row["neuron_ids"])),
             synapse_ids=set(json.loads(row["synapse_ids"])),
             anchor_neuron_id=row["anchor_neuron_id"],
+            pathway=pathway,
+            conductivity=conductivity,
+            last_conducted=last_conducted,
             time_start=(datetime.fromisoformat(row["time_start"]) if row["time_start"] else None),
             time_end=(datetime.fromisoformat(row["time_end"]) if row["time_end"] else None),
             coherence=row["coherence"],
