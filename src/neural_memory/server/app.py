@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from neural_memory import __version__
 from neural_memory.server.models import HealthResponse
 from neural_memory.server.routes import brain_router, memory_router, sync_router
-from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.storage.base import NeuralStorage
 
 # Static files directory
 STATIC_DIR = Path(__file__).parent / "static"
@@ -23,11 +23,12 @@ STATIC_DIR = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
-    # Startup
-    app.state.storage = InMemoryStorage()
+    from neural_memory.unified_config import get_shared_storage
+
+    storage = await get_shared_storage()
+    app.state.storage = storage
     yield
-    # Shutdown
-    pass
+    await storage.close()
 
 
 def create_app(
@@ -70,7 +71,7 @@ def create_app(
     # Override storage dependency using the shared module
     from neural_memory.server.dependencies import get_storage as shared_get_storage
 
-    async def get_storage() -> InMemoryStorage:
+    async def get_storage() -> NeuralStorage:
         return app.state.storage
 
     app.dependency_overrides[shared_get_storage] = get_storage

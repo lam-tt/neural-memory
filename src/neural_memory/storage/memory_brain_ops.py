@@ -42,6 +42,12 @@ class InMemoryBrainMixin:
     async def get_brain(self, brain_id: str) -> Brain | None:
         return self._brains.get(brain_id)
 
+    async def find_brain_by_name(self, name: str) -> Brain | None:
+        for brain in self._brains.values():
+            if brain.name == name:
+                return brain
+        return None
+
     async def export_brain(self, brain_id: str) -> BrainSnapshot:
         brain = self._brains.get(brain_id)
         if brain is None:

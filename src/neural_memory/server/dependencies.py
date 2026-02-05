@@ -26,8 +26,11 @@ async def get_brain(
     """Dependency to get and validate brain from header."""
     brain = await storage.get_brain(brain_id)
     if brain is None:
+        # Fallback: brain_id might be a name, not a UUID
+        brain = await storage.find_brain_by_name(brain_id)  # type: ignore[attr-defined]
+    if brain is None:
         raise HTTPException(status_code=404, detail=f"Brain {brain_id} not found")
 
-    # Set brain context
-    storage.set_brain(brain_id)  # type: ignore
+    # Set brain context using the actual brain ID
+    storage.set_brain(brain.id)  # type: ignore[attr-defined]
     return brain

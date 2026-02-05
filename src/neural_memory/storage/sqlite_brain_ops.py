@@ -72,6 +72,15 @@ class SQLiteBrainMixin:
                 return None
             return row_to_brain(row)
 
+    async def find_brain_by_name(self, name: str) -> Brain | None:
+        conn = self._ensure_conn()
+
+        async with conn.execute("SELECT * FROM brains WHERE name = ?", (name,)) as cursor:
+            row = await cursor.fetchone()
+            if row is None:
+                return None
+            return row_to_brain(row)
+
     async def export_brain(self, brain_id: str) -> BrainSnapshot:
         conn = self._ensure_conn()
 
