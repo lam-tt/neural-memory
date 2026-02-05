@@ -220,9 +220,7 @@ def mcp_config(
 
 
 def prompt(
-    compact: Annotated[
-        bool, typer.Option("--compact", "-c", help="Show compact version")
-    ] = False,
+    compact: Annotated[bool, typer.Option("--compact", "-c", help="Show compact version")] = False,
     copy: Annotated[
         bool, typer.Option("--copy", help="Copy to clipboard (requires pyperclip)")
     ] = False,
@@ -256,9 +254,7 @@ def prompt(
 
 
 def export_brain_cmd(
-    output: Annotated[
-        str, typer.Argument(help="Output file path (e.g., my-brain.json)")
-    ],
+    output: Annotated[str, typer.Argument(help="Output file path (e.g., my-brain.json)")],
     brain: Annotated[
         str | None, typer.Option("--brain", "-b", help="Brain to export (default: current)")
     ] = None,
@@ -304,15 +300,11 @@ def export_brain_cmd(
 
 
 def import_brain_cmd(
-    input_file: Annotated[
-        str, typer.Argument(help="Input file path (e.g., my-brain.json)")
-    ],
+    input_file: Annotated[str, typer.Argument(help="Input file path (e.g., my-brain.json)")],
     brain: Annotated[
         str | None, typer.Option("--brain", "-b", help="Target brain name (default: from file)")
     ] = None,
-    merge: Annotated[
-        bool, typer.Option("--merge", "-m", help="Merge with existing brain")
-    ] = False,
+    merge: Annotated[bool, typer.Option("--merge", "-m", help="Merge with existing brain")] = False,
 ) -> None:
     """Import brain from JSON file.
 

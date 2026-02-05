@@ -22,9 +22,7 @@ REQUEST_TIMEOUT_SECONDS = 3
 
 def _get_cache_path() -> Path:
     """Get path to update check cache file."""
-    data_dir = os.environ.get("NEURALMEMORY_DIR") or str(
-        Path.home() / ".neuralmemory"
-    )
+    data_dir = os.environ.get("NEURALMEMORY_DIR") or str(Path.home() / ".neuralmemory")
     return Path(data_dir) / ".update_check"
 
 

@@ -266,7 +266,8 @@ class TestHybridFallback:
 
         # Pure reflex: only fiber pathway neurons
         reflex_results = await reflex.activate_trail(
-            anchor_neurons=["nA"], fibers=fibers,
+            anchor_neurons=["nA"],
+            fibers=fibers,
         )
         reflex_ids = set(reflex_results.keys())
 
@@ -286,7 +287,9 @@ class TestHybridFallback:
 
         # Now test the hybrid pipeline method directly
         pipeline = ReflexPipeline(
-            storage_with_partial_fibers, brain.config, use_reflex=True,
+            storage_with_partial_fibers,
+            brain.config,
+            use_reflex=True,
         )
         hybrid_activations, intersections, co_acts = await pipeline._reflex_query(
             anchor_sets=[["nA"]],
@@ -297,8 +300,7 @@ class TestHybridFallback:
         # Hybrid should find BOTH fiber neurons AND discovery neurons
         assert "nA" in hybrid_ids
         assert "nD" in hybrid_ids, (
-            f"Hybrid should discover nD (outside fiber via classic BFS), "
-            f"got: {hybrid_ids}"
+            f"Hybrid should discover nD (outside fiber via classic BFS), got: {hybrid_ids}"
         )
 
     @pytest.mark.asyncio
@@ -312,7 +314,9 @@ class TestHybridFallback:
         assert brain is not None
 
         pipeline = ReflexPipeline(
-            storage_with_partial_fibers, brain.config, use_reflex=True,
+            storage_with_partial_fibers,
+            brain.config,
+            use_reflex=True,
         )
         activations, _, _ = await pipeline._reflex_query(
             anchor_sets=[["nA"]],
@@ -338,7 +342,9 @@ class TestHybridFallback:
         assert brain is not None
 
         pipeline = ReflexPipeline(
-            storage_with_partial_fibers, brain.config, use_reflex=True,
+            storage_with_partial_fibers,
+            brain.config,
+            use_reflex=True,
         )
 
         # nD is not in any fiber -- should fall back to pure classic

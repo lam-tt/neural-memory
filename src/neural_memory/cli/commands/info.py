@@ -163,9 +163,7 @@ def check(
 
 
 def status(
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="Output as JSON")
-    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Show current brain status, recent activity, and actionable suggestions.
 
@@ -217,17 +215,13 @@ def status(
                 )
 
         if len(expired) > 0:
-            suggestions.append(
-                f"{len(expired)} expired memories — run 'nmem cleanup' to remove"
-            )
+            suggestions.append(f"{len(expired)} expired memories — run 'nmem cleanup' to remove")
 
         if len(todos) > 0:
             suggestions.append(f"{len(todos)} pending TODOs")
 
         if stats_data["fiber_count"] == 0:
-            suggestions.append(
-                "No memories yet — try: nmem remember \"your first memory\""
-            )
+            suggestions.append('No memories yet — try: nmem remember "your first memory"')
 
         return {
             "brain": brain.name,

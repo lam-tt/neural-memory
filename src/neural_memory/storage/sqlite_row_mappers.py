@@ -79,9 +79,7 @@ def row_to_fiber(row: aiosqlite.Row) -> Fiber:
 
     # Handle last_conducted with fallback
     last_conducted_raw = row["last_conducted"] if "last_conducted" in row_keys else None
-    last_conducted = (
-        datetime.fromisoformat(last_conducted_raw) if last_conducted_raw else None
-    )
+    last_conducted = datetime.fromisoformat(last_conducted_raw) if last_conducted_raw else None
 
     return Fiber(
         id=row["id"],
@@ -180,9 +178,7 @@ def provenance_to_dict(provenance: Provenance) -> dict:
         "source": provenance.source,
         "confidence": provenance.confidence.value,
         "verified": provenance.verified,
-        "verified_at": (
-            provenance.verified_at.isoformat() if provenance.verified_at else None
-        ),
+        "verified_at": (provenance.verified_at.isoformat() if provenance.verified_at else None),
         "created_by": provenance.created_by,
         "last_confirmed": (
             provenance.last_confirmed.isoformat() if provenance.last_confirmed else None

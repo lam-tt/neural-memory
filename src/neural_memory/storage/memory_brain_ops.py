@@ -208,9 +208,7 @@ class InMemoryBrainMixin:
                     else None
                 ),
                 time_end=(
-                    datetime.fromisoformat(f_data["time_end"])
-                    if f_data.get("time_end")
-                    else None
+                    datetime.fromisoformat(f_data["time_end"]) if f_data.get("time_end") else None
                 ),
                 coherence=f_data.get("coherence", 0.0),
                 salience=f_data.get("salience", 0.0),
@@ -222,9 +220,7 @@ class InMemoryBrainMixin:
             )
             await self.add_fiber(fiber)
 
-    async def _import_typed_memories(
-        self, brain_id: str, typed_memories_data: list[dict]
-    ) -> None:
+    async def _import_typed_memories(self, brain_id: str, typed_memories_data: list[dict]) -> None:
         for tm_data in typed_memories_data:
             prov_data = tm_data.get("provenance", {})
             provenance = Provenance(

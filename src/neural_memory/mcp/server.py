@@ -333,7 +333,9 @@ class MCPServer:
             return {
                 "saved": len(saved),
                 "memories": saved,
-                "message": f"Auto-captured {len(saved)} memories" if saved else "No memories met confidence threshold",
+                "message": f"Auto-captured {len(saved)} memories"
+                if saved
+                else "No memories met confidence threshold",
             }
 
         return {"error": f"Unknown action: {action}"}

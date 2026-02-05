@@ -224,9 +224,7 @@ class ReinforcementManager:
                         synapse.weight + self.reinforcement_delta,
                         self.max_weight,
                     )
-                    reinforced_synapse = synapse.reinforce(
-                        new_weight - synapse.weight
-                    )
+                    reinforced_synapse = synapse.reinforce(new_weight - synapse.weight)
                     await storage.update_synapse(reinforced_synapse)
                     reinforced += 1
 

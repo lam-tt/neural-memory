@@ -65,9 +65,7 @@ def dict_to_fiber(data: dict[str, Any]) -> Fiber:
         neuron_ids=frozenset(data.get("neuron_ids", [])),
         synapse_ids=frozenset(data.get("synapse_ids", [])),
         anchor_neuron_id=data["anchor_neuron_id"],
-        time_start=datetime.fromisoformat(data["time_start"])
-        if data.get("time_start")
-        else None,
+        time_start=datetime.fromisoformat(data["time_start"]) if data.get("time_start") else None,
         time_end=datetime.fromisoformat(data["time_end"]) if data.get("time_end") else None,
         coherence=data.get("coherence", 0.0),
         salience=data.get("salience", 0.0),

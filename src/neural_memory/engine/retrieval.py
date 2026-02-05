@@ -128,11 +128,7 @@ class ReflexPipeline:
 
         # 7. Reconstitute answer and context
         # Use co-activated neurons as priority intersections
-        co_activated_ids = [
-            neuron_id
-            for co in co_activations
-            for neuron_id in co.neuron_ids
-        ]
+        co_activated_ids = [neuron_id for co in co_activations for neuron_id in co.neuron_ids]
         all_intersections = co_activated_ids + [
             n for n in intersections if n not in co_activated_ids
         ]
@@ -242,21 +238,17 @@ class ReflexPipeline:
             return activations, intersections, []
 
         # --- Phase 1: Reflex activation (primary) ---
-        reflex_activations, co_activations = (
-            await self._reflex_activator.activate_with_co_binding(
-                anchor_sets=anchor_sets,
-                fibers=fibers,
-                reference_time=reference_time,
-            )
+        reflex_activations, co_activations = await self._reflex_activator.activate_with_co_binding(
+            anchor_sets=anchor_sets,
+            fibers=fibers,
+            reference_time=reference_time,
         )
 
         # --- Phase 2: Limited classic BFS (discovery) ---
         discovery_hops = max(1, self._config.max_spread_hops // 2)
-        classic_activations, classic_intersections = (
-            await self._activator.activate_from_multiple(
-                anchor_sets,
-                max_hops=discovery_hops,
-            )
+        classic_activations, classic_intersections = await self._activator.activate_from_multiple(
+            anchor_sets,
+            max_hops=discovery_hops,
         )
 
         # --- Phase 3: Merge results ---
@@ -277,11 +269,7 @@ class ReflexPipeline:
                 )
 
         # Merge intersections
-        co_intersection_ids = [
-            neuron_id
-            for co in co_activations
-            for neuron_id in co.neuron_ids
-        ]
+        co_intersection_ids = [neuron_id for co in co_activations for neuron_id in co.neuron_ids]
         intersections = co_intersection_ids + [
             n for n in classic_intersections if n not in co_intersection_ids
         ]

@@ -51,12 +51,14 @@ def _detect_patterns(
         for match in matches:
             if len(match) >= min_match_len:
                 content = f"{prefix}{match.strip()}" if prefix else match.strip()
-                detected.append({
-                    "type": memory_type,
-                    "content": content,
-                    "confidence": confidence,
-                    "priority": priority,
-                })
+                detected.append(
+                    {
+                        "type": memory_type,
+                        "content": content,
+                        "confidence": confidence,
+                        "priority": priority,
+                    }
+                )
     return detected
 
 
@@ -86,14 +88,10 @@ def analyze_text_for_memories(
         )
 
     if capture_todos:
-        detected.extend(
-            _detect_patterns(text, TODO_PATTERNS, "todo", 0.75, 5, 5, "TODO: ")
-        )
+        detected.extend(_detect_patterns(text, TODO_PATTERNS, "todo", 0.75, 5, 5, "TODO: "))
 
     if capture_facts:
-        detected.extend(
-            _detect_patterns(text_lower, FACT_PATTERNS, "fact", 0.7, 5, 15)
-        )
+        detected.extend(_detect_patterns(text_lower, FACT_PATTERNS, "fact", 0.7, 5, 15))
 
     # Remove duplicates
     seen: set[str] = set()

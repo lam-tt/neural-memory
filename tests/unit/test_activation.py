@@ -222,9 +222,7 @@ class TestReflexActivation:
             Synapse.create(
                 "time1", "entity1", SynapseType.HAPPENED_AT, weight=0.9, synapse_id="s1"
             ),
-            Synapse.create(
-                "entity1", "action1", SynapseType.INVOLVES, weight=0.8, synapse_id="s2"
-            ),
+            Synapse.create("entity1", "action1", SynapseType.INVOLVES, weight=0.8, synapse_id="s2"),
             Synapse.create(
                 "action1", "spatial1", SynapseType.AT_LOCATION, weight=0.7, synapse_id="s3"
             ),
@@ -329,7 +327,10 @@ class TestReflexActivation:
 
         # Recent fiber should result in higher activation
         if "entity1" in recent_results and "entity1" in old_results:
-            assert recent_results["entity1"].activation_level >= old_results["entity1"].activation_level
+            assert (
+                recent_results["entity1"].activation_level
+                >= old_results["entity1"].activation_level
+            )
 
 
 class TestCoActivation:
@@ -364,9 +365,7 @@ class TestCoActivation:
         return storage
 
     @pytest.mark.asyncio
-    async def test_find_co_activated(
-        self, storage: InMemoryStorage, config: BrainConfig
-    ) -> None:
+    async def test_find_co_activated(self, storage: InMemoryStorage, config: BrainConfig) -> None:
         """Test finding co-activated neurons."""
         reflex = ReflexActivation(storage, config)
 
@@ -385,9 +384,7 @@ class TestCoActivation:
         co_activations = reflex.find_co_activated([set1, set2])
 
         # n2 and n3 should be co-activated (appear in both sets)
-        co_activated_ids = {
-            neuron_id for co in co_activations for neuron_id in co.neuron_ids
-        }
+        co_activated_ids = {neuron_id for co in co_activations for neuron_id in co.neuron_ids}
         assert "n2" in co_activated_ids
         assert "n3" in co_activated_ids
         assert "n1" not in co_activated_ids  # Only in set1

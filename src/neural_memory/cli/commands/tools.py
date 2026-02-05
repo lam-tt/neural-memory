@@ -184,12 +184,8 @@ def init(
 
 
 def serve(
-    host: Annotated[
-        str, typer.Option("--host", "-h", help="Host to bind to")
-    ] = "127.0.0.1",
-    port: Annotated[
-        int, typer.Option("--port", "-p", help="Port to bind to")
-    ] = 8000,
+    host: Annotated[str, typer.Option("--host", "-h", help="Host to bind to")] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", "-p", help="Port to bind to")] = 8000,
     reload: Annotated[
         bool, typer.Option("--reload", "-r", help="Enable auto-reload for development")
     ] = False,
@@ -384,7 +380,9 @@ fi
         if post_commit.exists():
             existing = post_commit.read_text(encoding="utf-8")
             is_nmem = hook_marker in existing
-            typer.echo(f"Post-commit hook: {'installed (neural-memory)' if is_nmem else 'exists (other)'}")
+            typer.echo(
+                f"Post-commit hook: {'installed (neural-memory)' if is_nmem else 'exists (other)'}"
+            )
             typer.echo(f"  Path: {post_commit}")
         else:
             typer.echo("Post-commit hook: not installed")

@@ -29,6 +29,7 @@ class SQLiteBrainMixin:
 
     def _ensure_conn(self) -> aiosqlite.Connection: ...
     def _get_brain_id(self) -> str: ...
+
     _current_brain_id: str | None
 
     def set_brain(self, brain_id: str) -> None: ...
@@ -173,9 +174,7 @@ class SQLiteBrainMixin:
                     else None
                 ),
                 time_end=(
-                    datetime.fromisoformat(f_data["time_end"])
-                    if f_data.get("time_end")
-                    else None
+                    datetime.fromisoformat(f_data["time_end"]) if f_data.get("time_end") else None
                 ),
                 coherence=f_data.get("coherence", 0.0),
                 salience=f_data.get("salience", 0.0),
@@ -195,9 +194,7 @@ class SQLiteBrainMixin:
                 description=p_data.get("description", ""),
                 start_date=datetime.fromisoformat(p_data["start_date"]),
                 end_date=(
-                    datetime.fromisoformat(p_data["end_date"])
-                    if p_data.get("end_date")
-                    else None
+                    datetime.fromisoformat(p_data["end_date"]) if p_data.get("end_date") else None
                 ),
                 tags=frozenset(p_data.get("tags", [])),
                 priority=p_data.get("priority", 1.0),
@@ -251,13 +248,15 @@ async def _export_neurons(conn: aiosqlite.Connection, brain_id: str) -> list[dic
     neurons: list[dict] = []
     async with conn.execute("SELECT * FROM neurons WHERE brain_id = ?", (brain_id,)) as cursor:
         async for row in cursor:
-            neurons.append({
-                "id": row["id"],
-                "type": row["type"],
-                "content": row["content"],
-                "metadata": json.loads(row["metadata"]),
-                "created_at": row["created_at"],
-            })
+            neurons.append(
+                {
+                    "id": row["id"],
+                    "type": row["type"],
+                    "content": row["content"],
+                    "metadata": json.loads(row["metadata"]),
+                    "created_at": row["created_at"],
+                }
+            )
     return neurons
 
 
@@ -265,17 +264,19 @@ async def _export_synapses(conn: aiosqlite.Connection, brain_id: str) -> list[di
     synapses: list[dict] = []
     async with conn.execute("SELECT * FROM synapses WHERE brain_id = ?", (brain_id,)) as cursor:
         async for row in cursor:
-            synapses.append({
-                "id": row["id"],
-                "source_id": row["source_id"],
-                "target_id": row["target_id"],
-                "type": row["type"],
-                "weight": row["weight"],
-                "direction": row["direction"],
-                "metadata": json.loads(row["metadata"]),
-                "reinforced_count": row["reinforced_count"],
-                "created_at": row["created_at"],
-            })
+            synapses.append(
+                {
+                    "id": row["id"],
+                    "source_id": row["source_id"],
+                    "target_id": row["target_id"],
+                    "type": row["type"],
+                    "weight": row["weight"],
+                    "direction": row["direction"],
+                    "metadata": json.loads(row["metadata"]),
+                    "reinforced_count": row["reinforced_count"],
+                    "created_at": row["created_at"],
+                }
+            )
     return synapses
 
 
@@ -283,21 +284,23 @@ async def _export_fibers(conn: aiosqlite.Connection, brain_id: str) -> list[dict
     fibers: list[dict] = []
     async with conn.execute("SELECT * FROM fibers WHERE brain_id = ?", (brain_id,)) as cursor:
         async for row in cursor:
-            fibers.append({
-                "id": row["id"],
-                "neuron_ids": json.loads(row["neuron_ids"]),
-                "synapse_ids": json.loads(row["synapse_ids"]),
-                "anchor_neuron_id": row["anchor_neuron_id"],
-                "time_start": row["time_start"],
-                "time_end": row["time_end"],
-                "coherence": row["coherence"],
-                "salience": row["salience"],
-                "frequency": row["frequency"],
-                "summary": row["summary"],
-                "tags": json.loads(row["tags"]),
-                "metadata": json.loads(row["metadata"]),
-                "created_at": row["created_at"],
-            })
+            fibers.append(
+                {
+                    "id": row["id"],
+                    "neuron_ids": json.loads(row["neuron_ids"]),
+                    "synapse_ids": json.loads(row["synapse_ids"]),
+                    "anchor_neuron_id": row["anchor_neuron_id"],
+                    "time_start": row["time_start"],
+                    "time_end": row["time_end"],
+                    "coherence": row["coherence"],
+                    "salience": row["salience"],
+                    "frequency": row["frequency"],
+                    "summary": row["summary"],
+                    "tags": json.loads(row["tags"]),
+                    "metadata": json.loads(row["metadata"]),
+                    "created_at": row["created_at"],
+                }
+            )
     return fibers
 
 
@@ -307,17 +310,19 @@ async def _export_typed_memories(conn: aiosqlite.Connection, brain_id: str) -> l
         "SELECT * FROM typed_memories WHERE brain_id = ?", (brain_id,)
     ) as cursor:
         async for row in cursor:
-            typed_memories.append({
-                "fiber_id": row["fiber_id"],
-                "memory_type": row["memory_type"],
-                "priority": row["priority"],
-                "provenance": json.loads(row["provenance"]),
-                "expires_at": row["expires_at"],
-                "project_id": row["project_id"],
-                "tags": json.loads(row["tags"]),
-                "metadata": json.loads(row["metadata"]),
-                "created_at": row["created_at"],
-            })
+            typed_memories.append(
+                {
+                    "fiber_id": row["fiber_id"],
+                    "memory_type": row["memory_type"],
+                    "priority": row["priority"],
+                    "provenance": json.loads(row["provenance"]),
+                    "expires_at": row["expires_at"],
+                    "project_id": row["project_id"],
+                    "tags": json.loads(row["tags"]),
+                    "metadata": json.loads(row["metadata"]),
+                    "created_at": row["created_at"],
+                }
+            )
     return typed_memories
 
 
@@ -325,15 +330,17 @@ async def _export_projects(conn: aiosqlite.Connection, brain_id: str) -> list[di
     projects: list[dict] = []
     async with conn.execute("SELECT * FROM projects WHERE brain_id = ?", (brain_id,)) as cursor:
         async for row in cursor:
-            projects.append({
-                "id": row["id"],
-                "name": row["name"],
-                "description": row["description"],
-                "start_date": row["start_date"],
-                "end_date": row["end_date"],
-                "tags": json.loads(row["tags"]),
-                "priority": row["priority"],
-                "metadata": json.loads(row["metadata"]),
-                "created_at": row["created_at"],
-            })
+            projects.append(
+                {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "description": row["description"],
+                    "start_date": row["start_date"],
+                    "end_date": row["end_date"],
+                    "tags": json.loads(row["tags"]),
+                    "priority": row["priority"],
+                    "metadata": json.loads(row["metadata"]),
+                    "created_at": row["created_at"],
+                }
+            )
     return projects

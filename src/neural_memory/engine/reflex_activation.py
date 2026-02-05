@@ -315,11 +315,7 @@ class ReflexActivation:
 
         # Combine results with boosted activation for co-activated neurons
         combined: dict[str, ActivationResult] = {}
-        co_activated_ids = {
-            neuron_id
-            for co in co_activations
-            for neuron_id in co.neuron_ids
-        }
+        co_activated_ids = {neuron_id for co in co_activations for neuron_id in co.neuron_ids}
 
         for result_set in activation_results:
             for neuron_id, activation in result_set.items():

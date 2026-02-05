@@ -103,8 +103,12 @@ class SQLiteStorage(
         conn = self._ensure_conn()
 
         for table in [
-            "typed_memories", "projects", "fibers",
-            "synapses", "neuron_states", "neurons",
+            "typed_memories",
+            "projects",
+            "fibers",
+            "synapses",
+            "neuron_states",
+            "neurons",
         ]:
             await conn.execute(f"DELETE FROM {table} WHERE brain_id = ?", (brain_id,))
 

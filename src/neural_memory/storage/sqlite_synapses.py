@@ -286,9 +286,7 @@ class SQLiteSynapseMixin:
 
         return None
 
-    async def _build_path_result(
-        self, path: list[tuple[str, str]]
-    ) -> list[tuple[Neuron, Synapse]]:
+    async def _build_path_result(self, path: list[tuple[str, str]]) -> list[tuple[Neuron, Synapse]]:
         """Build path result from neuron/synapse IDs."""
         result: list[tuple[Neuron, Synapse]] = []
         for neuron_id, synapse_id in path:
@@ -311,9 +309,7 @@ def _row_to_joined_synapse(row: Any) -> Synapse:
         metadata=json.loads(row["s_metadata"]),
         reinforced_count=row["reinforced_count"],
         last_activated=(
-            datetime.fromisoformat(row["s_last_activated"])
-            if row["s_last_activated"]
-            else None
+            datetime.fromisoformat(row["s_last_activated"]) if row["s_last_activated"] else None
         ),
         created_at=datetime.fromisoformat(row["s_created_at"]),
     )
