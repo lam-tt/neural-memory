@@ -3,7 +3,7 @@
   "displayName": "NeuralMemory",
   "description": "Visual brain explorer, inline recall, and memory management for NeuralMemory",
   "version": "0.1.0",
-  "publisher": "neuralmemory",
+  "publisher": "neuralmem",
   "license": "MIT",
   "preview": true,
   "repository": {
