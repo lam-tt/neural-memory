@@ -133,7 +133,7 @@
 | `nmem_context` | limit?, fresh_only? | Get recent context |
 | `nmem_todo` | task, priority? | Quick TODO (30-day expiry) |
 | `nmem_stats` | — | Brain statistics |
-| `nmem_auto` | action (status/enable/disable/analyze/process), text?, save? | Auto-capture from text |
+| `nmem_auto` | action (status/enable/disable/analyze/process), text?, save? | Auto-capture from text (with passive recall learning) |
 
 **MCP Resources:**
 - `neuralmemory://prompt/system` — Full system prompt
@@ -175,6 +175,55 @@
 - **Tree View**: "Memories" panel showing neurons and fibers
 - **CodeLens**: Inline hints on matching comment patterns
 - **Graph Explorer**: Interactive neural graph webview
+
+---
+
+## Auto-Capture System
+
+Brain tự động tích lũy memories qua MCP usage, aligned với "The Key: Associative Reflex" vision.
+
+### How It Works
+
+1. **Passive capture on `nmem_recall`**: Queries >=50 chars are analyzed for capturable patterns (fire-and-forget, higher confidence threshold 0.8)
+2. **Explicit capture via `nmem_auto process`**: Analyze text and save detected memories (respects `enabled` flag)
+3. **Pattern analysis via `nmem_auto analyze`**: Preview detected patterns without saving
+
+### Detection Patterns (5 categories)
+
+| Category | Confidence | Priority | Example Triggers |
+|----------|-----------|----------|-----------------|
+| `decision` | 0.8 | 6 | "decided to", "chose X over Y", "quyết định" |
+| `error` | 0.85 | 7 | "error:", "bug:", "fixed by", "lỗi do" |
+| `todo` | 0.75 | 5 | "TODO:", "need to", "cần phải" |
+| `fact` | 0.7 | 5 | "answer is", "works because", "giải pháp là" |
+| `insight` | 0.8 | 6 | "turns out", "root cause was", "hóa ra", "TIL" |
+
+### Configuration (`~/.neuralmemory/config.toml`)
+
+```toml
+[auto]
+enabled = true              # Master switch (default: true)
+capture_decisions = true
+capture_errors = true
+capture_todos = true
+capture_facts = true
+capture_insights = true     # NEW: "aha moment" detection
+min_confidence = 0.7        # Threshold for explicit process
+                            # Passive capture uses max(0.8, min_confidence)
+```
+
+### Safety Guards
+
+- Minimum text length: 20 chars (avoids false positives on tiny inputs)
+- Passive capture: >=50 char queries only, confidence >=0.8
+- Fire-and-forget: passive capture errors never break `nmem_recall`
+- `nmem_auto process` enforces `enabled` flag (returns early if disabled)
+- Deduplication with type-prefix stripping
+
+### Supported Languages
+
+- English (all 5 categories)
+- Vietnamese (decision, error, todo, fact, insight patterns)
 
 ---
 
@@ -246,7 +295,8 @@ nmem-mcp = neural_memory.mcp:main
 ### Unit Tests (16)
 - test_neuron, test_synapse, test_fiber, test_brain_mode, test_project
 - test_memory_types, test_activation, test_consolidation, test_hebbian
-- test_mcp, test_router, test_safety, test_sqlite_storage
+- test_mcp (52 tests: schemas, tool calls, protocol, resources, storage, auto-capture, passive capture)
+- test_router, test_safety, test_sqlite_storage
 - test_sync, test_temporal, test_typed_memory_storage
 
 ### Integration Tests (2)
