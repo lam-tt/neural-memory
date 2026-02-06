@@ -112,6 +112,8 @@ class MCPServer:
             return await self._session(arguments)
         elif name == "nmem_index":
             return await self._index(arguments)
+        elif name == "nmem_import":
+            return await self._import(arguments)
         else:
             return {"error": f"Unknown tool: {name}"}
 
@@ -715,6 +717,80 @@ class MCPServer:
             }
 
         return {"error": f"Unknown index action: {action}"}
+
+    async def _import(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Import memories from an external source."""
+        from neural_memory.integration.adapters import get_adapter
+        from neural_memory.integration.sync_engine import SyncEngine
+
+        storage = await self.get_storage()
+        brain = await storage.get_brain(storage._current_brain_id)
+        if not brain:
+            return {"error": "No brain configured"}
+
+        source = args.get("source", "")
+        if not source:
+            return {"error": "Source system name required"}
+
+        adapter_kwargs: dict[str, Any] = {}
+        connection = args.get("connection")
+
+        if source == "chromadb":
+            if connection:
+                adapter_kwargs["path"] = connection
+        elif source == "mem0":
+            if connection:
+                adapter_kwargs["api_key"] = connection
+            if args.get("user_id"):
+                adapter_kwargs["user_id"] = args["user_id"]
+        elif source == "awf":
+            if connection:
+                adapter_kwargs["brain_dir"] = connection
+        elif source == "cognee":
+            if connection:
+                adapter_kwargs["api_key"] = connection
+        elif source == "graphiti":
+            if connection:
+                adapter_kwargs["uri"] = connection
+            if args.get("group_id"):
+                adapter_kwargs["group_id"] = args["group_id"]
+        elif source == "llamaindex":
+            if connection:
+                adapter_kwargs["persist_dir"] = connection
+
+        try:
+            adapter = get_adapter(source, **adapter_kwargs)
+        except ValueError as e:
+            return {"error": str(e)}
+
+        engine = SyncEngine(storage, brain.config)
+        storage.disable_auto_save()
+
+        try:
+            result, _sync_state = await engine.sync(
+                adapter=adapter,
+                collection=args.get("collection"),
+                limit=args.get("limit"),
+            )
+            await storage.batch_save()
+        except Exception as e:
+            return {"error": f"Import failed: {e}"}
+
+        return {
+            "success": True,
+            "source": result.source_system,
+            "collection": result.source_collection,
+            "records_fetched": result.records_fetched,
+            "records_imported": result.records_imported,
+            "records_skipped": result.records_skipped,
+            "records_failed": result.records_failed,
+            "duration_seconds": result.duration_seconds,
+            "errors": list(result.errors)[:5],
+            "message": (
+                f"Imported {result.records_imported} memories from "
+                f"{result.source_system}/{result.source_collection}"
+            ),
+        }
 
     async def _save_detected_memories(self, detected: list[dict[str, Any]]) -> list[str]:
         """Save detected memories that meet confidence threshold."""

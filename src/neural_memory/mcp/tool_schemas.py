@@ -61,7 +61,7 @@ def get_tool_schemas() -> list[dict[str, Any]]:
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 3,
-                        "description": "Search depth: 0=instant, 1=context, 2=habit, 3=deep",
+                        "description": "Search depth: 0=instant (direct lookup, 1 hop), 1=context (spreading activation, 3 hops), 2=habit (cross-time patterns, 4 hops), 3=deep (full graph traversal). Auto-detected if unset.",
                     },
                     "max_tokens": {
                         "type": "integer",
@@ -228,6 +228,38 @@ def get_tool_schemas() -> list[dict[str, Any]]:
                     },
                 },
                 "required": ["action"],
+            },
+        },
+        {
+            "name": "nmem_import",
+            "description": "Import memories from external systems (ChromaDB, Mem0, AWF, Cognee, Graphiti, LlamaIndex) into NeuralMemory. Supports full and incremental sync.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "enum": ["chromadb", "mem0", "awf", "cognee", "graphiti", "llamaindex"],
+                        "description": "Source system to import from",
+                    },
+                    "connection": {
+                        "type": "string",
+                        "description": "Connection string/path (e.g., '/path/to/chroma', API key, graph URI, or index dir path)",
+                    },
+                    "collection": {
+                        "type": "string",
+                        "description": "Collection/namespace to import from",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Maximum records to import",
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "description": "User ID filter (for Mem0)",
+                    },
+                },
+                "required": ["source"],
             },
         },
     ]

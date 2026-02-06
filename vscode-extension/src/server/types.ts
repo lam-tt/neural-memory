@@ -155,6 +155,38 @@ export interface IndexResponse {
   readonly indexed_files: readonly string[] | null;
 }
 
+// ============ Import types ============
+
+export type ImportSource =
+  | "chromadb"
+  | "mem0"
+  | "awf"
+  | "cognee"
+  | "graphiti"
+  | "llamaindex";
+
+export interface ImportRequest {
+  readonly source: ImportSource;
+  readonly connection?: string;
+  readonly collection?: string;
+  readonly limit?: number;
+  readonly user_id?: string;
+  readonly group_id?: string;
+}
+
+export interface ImportResponse {
+  readonly success: boolean;
+  readonly source: string;
+  readonly collection: string;
+  readonly records_fetched: number;
+  readonly records_imported: number;
+  readonly records_skipped: number;
+  readonly records_failed: number;
+  readonly duration_seconds: number;
+  readonly errors: readonly string[];
+  readonly message: string;
+}
+
 // ============ Graph types (from /api/graph) ============
 
 export interface GraphNeuron {

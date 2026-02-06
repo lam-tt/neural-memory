@@ -16,6 +16,8 @@ import type {
   FiberResponse,
   GraphData,
   HealthResponse,
+  ImportRequest,
+  ImportResponse,
   IndexRequest,
   IndexResponse,
   NeuronListResponse,
@@ -110,6 +112,13 @@ export class NeuralMemoryClient {
     request: IndexRequest,
   ): Promise<IndexResponse> {
     return this._post<IndexResponse>("/memory/index", request, brainId);
+  }
+
+  async importMemories(
+    brainId: string,
+    request: ImportRequest,
+  ): Promise<ImportResponse> {
+    return this._post<ImportResponse>("/memory/import", request, brainId);
   }
 
   // ============ Graph ============

@@ -88,6 +88,12 @@
         "title": "Index Codebase",
         "category": "NeuralMemory",
         "icon": "$(search-fuzzy)"
+      },
+      {
+        "command": "neuralmemory.importMemories",
+        "title": "Import Memories from External Source",
+        "category": "NeuralMemory",
+        "icon": "$(cloud-download)"
       }
     ],
     "viewsContainers": {
