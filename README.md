@@ -31,7 +31,7 @@ NeuralMemory stores experiences as interconnected neurons and recalls them throu
 - **RAG**: Returns "JWT caused outage" (missing *why* we used JWT)
 - **NeuralMemory**: Traces `outage ← CAUSED_BY ← JWT ← SUGGESTED_BY ← Alice` → full causal chain
 
-See [full comparison](docs/GUIDE.md#neuralmemory-vs-rag--vector-search) in the docs.
+See [full comparison](docs/index.md) in the docs.
 
 ---
 
@@ -190,10 +190,10 @@ WS   /sync/ws           - Real-time sync
 
 ## Documentation
 
-- **[Complete Guide](docs/GUIDE.md)** - Full documentation with all features
-- **[Integration Guide](docs/integration.md)** - AI assistant & tool integration
-- **[Safety & Limitations](docs/safety.md)** - Security best practices
-- **[Architecture & Scalability](docs/architecture.md)** - Technical design & future roadmap
+- **[Complete Guide](docs/index.md)** - Full documentation with all features
+- **[Integration Guide](docs/guides/integration.md)** - AI assistant & tool integration
+- **[Safety & Limitations](docs/guides/safety.md)** - Security best practices
+- **[Architecture & Scalability](docs/architecture/overview.md)** - Technical design & future roadmap
 
 ## Development
 

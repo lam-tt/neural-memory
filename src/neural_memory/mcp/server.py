@@ -177,6 +177,20 @@ class MCPServer:
             "message": f"Remembered: {content[:50]}{'...' if len(content) > 50 else ''}",
         }
 
+    async def _get_active_session(self, storage: SQLiteStorage) -> dict[str, Any] | None:
+        """Get active session metadata, or None if no active session."""
+        try:
+            sessions = await storage.find_typed_memories(
+                memory_type=MemoryType.CONTEXT,
+                tags={"session_state"},
+                limit=1,
+            )
+            if sessions and sessions[0].metadata.get("active", True):
+                return sessions[0].metadata
+        except Exception:
+            pass
+        return None
+
     async def _recall(self, args: dict[str, Any]) -> dict[str, Any]:
         """Query memories."""
         storage = await self.get_storage()
@@ -189,9 +203,28 @@ class MCPServer:
         max_tokens = args.get("max_tokens", 500)
         min_confidence = args.get("min_confidence", 0.0)
 
+        # Inject session context for richer recall on vague queries
+        # Fire-and-forget: never let session logic break core recall
+        effective_query = query
+        try:
+            session = await self._get_active_session(storage)
+            if session and isinstance(session, dict):
+                session_terms: list[str] = []
+                feature = session.get("feature", "")
+                task = session.get("task", "")
+                if isinstance(feature, str) and feature:
+                    session_terms.append(feature)
+                if isinstance(task, str) and task:
+                    session_terms.append(task)
+                # Only inject if query is vague (short, few specific terms)
+                if session_terms and len(query.split()) < 8:
+                    effective_query = f"{query} [context: {', '.join(session_terms)}]"
+        except Exception:
+            pass
+
         pipeline = ReflexPipeline(storage, brain.config)
         result = await pipeline.query(
-            query=query,
+            query=effective_query,
             depth=depth,
             max_tokens=max_tokens,
             reference_time=datetime.now(),

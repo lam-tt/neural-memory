@@ -296,16 +296,43 @@ class QueryParser:
 
         return "en"
 
+    # Specificity weights: more specific intents score higher per match
+    # to avoid generic intents (ASK_WHAT) shadowing specific ones (ASK_PATTERN).
+    # Question-word intents (ASK_WHEN, ASK_WHERE, etc.) get a slight boost
+    # over structural intents (CONFIRM) since "When did we..." is a WHEN question.
+    _INTENT_SPECIFICITY: dict[QueryIntent, float] = {
+        QueryIntent.ASK_FEELING: 1.5,
+        QueryIntent.ASK_PATTERN: 1.3,
+        QueryIntent.ASK_WHY: 1.2,
+        QueryIntent.ASK_HOW: 1.2,
+        QueryIntent.ASK_WHEN: 1.15,
+        QueryIntent.ASK_WHERE: 1.15,
+        QueryIntent.ASK_WHO: 1.15,
+        QueryIntent.COMPARE: 1.2,
+        QueryIntent.CONFIRM: 1.05,
+    }
+
     def _detect_intent(self, query: str) -> QueryIntent:
-        """Detect the query intent."""
+        """Detect the query intent using scored matching.
+
+        Each intent's score = match_count * specificity_weight.
+        The intent with highest score wins, resolving ambiguity when
+        a query matches multiple intents (e.g. "What pattern..." matching
+        both ASK_WHAT and ASK_PATTERN).
+        """
         query_lower = query.lower()
+        scores: dict[QueryIntent, float] = {}
 
         for intent, patterns in self._intent_compiled.items():
-            for pattern in patterns:
-                if pattern.search(query_lower):
-                    return intent
+            match_count = sum(1 for p in patterns if p.search(query_lower))
+            if match_count > 0:
+                weight = self._INTENT_SPECIFICITY.get(intent, 1.0)
+                scores[intent] = match_count * weight
 
-        return QueryIntent.RECALL
+        if not scores:
+            return QueryIntent.RECALL
+
+        return max(scores, key=lambda k: scores[k])
 
     def _detect_perspective(
         self,

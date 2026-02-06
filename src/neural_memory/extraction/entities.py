@@ -18,6 +18,7 @@ class EntityType(StrEnum):
     ORGANIZATION = "organization"
     PRODUCT = "product"
     EVENT = "event"
+    CODE = "code"
     UNKNOWN = "unknown"
 
 
@@ -98,6 +99,14 @@ class EntityExtractor:
     # Pattern for capitalized words (potential entities)
     CAPITALIZED_PATTERN = re.compile(r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\b")
 
+    # Code entity patterns
+    # PascalCase: ReflexPipeline, MemoryEncoder (2+ capitalized segments)
+    PASCAL_CASE_PATTERN = re.compile(r"\b([A-Z][a-z]+(?:[A-Z][a-z]+)+)\b")
+    # snake_case with 2+ segments: extract_keywords, activate_trail
+    SNAKE_CASE_PATTERN = re.compile(r"\b([a-z][a-z0-9]*(?:_[a-z][a-z0-9]*){1,})\b")
+    # File paths: src/neural_memory/server.py, config.toml
+    FILE_PATH_PATTERN = re.compile(r"(?:[\w.-]+/)+[\w.-]+\.\w+")
+
     # Pattern for Vietnamese names (words after person prefixes)
     VI_NAME_PATTERN = re.compile(
         r"\b(?:anh|chị|em|bạn|cô|chú|bác|ông|bà)\s+([A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]+)*)",
@@ -161,6 +170,7 @@ class EntityExtractor:
 
         # Fall back to pattern-based extraction
         entities.extend(self._extract_vietnamese_names(text))
+        entities.extend(self._extract_code_entities(text, entities))
         entities.extend(self._extract_capitalized_words(text, entities))
         entities.extend(self._extract_locations(text, entities))
 
@@ -300,6 +310,68 @@ class EntityExtractor:
                     start=match.start(),
                     end=match.end(),
                     confidence=0.5,
+                )
+            )
+
+        return entities
+
+    def _extract_code_entities(
+        self,
+        text: str,
+        existing: list[Entity],
+    ) -> list[Entity]:
+        """Extract code identifiers (PascalCase, snake_case, file paths)."""
+        entities: list[Entity] = []
+        existing_spans = {(e.start, e.end) for e in existing}
+        existing_texts = {e.text.lower() for e in existing}
+
+        # PascalCase (e.g., ReflexPipeline, MemoryEncoder)
+        for match in self.PASCAL_CASE_PATTERN.finditer(text):
+            if (match.start(), match.end()) in existing_spans:
+                continue
+            if match.group(1).lower() in existing_texts:
+                continue
+            entities.append(
+                Entity(
+                    text=match.group(1),
+                    type=EntityType.CODE,
+                    start=match.start(),
+                    end=match.end(),
+                    confidence=0.85,
+                )
+            )
+
+        # snake_case (e.g., extract_keywords, activate_trail)
+        for match in self.SNAKE_CASE_PATTERN.finditer(text):
+            if (match.start(), match.end()) in existing_spans:
+                continue
+            word = match.group(1)
+            if word.lower() in existing_texts:
+                continue
+            # Skip common non-code snake_case (e.g., stop words joined)
+            if len(word) < 5:
+                continue
+            entities.append(
+                Entity(
+                    text=word,
+                    type=EntityType.CODE,
+                    start=match.start(),
+                    end=match.end(),
+                    confidence=0.8,
+                )
+            )
+
+        # File paths (e.g., src/neural_memory/server.py)
+        for match in self.FILE_PATH_PATTERN.finditer(text):
+            if (match.start(), match.end()) in existing_spans:
+                continue
+            entities.append(
+                Entity(
+                    text=match.group(0),
+                    type=EntityType.CODE,
+                    start=match.start(),
+                    end=match.end(),
+                    confidence=0.9,
                 )
             )
 

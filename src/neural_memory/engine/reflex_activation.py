@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -302,17 +303,17 @@ class ReflexActivation:
         if reference_time is None:
             reference_time = datetime.utcnow()
 
-        # Activate from each anchor set
-        activation_results: list[dict[str, ActivationResult]] = []
-
-        for anchors in anchor_sets:
-            if anchors:
-                result = await self.activate_trail(
-                    anchor_neurons=anchors,
-                    fibers=fibers,
-                    reference_time=reference_time,
-                )
-                activation_results.append(result)
+        # Activate from each anchor set in parallel
+        tasks = [
+            self.activate_trail(
+                anchor_neurons=anchors,
+                fibers=fibers,
+                reference_time=reference_time,
+            )
+            for anchors in anchor_sets
+            if anchors
+        ]
+        activation_results = list(await asyncio.gather(*tasks)) if tasks else []
 
         if not activation_results:
             return {}, []

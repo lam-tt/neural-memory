@@ -10,7 +10,7 @@ from neural_memory.core.fiber import Fiber
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.extraction.entities import EntityExtractor, EntityType
-from neural_memory.extraction.keywords import extract_keywords
+from neural_memory.extraction.keywords import extract_keywords, extract_weighted_keywords
 from neural_memory.extraction.temporal import TemporalExtractor
 
 if TYPE_CHECKING:
@@ -134,24 +134,30 @@ class MemoryEncoder:
             await self._storage.add_synapse(synapse)
             synapses_created.append(synapse)
 
-        # Connect anchor to entity neurons
+        # Connect anchor to entity neurons (weight by mention frequency)
+        content_lower = content.lower()
         for entity_neuron in entity_neurons:
+            mention_count = content_lower.count(entity_neuron.content.lower())
+            entity_weight = min(0.95, 0.7 + 0.05 * mention_count)
             synapse = Synapse.create(
                 source_id=anchor_neuron.id,
                 target_id=entity_neuron.id,
                 type=SynapseType.INVOLVES,
-                weight=0.8,
+                weight=entity_weight,
             )
             await self._storage.add_synapse(synapse)
             synapses_created.append(synapse)
 
-        # Connect anchor to concept neurons
+        # Connect anchor to concept neurons (weight by keyword importance)
+        kw_weight_map = {kw.text: kw.weight for kw in extract_weighted_keywords(content)}
         for concept_neuron in concept_neurons:
+            kw_weight = kw_weight_map.get(concept_neuron.content.lower(), 0.5)
+            concept_weight = min(0.8, 0.4 + 0.3 * kw_weight)
             synapse = Synapse.create(
                 source_id=anchor_neuron.id,
                 target_id=concept_neuron.id,
                 type=SynapseType.RELATED_TO,
-                weight=0.6,
+                weight=concept_weight,
             )
             await self._storage.add_synapse(synapse)
             synapses_created.append(synapse)
@@ -303,6 +309,7 @@ class MemoryEncoder:
             EntityType.ORGANIZATION: NeuronType.ENTITY,
             EntityType.PRODUCT: NeuronType.ENTITY,
             EntityType.EVENT: NeuronType.ACTION,
+            EntityType.CODE: NeuronType.CONCEPT,
             EntityType.UNKNOWN: NeuronType.CONCEPT,
         }
         return mapping.get(entity_type, NeuronType.CONCEPT)

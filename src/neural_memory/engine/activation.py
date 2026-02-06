@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import heapq
 import math
 from collections import defaultdict
@@ -222,12 +223,9 @@ class SpreadingActivation:
         if not anchor_sets:
             return {}, []
 
-        # Activate from each set
-        activation_results: list[dict[str, ActivationResult]] = []
-        for anchors in anchor_sets:
-            if anchors:
-                result = await self.activate(anchors, max_hops)
-                activation_results.append(result)
+        # Activate from each set in parallel
+        tasks = [self.activate(anchors, max_hops) for anchors in anchor_sets if anchors]
+        activation_results = list(await asyncio.gather(*tasks)) if tasks else []
 
         if not activation_results:
             return {}, []

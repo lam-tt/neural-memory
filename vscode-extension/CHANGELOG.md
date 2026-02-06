@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.5] - 2026-02-06
+
+### Changed
+
+- Parallel activation: asyncio.gather for reflex + classic activation (~3x speedup)
+- Scored intent detection: fixes first-match-wins misclassification
+- Weighted keywords with bi-gram extraction and position-based scoring
+- Code entity detection: PascalCase, snake_case, file path patterns
+- Content-aware synapse weights: mention frequency + keyword importance
+- Session-aware recall: injects active session context into queries
+
 ## [0.1.4] - 2026-02-06
 
 ### Changed
