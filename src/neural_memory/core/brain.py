@@ -31,6 +31,9 @@ class BrainConfig:
     hebbian_delta: float = 0.03
     hebbian_threshold: float = 0.5
     hebbian_initial_weight: float = 0.2
+    consolidation_prune_threshold: float = 0.05
+    prune_min_inactive_days: float = 7.0
+    merge_overlap_threshold: float = 0.5
 
     def with_updates(self, **kwargs: Any) -> BrainConfig:
         """Create a new config with updated values."""
@@ -47,6 +50,15 @@ class BrainConfig:
             hebbian_threshold=kwargs.get("hebbian_threshold", self.hebbian_threshold),
             hebbian_initial_weight=kwargs.get(
                 "hebbian_initial_weight", self.hebbian_initial_weight
+            ),
+            consolidation_prune_threshold=kwargs.get(
+                "consolidation_prune_threshold", self.consolidation_prune_threshold
+            ),
+            prune_min_inactive_days=kwargs.get(
+                "prune_min_inactive_days", self.prune_min_inactive_days
+            ),
+            merge_overlap_threshold=kwargs.get(
+                "merge_overlap_threshold", self.merge_overlap_threshold
             ),
         )
 

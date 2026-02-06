@@ -56,6 +56,9 @@ class SQLiteBrainMixin:
                         "hebbian_delta": brain.config.hebbian_delta,
                         "hebbian_threshold": brain.config.hebbian_threshold,
                         "hebbian_initial_weight": brain.config.hebbian_initial_weight,
+                        "consolidation_prune_threshold": brain.config.consolidation_prune_threshold,
+                        "prune_min_inactive_days": brain.config.prune_min_inactive_days,
+                        "merge_overlap_threshold": brain.config.merge_overlap_threshold,
                     }
                 ),
                 brain.owner_id,
@@ -116,6 +119,9 @@ class SQLiteBrainMixin:
                 "hebbian_delta": brain.config.hebbian_delta,
                 "hebbian_threshold": brain.config.hebbian_threshold,
                 "hebbian_initial_weight": brain.config.hebbian_initial_weight,
+                "consolidation_prune_threshold": brain.config.consolidation_prune_threshold,
+                "prune_min_inactive_days": brain.config.prune_min_inactive_days,
+                "merge_overlap_threshold": brain.config.merge_overlap_threshold,
             },
             metadata={
                 "typed_memories": typed_memories,

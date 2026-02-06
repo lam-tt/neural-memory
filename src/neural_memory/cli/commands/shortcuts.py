@@ -305,13 +305,21 @@ def import_brain_cmd(
         str | None, typer.Option("--brain", "-b", help="Target brain name (default: from file)")
     ] = None,
     merge: Annotated[bool, typer.Option("--merge", "-m", help="Merge with existing brain")] = False,
+    strategy: Annotated[
+        str,
+        typer.Option(
+            "--strategy",
+            help="Conflict resolution: prefer_local, prefer_remote, prefer_recent, prefer_stronger",
+        ),
+    ] = "prefer_local",
 ) -> None:
     """Import brain from JSON file.
 
     Examples:
-        nmem import backup.json           # Import as original brain name
-        nmem import backup.json -b new    # Import as 'new' brain
-        nmem import backup.json --merge   # Merge into existing brain
+        nmem import backup.json                          # Import (replace)
+        nmem import backup.json -b new                   # Import as 'new' brain
+        nmem import backup.json --merge                  # Merge into existing brain
+        nmem import backup.json --merge --strategy prefer_recent
     """
     from pathlib import Path
 
@@ -329,7 +337,7 @@ def import_brain_cmd(
         brain_name = brain or data.get("brain_name", "imported")
         storage = await get_shared_storage(brain_name)
 
-        snapshot = BrainSnapshot(
+        incoming_snapshot = BrainSnapshot(
             brain_id=data.get("brain_id", brain_name),
             brain_name=data["brain_name"],
             exported_at=datetime.fromisoformat(data["exported_at"]),
@@ -341,12 +349,39 @@ def import_brain_cmd(
             metadata=data.get("metadata", {}),
         )
 
-        await storage.import_brain(snapshot, brain_name)
+        if merge:
+            # Try to export existing brain for merge
+            from neural_memory.engine.merge import ConflictStrategy, merge_snapshots
 
-        typer.echo(f"Imported brain '{brain_name}' from {input_path}")
-        typer.echo(f"  Neurons: {len(snapshot.neurons)}")
-        typer.echo(f"  Synapses: {len(snapshot.synapses)}")
-        typer.echo(f"  Fibers: {len(snapshot.fibers)}")
+            try:
+                local_snapshot = await storage.export_brain(brain_name)
+            except (ValueError, Exception):
+                # No existing brain, just import directly
+                await storage.import_brain(incoming_snapshot, brain_name)
+                typer.echo(f"Imported brain '{brain_name}' from {input_path} (no existing brain to merge)")
+                return
+
+            conflict_strategy = ConflictStrategy(strategy)
+            merged_snapshot, merge_report = merge_snapshots(
+                local=local_snapshot,
+                incoming=incoming_snapshot,
+                strategy=conflict_strategy,
+            )
+
+            # Clear and reimport merged
+            await storage.clear(brain_name)
+            await storage.import_brain(merged_snapshot, brain_name)
+
+            typer.echo(f"Merged brain '{brain_name}' from {input_path}")
+            typer.echo(f"  Strategy: {strategy}")
+            typer.echo(merge_report.summary())
+        else:
+            await storage.import_brain(incoming_snapshot, brain_name)
+
+            typer.echo(f"Imported brain '{brain_name}' from {input_path}")
+            typer.echo(f"  Neurons: {len(incoming_snapshot.neurons)}")
+            typer.echo(f"  Synapses: {len(incoming_snapshot.synapses)}")
+            typer.echo(f"  Fibers: {len(incoming_snapshot.fibers)}")
 
     asyncio.run(_import())
 

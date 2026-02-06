@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from neural_memory.core.brain import Brain, BrainSnapshot
@@ -425,6 +425,22 @@ class NeuralStorage(ABC):
 
         Returns:
             Dict with keys: neuron_count, synapse_count, fiber_count
+        """
+        ...
+
+    @abstractmethod
+    async def get_enhanced_stats(self, brain_id: str) -> dict[str, Any]:
+        """
+        Get enhanced statistics for a brain.
+
+        Includes hot neurons, DB size, daily activity, synapse stats,
+        neuron type breakdown, and memory time range.
+
+        Args:
+            brain_id: The brain ID
+
+        Returns:
+            Dict with enhanced statistics
         """
         ...
 

@@ -32,7 +32,7 @@ def stats(
         if not brain:
             return {"error": "No brain configured"}
 
-        stats_data = await storage.get_stats(brain.id)
+        enhanced = await storage.get_enhanced_stats(brain.id)
 
         # Get fibers for freshness analysis
         fibers = await storage.get_fibers(limit=1000)
@@ -61,9 +61,16 @@ def stats(
         return {
             "brain": brain.name,
             "brain_id": brain.id,
-            "neuron_count": stats_data["neuron_count"],
-            "synapse_count": stats_data["synapse_count"],
-            "fiber_count": stats_data["fiber_count"],
+            "neuron_count": enhanced["neuron_count"],
+            "synapse_count": enhanced["synapse_count"],
+            "fiber_count": enhanced["fiber_count"],
+            "db_size_bytes": enhanced.get("db_size_bytes", 0),
+            "hot_neurons": enhanced.get("hot_neurons", []),
+            "today_fibers_count": enhanced.get("today_fibers_count", 0),
+            "synapse_stats": enhanced.get("synapse_stats", {}),
+            "neuron_type_breakdown": enhanced.get("neuron_type_breakdown", {}),
+            "oldest_memory": enhanced.get("oldest_memory"),
+            "newest_memory": enhanced.get("newest_memory"),
             "typed_memory_count": len(typed_memories),
             "expired_count": len(expired_memories),
             "created_at": brain.created_at.isoformat(),
@@ -88,6 +95,46 @@ def stats(
         typer.echo(f"Neurons: {result['neuron_count']}")
         typer.echo(f"Synapses: {result['synapse_count']}")
         typer.echo(f"Fibers (memories): {result['fiber_count']}")
+
+        # DB size
+        db_size = result.get("db_size_bytes", 0)
+        if db_size > 0:
+            if db_size >= 1_048_576:
+                typer.echo(f"DB size: {db_size / 1_048_576:.1f} MB")
+            else:
+                typer.echo(f"DB size: {db_size / 1024:.1f} KB")
+
+        # Today's activity
+        today_count = result.get("today_fibers_count", 0)
+        typer.echo(f"Today's memories: {today_count}")
+
+        # Neuron type breakdown
+        neuron_types = result.get("neuron_type_breakdown", {})
+        if neuron_types:
+            typer.echo("\nNeuron Types:")
+            for ntype, count in sorted(neuron_types.items(), key=lambda x: -x[1]):
+                typer.echo(f"  {ntype}: {count}")
+
+        # Hot neurons
+        hot_neurons = result.get("hot_neurons", [])
+        if hot_neurons:
+            typer.echo("\nHot Neurons (most accessed):")
+            for hn in hot_neurons[:5]:
+                content = hn["content"][:50] + "..." if len(hn["content"]) > 50 else hn["content"]
+                typer.echo(f"  [{hn['type']}] {content} (freq: {hn['access_frequency']})")
+
+        # Synapse stats
+        synapse_stats = result.get("synapse_stats", {})
+        if synapse_stats and synapse_stats.get("by_type"):
+            typer.echo(f"\nSynapse Stats:")
+            typer.echo(f"  Avg weight: {synapse_stats['avg_weight']}")
+            typer.echo(f"  Total reinforcements: {synapse_stats['total_reinforcements']}")
+
+        # Memory time range
+        oldest = result.get("oldest_memory")
+        newest = result.get("newest_memory")
+        if oldest and newest:
+            typer.echo(f"\nMemory Range: {oldest[:10]} to {newest[:10]}")
 
         # Show typed memory stats
         if result.get("typed_memory_count", 0) > 0:

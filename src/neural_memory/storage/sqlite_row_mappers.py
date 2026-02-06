@@ -162,6 +162,9 @@ def row_to_brain(row: aiosqlite.Row) -> Brain:
         hebbian_delta=config_data.get("hebbian_delta", 0.03),
         hebbian_threshold=config_data.get("hebbian_threshold", 0.5),
         hebbian_initial_weight=config_data.get("hebbian_initial_weight", 0.2),
+        consolidation_prune_threshold=config_data.get("consolidation_prune_threshold", 0.05),
+        prune_min_inactive_days=config_data.get("prune_min_inactive_days", 7.0),
+        merge_overlap_threshold=config_data.get("merge_overlap_threshold", 0.5),
     )
 
     return Brain(

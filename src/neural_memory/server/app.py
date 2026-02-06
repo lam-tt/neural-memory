@@ -6,14 +6,14 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from neural_memory import __version__
 from neural_memory.server.models import HealthResponse
-from neural_memory.server.routes import brain_router, memory_router, sync_router
+from neural_memory.server.routes import brain_router, consolidation_router, memory_router, sync_router
 from neural_memory.storage.base import NeuralStorage
 
 # Static files directory
@@ -76,10 +76,19 @@ def create_app(
 
     app.dependency_overrides[shared_get_storage] = get_storage
 
-    # Include routers
+    # Versioned API routes
+    api_v1 = APIRouter(prefix="/api/v1")
+    api_v1.include_router(memory_router)
+    api_v1.include_router(brain_router)
+    api_v1.include_router(sync_router)
+    api_v1.include_router(consolidation_router)
+    app.include_router(api_v1)
+
+    # Legacy unversioned routes (backward compat)
     app.include_router(memory_router)
     app.include_router(brain_router)
     app.include_router(sync_router)
+    app.include_router(consolidation_router)
 
     # Health check endpoint
     @app.get("/health", response_model=HealthResponse, tags=["health"])

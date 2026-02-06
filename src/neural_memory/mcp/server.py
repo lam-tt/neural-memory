@@ -263,13 +263,20 @@ class MCPServer:
         if not brain:
             return {"error": "No brain configured"}
 
-        stats = await storage.get_stats(brain.id)
+        stats = await storage.get_enhanced_stats(brain.id)
 
         return {
             "brain": brain.name,
             "neuron_count": stats["neuron_count"],
             "synapse_count": stats["synapse_count"],
             "fiber_count": stats["fiber_count"],
+            "db_size_bytes": stats.get("db_size_bytes", 0),
+            "today_fibers_count": stats.get("today_fibers_count", 0),
+            "hot_neurons": stats.get("hot_neurons", []),
+            "synapse_stats": stats.get("synapse_stats", {}),
+            "neuron_type_breakdown": stats.get("neuron_type_breakdown", {}),
+            "oldest_memory": stats.get("oldest_memory"),
+            "newest_memory": stats.get("newest_memory"),
         }
 
     async def _auto(self, args: dict[str, Any]) -> dict[str, Any]:

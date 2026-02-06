@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import aiosqlite
 
@@ -140,6 +141,102 @@ class SQLiteStorage(
                 stats[key] = row["cnt"] if row else 0
 
         return stats
+
+    async def get_enhanced_stats(self, brain_id: str) -> dict[str, Any]:
+        from datetime import datetime as dt
+
+        conn = self._ensure_conn()
+        basic_stats = await self.get_stats(brain_id)
+
+        # DB file size
+        db_size_bytes = self._db_path.stat().st_size if self._db_path.exists() else 0
+
+        # Hot neurons (most frequently accessed)
+        hot_neurons: list[dict[str, Any]] = []
+        async with conn.execute(
+            """SELECT ns.neuron_id, n.content, n.type,
+                      ns.activation_level, ns.access_frequency
+               FROM neuron_states ns
+               JOIN neurons n ON n.brain_id = ns.brain_id AND n.id = ns.neuron_id
+               WHERE ns.brain_id = ?
+               ORDER BY ns.access_frequency DESC
+               LIMIT 10""",
+            (brain_id,),
+        ) as cursor:
+            async for row in cursor:
+                hot_neurons.append({
+                    "neuron_id": row["neuron_id"],
+                    "content": row["content"],
+                    "type": row["type"],
+                    "activation_level": row["activation_level"],
+                    "access_frequency": row["access_frequency"],
+                })
+
+        # Today's fibers
+        today_midnight = dt.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        async with conn.execute(
+            "SELECT COUNT(*) as cnt FROM fibers WHERE brain_id = ? AND created_at >= ?",
+            (brain_id, today_midnight.isoformat()),
+        ) as cursor:
+            row = await cursor.fetchone()
+            today_fibers_count = row["cnt"] if row else 0
+
+        # Synapse stats by type
+        synapse_stats: dict[str, Any] = {"avg_weight": 0.0, "total_reinforcements": 0, "by_type": {}}
+        async with conn.execute(
+            """SELECT type, AVG(weight) as avg_w, SUM(reinforced_count) as total_r, COUNT(*) as cnt
+               FROM synapses WHERE brain_id = ?
+               GROUP BY type""",
+            (brain_id,),
+        ) as cursor:
+            total_weight = 0.0
+            total_count = 0
+            total_reinforcements = 0
+            async for row in cursor:
+                synapse_stats["by_type"][row["type"]] = {
+                    "count": row["cnt"],
+                    "avg_weight": round(row["avg_w"], 4),
+                    "total_reinforcements": row["total_r"] or 0,
+                }
+                total_weight += (row["avg_w"] or 0.0) * row["cnt"]
+                total_count += row["cnt"]
+                total_reinforcements += row["total_r"] or 0
+
+        if total_count > 0:
+            synapse_stats["avg_weight"] = round(total_weight / total_count, 4)
+        synapse_stats["total_reinforcements"] = total_reinforcements
+
+        # Neuron type breakdown
+        neuron_type_breakdown: dict[str, int] = {}
+        async with conn.execute(
+            "SELECT type, COUNT(*) as cnt FROM neurons WHERE brain_id = ? GROUP BY type",
+            (brain_id,),
+        ) as cursor:
+            async for row in cursor:
+                neuron_type_breakdown[row["type"]] = row["cnt"]
+
+        # Memory time range
+        oldest_memory: str | None = None
+        newest_memory: str | None = None
+        async with conn.execute(
+            "SELECT MIN(created_at) as oldest, MAX(created_at) as newest FROM fibers WHERE brain_id = ?",
+            (brain_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                oldest_memory = row["oldest"]
+                newest_memory = row["newest"]
+
+        return {
+            **basic_stats,
+            "db_size_bytes": db_size_bytes,
+            "hot_neurons": hot_neurons,
+            "today_fibers_count": today_fibers_count,
+            "synapse_stats": synapse_stats,
+            "neuron_type_breakdown": neuron_type_breakdown,
+            "oldest_memory": oldest_memory,
+            "newest_memory": newest_memory,
+        }
 
     # ========== Cleanup ==========
 

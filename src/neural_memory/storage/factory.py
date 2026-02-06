@@ -288,21 +288,32 @@ class HybridStorage:
     async def get_stats(self, brain_id):
         return await self._local.get_stats(brain_id)
 
+    async def get_enhanced_stats(self, brain_id):
+        return await self._local.get_enhanced_stats(brain_id)
+
     async def clear(self, brain_id):
         await self._local.clear(brain_id)
 
     # Sync operations
 
-    async def sync(self) -> dict:
+    async def sync(
+        self,
+        strategy: str = "prefer_local",
+    ) -> dict:
         """
         Manually trigger a full sync with remote server.
 
+        Args:
+            strategy: Conflict resolution strategy
+                (prefer_local, prefer_remote, prefer_recent, prefer_stronger)
+
         Returns:
-            Sync statistics
+            Sync statistics including merge report
         """
+        from neural_memory.engine.merge import ConflictStrategy, merge_snapshots
+
         await self._ensure_connected()
 
-        # Export local brain
         if not self._brain_id:
             raise ValueError("No brain set")
 
@@ -310,17 +321,41 @@ class HybridStorage:
 
         # Get remote snapshot
         try:
-            _remote_snapshot = await self._remote.export_brain(self._brain_id)
+            remote_snapshot = await self._remote.export_brain(self._brain_id)
         except Exception:
             # Brain doesn't exist on remote, push our version
             await self._remote.import_brain(local_snapshot, self._brain_id)
-            return {"pushed": True, "pulled": False}
+            return {"pushed": True, "pulled": False, "merge_report": None}
 
-        # TODO: Implement proper merge logic using _remote_snapshot
-        # For now, just push local to remote
-        await self._remote.import_brain(local_snapshot, self._brain_id)
+        # Merge snapshots
+        conflict_strategy = ConflictStrategy(strategy)
+        merged_snapshot, merge_report = merge_snapshots(
+            local=local_snapshot,
+            incoming=remote_snapshot,
+            strategy=conflict_strategy,
+        )
 
-        return {"pushed": True, "pulled": False}
+        # Clear local and reimport merged
+        await self._local.clear(self._brain_id)
+        await self._local.import_brain(merged_snapshot, self._brain_id)
+        self._local.set_brain(self._brain_id)
+
+        # Push merged to remote
+        await self._remote.import_brain(merged_snapshot, self._brain_id)
+
+        return {
+            "pushed": True,
+            "pulled": True,
+            "merge_report": {
+                "neurons_added": merge_report.neurons_added,
+                "neurons_updated": merge_report.neurons_updated,
+                "neurons_skipped": merge_report.neurons_skipped,
+                "synapses_added": merge_report.synapses_added,
+                "synapses_updated": merge_report.synapses_updated,
+                "fibers_added": merge_report.fibers_added,
+                "conflicts": len(merge_report.conflicts),
+            },
+        }
 
     async def _ensure_connected(self) -> None:
         """Ensure remote storage is connected."""

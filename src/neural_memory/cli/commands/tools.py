@@ -288,6 +288,78 @@ def decay(
     asyncio.run(_decay())
 
 
+def consolidate(
+    brain: Annotated[
+        str | None, typer.Option("--brain", "-b", help="Brain to consolidate")
+    ] = None,
+    strategy: Annotated[
+        str, typer.Option("--strategy", "-s", help="Strategy: prune, merge, summarize, all")
+    ] = "all",
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", "-n", help="Preview changes without applying")
+    ] = False,
+    prune_threshold: Annotated[
+        float, typer.Option("--prune-threshold", help="Weight threshold for pruning synapses")
+    ] = 0.05,
+    merge_overlap: Annotated[
+        float, typer.Option("--merge-overlap", help="Jaccard overlap threshold for merging fibers")
+    ] = 0.5,
+    min_inactive_days: Annotated[
+        float, typer.Option("--min-inactive-days", help="Minimum inactive days before pruning")
+    ] = 7.0,
+) -> None:
+    """Consolidate brain memories by pruning, merging, or summarizing.
+
+    Strategies:
+        prune      - Remove weak synapses and orphan neurons
+        merge      - Combine overlapping fibers
+        summarize  - Create concept neurons for topic clusters
+        all        - Run all strategies in order
+
+    Examples:
+        nmem consolidate                    # Run all strategies
+        nmem consolidate -s prune           # Only prune
+        nmem consolidate --dry-run          # Preview without changes
+        nmem consolidate -s merge --merge-overlap 0.3
+    """
+    from neural_memory.engine.consolidation import (
+        ConsolidationConfig,
+        ConsolidationEngine,
+        ConsolidationStrategy,
+    )
+    from neural_memory.unified_config import get_config, get_shared_storage
+
+    async def _consolidate() -> None:
+        config = get_config()
+        brain_name = brain or config.current_brain
+
+        typer.echo(f"Consolidating brain '{brain_name}' (strategy: {strategy})...")
+        if dry_run:
+            typer.echo("(dry run - no changes will be saved)")
+
+        storage = await get_shared_storage(brain_name)
+
+        strategies = [ConsolidationStrategy(strategy)]
+        cons_config = ConsolidationConfig(
+            prune_weight_threshold=prune_threshold,
+            prune_min_inactive_days=min_inactive_days,
+            merge_overlap_threshold=merge_overlap,
+        )
+
+        engine = ConsolidationEngine(storage, cons_config)
+        report = engine.run(strategies=strategies, dry_run=dry_run)
+
+        # Handle both sync and async
+        import inspect
+        if inspect.isawaitable(report):
+            report = await report
+
+        typer.echo("")
+        typer.echo(report.summary())
+
+    asyncio.run(_consolidate())
+
+
 def hooks(
     action: Annotated[
         str,
@@ -421,4 +493,5 @@ def register(app: typer.Typer) -> None:
     app.command()(init)
     app.command()(serve)
     app.command()(decay)
+    app.command()(consolidate)
     app.command()(hooks)

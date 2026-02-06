@@ -305,11 +305,18 @@ class TestMCPToolCalls:
         mock_brain.name = "my-brain"
         mock_storage.get_brain = AsyncMock(return_value=mock_brain)
         mock_storage._current_brain_id = "test-brain"
-        mock_storage.get_stats = AsyncMock(
+        mock_storage.get_enhanced_stats = AsyncMock(
             return_value={
                 "neuron_count": 100,
                 "synapse_count": 250,
                 "fiber_count": 50,
+                "db_size_bytes": 12345,
+                "today_fibers_count": 3,
+                "hot_neurons": [],
+                "synapse_stats": {},
+                "neuron_type_breakdown": {},
+                "oldest_memory": None,
+                "newest_memory": None,
             }
         )
 
@@ -320,6 +327,8 @@ class TestMCPToolCalls:
         assert result["neuron_count"] == 100
         assert result["synapse_count"] == 250
         assert result["fiber_count"] == 50
+        assert result["db_size_bytes"] == 12345
+        assert result["today_fibers_count"] == 3
 
     @pytest.mark.asyncio
     async def test_auto_tool_status(self, server: MCPServer) -> None:

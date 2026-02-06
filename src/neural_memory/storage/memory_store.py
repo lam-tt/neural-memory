@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 import networkx as nx
 
@@ -317,6 +317,82 @@ class InMemoryStorage(InMemoryCollectionsMixin, InMemoryBrainMixin, NeuralStorag
             "synapse_count": len(self._synapses[brain_id]),
             "fiber_count": len(self._fibers[brain_id]),
             "project_count": len(self._projects[brain_id]),
+        }
+
+    async def get_enhanced_stats(self, brain_id: str) -> dict[str, Any]:
+        basic_stats = await self.get_stats(brain_id)
+
+        # Hot neurons by access frequency
+        hot_neurons: list[dict[str, Any]] = []
+        states = sorted(
+            self._states[brain_id].values(),
+            key=lambda s: s.access_frequency,
+            reverse=True,
+        )
+        for state in states[:10]:
+            neuron = self._neurons[brain_id].get(state.neuron_id)
+            if neuron:
+                hot_neurons.append({
+                    "neuron_id": state.neuron_id,
+                    "content": neuron.content,
+                    "type": neuron.type.value,
+                    "activation_level": state.activation_level,
+                    "access_frequency": state.access_frequency,
+                })
+
+        # Today's fibers
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_fibers_count = sum(
+            1 for f in self._fibers[brain_id].values() if f.created_at >= today
+        )
+
+        # Neuron type breakdown
+        neuron_type_breakdown: dict[str, int] = {}
+        for neuron in self._neurons[brain_id].values():
+            t = neuron.type.value
+            neuron_type_breakdown[t] = neuron_type_breakdown.get(t, 0) + 1
+
+        # Synapse stats
+        synapse_stats: dict[str, Any] = {"avg_weight": 0.0, "total_reinforcements": 0, "by_type": {}}
+        by_type: dict[str, list[float]] = {}
+        total_reinforcements = 0
+        for synapse in self._synapses[brain_id].values():
+            t = synapse.type.value
+            by_type.setdefault(t, []).append(synapse.weight)
+            total_reinforcements += synapse.reinforced_count
+
+        all_weights: list[float] = []
+        for t, weights in by_type.items():
+            avg_w = sum(weights) / len(weights) if weights else 0.0
+            synapse_stats["by_type"][t] = {
+                "count": len(weights),
+                "avg_weight": round(avg_w, 4),
+                "total_reinforcements": 0,
+            }
+            all_weights.extend(weights)
+
+        if all_weights:
+            synapse_stats["avg_weight"] = round(sum(all_weights) / len(all_weights), 4)
+        synapse_stats["total_reinforcements"] = total_reinforcements
+
+        # Memory time range
+        fibers = list(self._fibers[brain_id].values())
+        oldest_memory: str | None = None
+        newest_memory: str | None = None
+        if fibers:
+            dates = [f.created_at for f in fibers]
+            oldest_memory = min(dates).isoformat()
+            newest_memory = max(dates).isoformat()
+
+        return {
+            **basic_stats,
+            "db_size_bytes": 0,
+            "hot_neurons": hot_neurons,
+            "today_fibers_count": today_fibers_count,
+            "synapse_stats": synapse_stats,
+            "neuron_type_breakdown": neuron_type_breakdown,
+            "oldest_memory": oldest_memory,
+            "newest_memory": newest_memory,
         }
 
     # ========== Cleanup ==========

@@ -115,6 +115,32 @@ class BrainListResponse(BaseModel):
     total: int
 
 
+class HotNeuronInfo(BaseModel):
+    """Info about a frequently accessed neuron."""
+
+    neuron_id: str
+    content: str
+    type: str
+    activation_level: float
+    access_frequency: int
+
+
+class SynapseTypeStats(BaseModel):
+    """Stats for a single synapse type."""
+
+    count: int
+    avg_weight: float
+    total_reinforcements: int
+
+
+class SynapseStatsInfo(BaseModel):
+    """Aggregate synapse statistics."""
+
+    avg_weight: float
+    total_reinforcements: int
+    by_type: dict[str, SynapseTypeStats] = Field(default_factory=dict)
+
+
 class StatsResponse(BaseModel):
     """Response with brain statistics."""
 
@@ -122,6 +148,13 @@ class StatsResponse(BaseModel):
     neuron_count: int
     synapse_count: int
     fiber_count: int
+    db_size_bytes: int | None = None
+    hot_neurons: list[HotNeuronInfo] | None = None
+    today_fibers_count: int | None = None
+    synapse_stats: SynapseStatsInfo | None = None
+    neuron_type_breakdown: dict[str, int] | None = None
+    oldest_memory: str | None = None
+    newest_memory: str | None = None
 
 
 class HealthResponse(BaseModel):
@@ -143,6 +176,41 @@ class ImportBrainRequest(BaseModel):
     fibers: list[dict[str, Any]] = Field(default_factory=list, description="Fiber data")
     config: dict[str, Any] = Field(default_factory=dict, description="Brain configuration")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+
+class MergeBrainRequest(BaseModel):
+    """Request to merge a snapshot into an existing brain."""
+
+    snapshot: ImportBrainRequest = Field(..., description="Incoming brain snapshot to merge")
+    strategy: str = Field(
+        "prefer_local",
+        description="Conflict strategy: prefer_local, prefer_remote, prefer_recent, prefer_stronger",
+    )
+
+
+class ConflictItemResponse(BaseModel):
+    """A single conflict resolution record."""
+
+    entity_type: str
+    local_id: str
+    incoming_id: str
+    resolution: str
+    reason: str
+
+
+class MergeReportResponse(BaseModel):
+    """Response from a merge operation."""
+
+    neurons_added: int
+    neurons_updated: int
+    neurons_skipped: int
+    synapses_added: int
+    synapses_updated: int
+    fibers_added: int
+    fibers_updated: int
+    fibers_skipped: int
+    conflicts: list[ConflictItemResponse]
+    id_remap_count: int
 
 
 class ErrorResponse(BaseModel):
