@@ -410,7 +410,7 @@ class TestCoActivation:
 
         co_activations = reflex.find_co_activated([set1, set2, set3])
 
-        # common neuron should have binding_strength = 3/3 = 1.0
+        # common neuron: weighted binding = (0.8 + 0.7 + 0.6) / 3 = 0.7
         assert len(co_activations) == 1
-        assert co_activations[0].binding_strength == 1.0
+        assert abs(co_activations[0].binding_strength - 0.7) < 0.01
         assert co_activations[0].co_fire_count == 3

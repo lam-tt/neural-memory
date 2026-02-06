@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.3] - 2026-02-06
+
+### Changed
+
+- Sync with NeuralMemory v0.9.1 system optimizations
+- Backend: fiber-neuron junction table for 100-1000x faster lookups
+- Backend: sigmoid time decay, weighted co-activation binding
+- Backend: smarter auto-capture with length validation and hash dedup
+- Backend: bridge synapse protection, time-aware fiber merging
+
+## [0.1.2] - 2026-02-06
+
+### Added
+
+- Codebase indexing command (`Ctrl+Shift+M I`)
+- New neuron types: Spatial (Files), Sensory, Intent in tree view
+
 ## [0.1.1] - 2026-02-05
 
 ### Fixed

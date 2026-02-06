@@ -176,6 +176,13 @@ class ConsolidationEngine:
                 )
 
             if should_prune:
+                # Protect bridge synapses (only connection between source and target)
+                if synapse.weight >= 0.02:
+                    neighbors = await self._storage.get_neighbors(synapse.source_id)
+                    neighbor_ids = {n.id for n in neighbors}
+                    if synapse.target_id in neighbor_ids and len(neighbor_ids) <= 1:
+                        continue  # Bridge synapse — don't prune
+
                 pruned_synapse_ids.add(synapse.id)
                 report.synapses_pruned += 1
                 if not dry_run:
@@ -272,11 +279,19 @@ class ConsolidationEngine:
                 intersection = len(set_a & set_b)
                 union_size = len(set_a | set_b)
 
-                if (
-                    union_size > 0
-                    and intersection / union_size >= self._config.merge_overlap_threshold
-                ):
-                    union(i, j)
+                if union_size > 0:
+                    jaccard = intersection / union_size
+                    # Lower threshold for temporally-close fibers (same session)
+                    time_diff = abs(
+                        (fiber_list[i].created_at - fiber_list[j].created_at).total_seconds()
+                    )
+                    effective_threshold = (
+                        self._config.merge_overlap_threshold * 0.6
+                        if time_diff < 3600
+                        else self._config.merge_overlap_threshold
+                    )
+                    if jaccard >= effective_threshold:
+                        union(i, j)
 
         # Group fibers by root
         groups: dict[int, list[int]] = {}

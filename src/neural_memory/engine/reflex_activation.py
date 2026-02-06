@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -215,11 +216,12 @@ class ReflexActivation:
             Time factor between 0.1 and 1.0
         """
         if fiber.last_conducted is None:
-            return 0.5  # Unknown history
+            # Use fiber salience as proxy for importance
+            return 0.3 + 0.4 * fiber.salience
 
         age_hours = (reference_time - fiber.last_conducted).total_seconds() / 3600
-        # Decay over 7 days (168 hours)
-        return max(0.1, 1.0 - (age_hours / 168))
+        # Sigmoid decay: ~1.0 at <1 day, ~0.5 at 3 days, ~0.15 at 7 days
+        return max(0.1, 1.0 / (1.0 + math.exp((age_hours - 72) / 36)))
 
     def find_co_activated(
         self,
@@ -255,15 +257,20 @@ class ReflexActivation:
             if len(sources) < 2:
                 continue
 
-            # Binding strength based on how many sources activated this neuron
-            binding_strength = len(sources) / len(activation_sets)
+            # Weight binding by activation levels from each source
+            source_activations = [
+                activation_sets[i][neuron_id].activation_level
+                for i in sources
+                if neuron_id in activation_sets[i]
+            ]
+            binding_strength = sum(source_activations) / len(activation_sets)
 
             co_activations.append(
                 CoActivation(
                     neuron_ids=frozenset([neuron_id]),
                     temporal_window_ms=temporal_window_ms,
                     co_fire_count=len(sources),
-                    binding_strength=binding_strength,
+                    binding_strength=min(1.0, binding_strength),
                     source_anchors=[],
                 )
             )

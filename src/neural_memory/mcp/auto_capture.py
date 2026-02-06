@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import Any
 
@@ -93,27 +94,43 @@ def _detect_patterns(
             # Handle tuple matches from patterns with multiple groups
             if isinstance(match, tuple):
                 match = " ".join(part for part in match if part)
-            if len(match) >= min_match_len:
-                content = f"{prefix}{match.strip()}" if prefix else match.strip()
-                detected.append(
-                    {
-                        "type": memory_type,
-                        "content": content,
-                        "confidence": confidence,
-                        "priority": priority,
-                    }
-                )
+            captured = match.strip()
+            if len(captured) < min_match_len:
+                continue
+
+            # Adjust confidence based on capture quality
+            adjusted_confidence = confidence
+            if len(captured) > 120:
+                adjusted_confidence *= 0.5  # Penalize over-captures
+            elif len(captured) < 10:
+                adjusted_confidence *= 0.3  # Penalize too-short captures
+
+            # Trim at sentence boundary if over-captured
+            if len(captured) > 100:
+                period_idx = captured.find(".", 50)
+                if period_idx > 0:
+                    captured = captured[:period_idx]
+
+            content = f"{prefix}{captured}" if prefix else captured
+            detected.append(
+                {
+                    "type": memory_type,
+                    "content": content,
+                    "confidence": adjusted_confidence,
+                    "priority": priority,
+                }
+            )
     return detected
 
 
 def _dedup_key(content: str) -> str:
-    """Create a deduplication key by stripping type prefix and normalizing."""
+    """Create a deduplication key by stripping type prefix and hashing."""
     key = content.lower()
     for prefix in _TYPE_PREFIXES:
         if key.startswith(prefix):
             key = key[len(prefix) :]
             break
-    return key[:50]
+    return hashlib.md5(key.encode()).hexdigest()
 
 
 def analyze_text_for_memories(

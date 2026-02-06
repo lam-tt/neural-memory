@@ -233,10 +233,16 @@ class MCPServer:
                 capture_insights=self.config.auto.capture_insights,
             )
             if detected:
-                # Higher threshold for passive capture (user didn't ask to save)
-                passive_threshold = max(self.config.auto.min_confidence, 0.8)
+                # Type-aware thresholds: errors/decisions are high-value
+                type_thresholds = {"error": 0.7, "decision": 0.75, "insight": 0.75}
                 high_confidence = [
-                    item for item in detected if item["confidence"] >= passive_threshold
+                    item
+                    for item in detected
+                    if item["confidence"]
+                    >= max(
+                        self.config.auto.min_confidence,
+                        type_thresholds.get(item["type"], 0.8),
+                    )
                 ]
                 if high_confidence:
                     await self._save_detected_memories(high_confidence)

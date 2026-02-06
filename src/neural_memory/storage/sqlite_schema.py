@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Schema version for migrations
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # ── Migrations ──────────────────────────────────────────────────────
 # Each entry maps (from_version -> to_version) with a list of SQL statements.
@@ -64,6 +64,26 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
             "INSERT OR IGNORE INTO neurons_fts(rowid, content, brain_id) "
             "SELECT rowid, content, brain_id FROM neurons"
         ),
+    ],
+    (3, 4): [
+        # Junction table for fast fiber↔neuron lookups (replaces LIKE on JSON)
+        """CREATE TABLE IF NOT EXISTS fiber_neurons (
+            brain_id TEXT NOT NULL,
+            fiber_id TEXT NOT NULL,
+            neuron_id TEXT NOT NULL,
+            PRIMARY KEY (brain_id, fiber_id, neuron_id),
+            FOREIGN KEY (brain_id, fiber_id) REFERENCES fibers(brain_id, id) ON DELETE CASCADE,
+            FOREIGN KEY (brain_id, neuron_id) REFERENCES neurons(brain_id, id) ON DELETE CASCADE
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_fiber_neurons_neuron ON fiber_neurons(brain_id, neuron_id)",
+        # Backfill from existing fibers JSON arrays
+        (
+            "INSERT OR IGNORE INTO fiber_neurons (brain_id, fiber_id, neuron_id) "
+            "SELECT f.brain_id, f.id, json_each.value "
+            "FROM fibers f, json_each(f.neuron_ids)"
+        ),
+        # Index for hot neurons query in get_enhanced_stats
+        "CREATE INDEX IF NOT EXISTS idx_neuron_states_freq ON neuron_states(brain_id, access_frequency DESC)",
     ],
 }
 
@@ -164,6 +184,7 @@ CREATE TABLE IF NOT EXISTS neuron_states (
     PRIMARY KEY (brain_id, neuron_id),
     FOREIGN KEY (brain_id, neuron_id) REFERENCES neurons(brain_id, id) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS idx_neuron_states_freq ON neuron_states(brain_id, access_frequency DESC);
 
 -- Synapses table
 CREATE TABLE IF NOT EXISTS synapses (
@@ -211,6 +232,17 @@ CREATE TABLE IF NOT EXISTS fibers (
 CREATE INDEX IF NOT EXISTS idx_fibers_created ON fibers(brain_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_fibers_salience ON fibers(brain_id, salience);
 CREATE INDEX IF NOT EXISTS idx_fibers_conductivity ON fibers(brain_id, conductivity);
+
+-- Fiber-neuron junction table (fast lookups)
+CREATE TABLE IF NOT EXISTS fiber_neurons (
+    brain_id TEXT NOT NULL,
+    fiber_id TEXT NOT NULL,
+    neuron_id TEXT NOT NULL,
+    PRIMARY KEY (brain_id, fiber_id, neuron_id),
+    FOREIGN KEY (brain_id, fiber_id) REFERENCES fibers(brain_id, id) ON DELETE CASCADE,
+    FOREIGN KEY (brain_id, neuron_id) REFERENCES neurons(brain_id, id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_fiber_neurons_neuron ON fiber_neurons(brain_id, neuron_id);
 
 -- Typed memories table
 CREATE TABLE IF NOT EXISTS typed_memories (

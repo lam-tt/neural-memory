@@ -146,18 +146,20 @@ class CodebaseEncoder:
             await self._storage.add_synapse(synapse)
             synapses_created.append(synapse)
 
-        # 4. Create co-occurrence synapses for symbols in the same file
+        # 4. Create co-occurrence synapses (capped to avoid O(n²) explosion)
         symbol_neurons = neurons_created[1:]  # Skip file neuron
-        for i, neuron_a in enumerate(symbol_neurons):
-            for neuron_b in symbol_neurons[i + 1 :]:
-                synapse = Synapse.create(
-                    source_id=neuron_a.id,
-                    target_id=neuron_b.id,
-                    type=SynapseType.CO_OCCURS,
-                    weight=0.5,
-                )
-                await self._storage.add_synapse(synapse)
-                synapses_created.append(synapse)
+        max_co_occurs = 5  # Max files: create all pairs; large files: skip
+        if len(symbol_neurons) <= max_co_occurs:
+            for i, neuron_a in enumerate(symbol_neurons):
+                for neuron_b in symbol_neurons[i + 1 :]:
+                    synapse = Synapse.create(
+                        source_id=neuron_a.id,
+                        target_id=neuron_b.id,
+                        type=SynapseType.CO_OCCURS,
+                        weight=0.5,
+                    )
+                    await self._storage.add_synapse(synapse)
+                    synapses_created.append(synapse)
 
         # 5. Bundle into fiber
         neuron_ids = {n.id for n in neurons_created}

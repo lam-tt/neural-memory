@@ -312,11 +312,26 @@ class MemoryEncoder:
         text: str,
     ) -> Neuron | None:
         """Find existing entity neuron with similar content."""
+        # Try exact match first
         existing = await self._storage.find_neurons(
             content_exact=text,
             limit=1,
         )
-        return existing[0] if existing else None
+        if existing:
+            return existing[0]
+
+        # Try normalized match (handles "Claude-Code" vs "Claude Code")
+        normalized = text.lower().replace("-", " ").replace("_", " ").strip()
+        candidates = await self._storage.find_neurons(
+            content_contains=normalized,
+            limit=5,
+        )
+        for candidate in candidates:
+            candidate_norm = candidate.content.lower().replace("-", " ").replace("_", " ").strip()
+            if candidate_norm == normalized:
+                return candidate
+
+        return None
 
     async def _extract_concept_neurons(
         self,
@@ -327,8 +342,9 @@ class MemoryEncoder:
 
         keywords = extract_keywords(content)
 
-        # Only create neurons for significant keywords
-        for keyword in keywords[:10]:  # Limit to top 10
+        # Dynamic limit based on content length
+        concept_limit = min(20, max(5, len(content) // 100))
+        for keyword in keywords[:concept_limit]:
             if len(keyword) < 3:
                 continue
 

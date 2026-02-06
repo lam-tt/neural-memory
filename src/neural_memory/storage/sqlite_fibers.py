@@ -52,6 +52,14 @@ class SQLiteFiberMixin:
                     fiber.created_at.isoformat(),
                 ),
             )
+
+            # Populate junction table for fast lookups
+            for neuron_id in fiber.neuron_ids:
+                await conn.execute(
+                    "INSERT OR IGNORE INTO fiber_neurons (brain_id, fiber_id, neuron_id) VALUES (?, ?, ?)",
+                    (brain_id, fiber.id, neuron_id),
+                )
+
             await conn.commit()
             return fiber.id
         except sqlite3.IntegrityError:
@@ -85,8 +93,8 @@ class SQLiteFiberMixin:
         params: list[Any] = [brain_id]
 
         if contains_neuron is not None:
-            query += " AND neuron_ids LIKE ?"
-            params.append(f'%"{contains_neuron}"%')
+            query += " AND id IN (SELECT fiber_id FROM fiber_neurons WHERE brain_id = ? AND neuron_id = ?)"
+            params.extend([brain_id, contains_neuron])
 
         if time_overlaps is not None:
             start, end = time_overlaps
@@ -146,11 +154,28 @@ class SQLiteFiberMixin:
         if cursor.rowcount == 0:
             raise ValueError(f"Fiber {fiber.id} does not exist")
 
+        # Refresh junction table
+        await conn.execute(
+            "DELETE FROM fiber_neurons WHERE brain_id = ? AND fiber_id = ?",
+            (brain_id, fiber.id),
+        )
+        for neuron_id in fiber.neuron_ids:
+            await conn.execute(
+                "INSERT OR IGNORE INTO fiber_neurons (brain_id, fiber_id, neuron_id) VALUES (?, ?, ?)",
+                (brain_id, fiber.id, neuron_id),
+            )
+
         await conn.commit()
 
     async def delete_fiber(self, fiber_id: str) -> bool:
         conn = self._ensure_conn()
         brain_id = self._get_brain_id()
+
+        # Delete junction entries first
+        await conn.execute(
+            "DELETE FROM fiber_neurons WHERE brain_id = ? AND fiber_id = ?",
+            (brain_id, fiber_id),
+        )
 
         cursor = await conn.execute(
             "DELETE FROM fibers WHERE id = ? AND brain_id = ?",
