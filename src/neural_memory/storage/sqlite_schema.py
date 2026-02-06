@@ -99,14 +99,13 @@ async def run_migrations(conn: aiosqlite.Connection, current_version: int) -> in
         for sql in statements:
             try:
                 await conn.execute(sql)
-            except (Exception) as e:
+            except Exception as e:
                 # Column/index may already exist (partial migration or manual fix).
                 # ALTER TABLE ADD COLUMN raises OperationalError if column exists.
                 import sqlite3
 
                 if isinstance(e, sqlite3.OperationalError) and (
-                    "duplicate column" in str(e).lower()
-                    or "already exists" in str(e).lower()
+                    "duplicate column" in str(e).lower() or "already exists" in str(e).lower()
                 ):
                     logger.debug("Migration already applied: %s", e)
                 else:

@@ -25,7 +25,7 @@ def _build_fts_query(search_term: str) -> str:
     tokens = search_term.split()
     if not tokens:
         return '""'
-    return " ".join(f'"{token.replace(chr(34), chr(34)+chr(34))}"' for token in tokens)
+    return " ".join(f'"{token.replace(chr(34), chr(34) + chr(34))}"' for token in tokens)
 
 
 class SQLiteNeuronMixin:
