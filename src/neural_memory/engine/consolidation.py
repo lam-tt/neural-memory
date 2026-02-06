@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from neural_memory.core.fiber import Fiber
@@ -153,7 +153,8 @@ class ConsolidationEngine:
         dry_run: bool,
     ) -> None:
         """Prune weak synapses and orphan neurons."""
-        brain_id = self._storage._get_brain_id()
+        # Ensure brain context is set (validates state)
+        self._storage._get_brain_id()
 
         # Get all synapses
         all_synapses = await self._storage.get_synapses()
@@ -165,10 +166,14 @@ class ConsolidationEngine:
             # Check inactivity
             if synapse.last_activated is not None:
                 days_inactive = (reference_time - synapse.last_activated).total_seconds() / 86400
-                should_prune = should_prune and days_inactive >= self._config.prune_min_inactive_days
+                should_prune = (
+                    should_prune and days_inactive >= self._config.prune_min_inactive_days
+                )
             elif synapse.created_at is not None:
                 days_since_creation = (reference_time - synapse.created_at).total_seconds() / 86400
-                should_prune = should_prune and days_since_creation >= self._config.prune_min_inactive_days
+                should_prune = (
+                    should_prune and days_since_creation >= self._config.prune_min_inactive_days
+                )
 
             if should_prune:
                 pruned_synapse_ids.add(synapse.id)
@@ -267,7 +272,10 @@ class ConsolidationEngine:
                 intersection = len(set_a & set_b)
                 union_size = len(set_a | set_b)
 
-                if union_size > 0 and intersection / union_size >= self._config.merge_overlap_threshold:
+                if (
+                    union_size > 0
+                    and intersection / union_size >= self._config.merge_overlap_threshold
+                ):
                     union(i, j)
 
         # Group fibers by root
@@ -277,7 +285,7 @@ class ConsolidationEngine:
             groups.setdefault(root, []).append(i)
 
         # Merge groups with more than 1 member
-        for root, members in groups.items():
+        for _root, members in groups.items():
             if len(members) < 2:
                 continue
 
@@ -318,12 +326,14 @@ class ConsolidationEngine:
 
             report.fibers_merged += len(member_fibers)
             report.fibers_created += 1
-            report.merge_details.append(MergeDetail(
-                original_fiber_ids=tuple(f.id for f in member_fibers),
-                merged_fiber_id=merged_fiber_id,
-                neuron_count=len(merged_neuron_ids),
-                reason="neuron_overlap",
-            ))
+            report.merge_details.append(
+                MergeDetail(
+                    original_fiber_ids=tuple(f.id for f in member_fibers),
+                    merged_fiber_id=merged_fiber_id,
+                    neuron_count=len(merged_neuron_ids),
+                    reason="neuron_overlap",
+                )
+            )
 
             if not dry_run:
                 # Delete originals
@@ -370,7 +380,10 @@ class ConsolidationEngine:
                 tags_b = fiber_list[j].tags
                 intersection = len(tags_a & tags_b)
                 union_size = len(tags_a | tags_b)
-                if union_size > 0 and intersection / union_size >= self._config.summarize_tag_overlap_threshold:
+                if (
+                    union_size > 0
+                    and intersection / union_size >= self._config.summarize_tag_overlap_threshold
+                ):
                     union(i, j)
 
         groups: dict[int, list[int]] = {}
@@ -378,7 +391,7 @@ class ConsolidationEngine:
             root = find(i)
             groups.setdefault(root, []).append(i)
 
-        for root, members in groups.items():
+        for _root, members in groups.items():
             if len(members) < self._config.summarize_min_cluster_size:
                 continue
 
@@ -390,7 +403,11 @@ class ConsolidationEngine:
             for f in cluster_fibers:
                 all_tags |= f.tags
 
-            summary_content = "; ".join(summaries[:10]) if summaries else f"Cluster of {len(cluster_fibers)} memories"
+            summary_content = (
+                "; ".join(summaries[:10])
+                if summaries
+                else f"Cluster of {len(cluster_fibers)} memories"
+            )
             tag_label = ", ".join(sorted(all_tags)[:5])
             concept_content = f"[{tag_label}] {summary_content[:200]}"
 

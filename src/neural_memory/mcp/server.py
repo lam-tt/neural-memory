@@ -31,10 +31,10 @@ import sys
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from neural_memory import __version__
 from neural_memory.core.memory_types import MemoryType, Priority, TypedMemory, suggest_memory_type
 from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
-from neural_memory import __version__
 from neural_memory.mcp.auto_capture import analyze_text_for_memories
 from neural_memory.mcp.prompt import get_system_prompt
 from neural_memory.mcp.tool_schemas import get_tool_schemas

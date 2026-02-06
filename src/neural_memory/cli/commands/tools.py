@@ -289,9 +289,7 @@ def decay(
 
 
 def consolidate(
-    brain: Annotated[
-        str | None, typer.Option("--brain", "-b", help="Brain to consolidate")
-    ] = None,
+    brain: Annotated[str | None, typer.Option("--brain", "-b", help="Brain to consolidate")] = None,
     strategy: Annotated[
         str, typer.Option("--strategy", "-s", help="Strategy: prune, merge, summarize, all")
     ] = "all",
@@ -351,6 +349,7 @@ def consolidate(
 
         # Handle both sync and async
         import inspect
+
         if inspect.isawaitable(report):
             report = await report
 

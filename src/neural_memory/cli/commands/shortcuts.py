@@ -358,7 +358,9 @@ def import_brain_cmd(
             except (ValueError, Exception):
                 # No existing brain, just import directly
                 await storage.import_brain(incoming_snapshot, brain_name)
-                typer.echo(f"Imported brain '{brain_name}' from {input_path} (no existing brain to merge)")
+                typer.echo(
+                    f"Imported brain '{brain_name}' from {input_path} (no existing brain to merge)"
+                )
                 return
 
             conflict_strategy = ConflictStrategy(strategy)

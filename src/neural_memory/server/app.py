@@ -13,7 +13,12 @@ from fastapi.staticfiles import StaticFiles
 
 from neural_memory import __version__
 from neural_memory.server.models import HealthResponse
-from neural_memory.server.routes import brain_router, consolidation_router, memory_router, sync_router
+from neural_memory.server.routes import (
+    brain_router,
+    consolidation_router,
+    memory_router,
+    sync_router,
+)
 from neural_memory.storage.base import NeuralStorage
 
 # Static files directory

@@ -124,15 +124,10 @@ async def get_brain_stats(
     synapse_stats_model = SynapseStatsInfo(
         avg_weight=synapse_stats_raw.get("avg_weight", 0.0),
         total_reinforcements=synapse_stats_raw.get("total_reinforcements", 0),
-        by_type={
-            k: SynapseTypeStats(**v)
-            for k, v in synapse_stats_raw.get("by_type", {}).items()
-        },
+        by_type={k: SynapseTypeStats(**v) for k, v in synapse_stats_raw.get("by_type", {}).items()},
     )
 
-    hot_neurons_models = [
-        HotNeuronInfo(**hn) for hn in stats.get("hot_neurons", [])
-    ]
+    hot_neurons_models = [HotNeuronInfo(**hn) for hn in stats.get("hot_neurons", [])]
 
     return StatsResponse(
         brain_id=brain_id,

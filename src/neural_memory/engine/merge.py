@@ -200,20 +200,21 @@ def merge_snapshots(
                 updated = {**incoming_neuron, "id": local_neuron["id"]}
                 updated = _add_provenance(updated, incoming.brain_id, resolution)
                 merged_neurons = [
-                    updated if n["id"] == local_neuron["id"] else n
-                    for n in merged_neurons
+                    updated if n["id"] == local_neuron["id"] else n for n in merged_neurons
                 ]
                 report.neurons_updated += 1
             else:
                 report.neurons_skipped += 1
 
-            report.conflicts.append(ConflictItem(
-                entity_type="neuron",
-                local_id=local_neuron["id"],
-                incoming_id=incoming_neuron["id"],
-                resolution=resolution,
-                reason=f"fingerprint match: {fp[:50]}",
-            ))
+            report.conflicts.append(
+                ConflictItem(
+                    entity_type="neuron",
+                    local_id=local_neuron["id"],
+                    incoming_id=incoming_neuron["id"],
+                    resolution=resolution,
+                    reason=f"fingerprint match: {fp[:50]}",
+                )
+            )
         else:
             # New neuron — add it
             provenance_neuron = _add_provenance(incoming_neuron, incoming.brain_id, "added")
@@ -253,18 +254,19 @@ def merge_snapshots(
                 updated = {**remapped_synapse, "id": local_synapse["id"]}
                 updated = _add_provenance(updated, incoming.brain_id, resolution)
                 merged_synapses = [
-                    updated if s["id"] == local_synapse["id"] else s
-                    for s in merged_synapses
+                    updated if s["id"] == local_synapse["id"] else s for s in merged_synapses
                 ]
                 report.synapses_updated += 1
 
-            report.conflicts.append(ConflictItem(
-                entity_type="synapse",
-                local_id=local_synapse["id"],
-                incoming_id=incoming_synapse["id"],
-                resolution=resolution,
-                reason=f"triple match: {triple[:60]}",
-            ))
+            report.conflicts.append(
+                ConflictItem(
+                    entity_type="synapse",
+                    local_id=local_synapse["id"],
+                    incoming_id=incoming_synapse["id"],
+                    resolution=resolution,
+                    reason=f"triple match: {triple[:60]}",
+                )
+            )
         else:
             # New synapse — remap and add
             remapped_synapse = _add_provenance(remapped_synapse, incoming.brain_id, "added")
@@ -293,9 +295,7 @@ def merge_snapshots(
             incoming_fiber.get("anchor_neuron_id", ""),
         )
         if "pathway" in incoming_fiber:
-            remapped_fiber["pathway"] = _remap_ids_in_list(
-                incoming_fiber["pathway"], id_remap
-            )
+            remapped_fiber["pathway"] = _remap_ids_in_list(incoming_fiber["pathway"], id_remap)
 
         neuron_set = _fiber_neuron_set(remapped_fiber, {})
 
@@ -310,20 +310,21 @@ def merge_snapshots(
                 updated = {**remapped_fiber, "id": local_fiber["id"]}
                 updated = _add_provenance(updated, incoming.brain_id, resolution)
                 merged_fibers = [
-                    updated if f["id"] == local_fiber["id"] else f
-                    for f in merged_fibers
+                    updated if f["id"] == local_fiber["id"] else f for f in merged_fibers
                 ]
                 report.fibers_updated += 1
             else:
                 report.fibers_skipped += 1
 
-            report.conflicts.append(ConflictItem(
-                entity_type="fiber",
-                local_id=local_fiber["id"],
-                incoming_id=incoming_fiber["id"],
-                resolution=resolution,
-                reason="neuron set match",
-            ))
+            report.conflicts.append(
+                ConflictItem(
+                    entity_type="fiber",
+                    local_id=local_fiber["id"],
+                    incoming_id=incoming_fiber["id"],
+                    resolution=resolution,
+                    reason="neuron set match",
+                )
+            )
         else:
             remapped_fiber = _add_provenance(remapped_fiber, incoming.brain_id, "added")
             merged_fibers.append(remapped_fiber)

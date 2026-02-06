@@ -126,7 +126,7 @@ def stats(
         # Synapse stats
         synapse_stats = result.get("synapse_stats", {})
         if synapse_stats and synapse_stats.get("by_type"):
-            typer.echo(f"\nSynapse Stats:")
+            typer.echo("\nSynapse Stats:")
             typer.echo(f"  Avg weight: {synapse_stats['avg_weight']}")
             typer.echo(f"  Total reinforcements: {synapse_stats['total_reinforcements']}")
 

@@ -332,13 +332,15 @@ class InMemoryStorage(InMemoryCollectionsMixin, InMemoryBrainMixin, NeuralStorag
         for state in states[:10]:
             neuron = self._neurons[brain_id].get(state.neuron_id)
             if neuron:
-                hot_neurons.append({
-                    "neuron_id": state.neuron_id,
-                    "content": neuron.content,
-                    "type": neuron.type.value,
-                    "activation_level": state.activation_level,
-                    "access_frequency": state.access_frequency,
-                })
+                hot_neurons.append(
+                    {
+                        "neuron_id": state.neuron_id,
+                        "content": neuron.content,
+                        "type": neuron.type.value,
+                        "activation_level": state.activation_level,
+                        "access_frequency": state.access_frequency,
+                    }
+                )
 
         # Today's fibers
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -353,7 +355,11 @@ class InMemoryStorage(InMemoryCollectionsMixin, InMemoryBrainMixin, NeuralStorag
             neuron_type_breakdown[t] = neuron_type_breakdown.get(t, 0) + 1
 
         # Synapse stats
-        synapse_stats: dict[str, Any] = {"avg_weight": 0.0, "total_reinforcements": 0, "by_type": {}}
+        synapse_stats: dict[str, Any] = {
+            "avg_weight": 0.0,
+            "total_reinforcements": 0,
+            "by_type": {},
+        }
         by_type: dict[str, list[float]] = {}
         total_reinforcements = 0
         for synapse in self._synapses[brain_id].values():

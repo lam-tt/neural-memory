@@ -164,13 +164,15 @@ class SQLiteStorage(
             (brain_id,),
         ) as cursor:
             async for row in cursor:
-                hot_neurons.append({
-                    "neuron_id": row["neuron_id"],
-                    "content": row["content"],
-                    "type": row["type"],
-                    "activation_level": row["activation_level"],
-                    "access_frequency": row["access_frequency"],
-                })
+                hot_neurons.append(
+                    {
+                        "neuron_id": row["neuron_id"],
+                        "content": row["content"],
+                        "type": row["type"],
+                        "activation_level": row["activation_level"],
+                        "access_frequency": row["access_frequency"],
+                    }
+                )
 
         # Today's fibers
         today_midnight = dt.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -182,7 +184,11 @@ class SQLiteStorage(
             today_fibers_count = row["cnt"] if row else 0
 
         # Synapse stats by type
-        synapse_stats: dict[str, Any] = {"avg_weight": 0.0, "total_reinforcements": 0, "by_type": {}}
+        synapse_stats: dict[str, Any] = {
+            "avg_weight": 0.0,
+            "total_reinforcements": 0,
+            "by_type": {},
+        }
         async with conn.execute(
             """SELECT type, AVG(weight) as avg_w, SUM(reinforced_count) as total_r, COUNT(*) as cnt
                FROM synapses WHERE brain_id = ?
