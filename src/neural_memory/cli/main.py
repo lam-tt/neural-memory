@@ -33,13 +33,21 @@ app.add_typer(project_app, name="project")
 app.add_typer(shared_app, name="shared")
 
 # Register top-level commands
-from neural_memory.cli.commands import info, listing, memory, shortcuts, tools  # noqa: E402
+from neural_memory.cli.commands import (  # noqa: E402
+    codebase,
+    info,
+    listing,
+    memory,
+    shortcuts,
+    tools,
+)
 
 memory.register(app)
 listing.register(app)
 info.register(app)
 tools.register(app)
 shortcuts.register(app)
+codebase.register(app)
 
 
 def main() -> None:

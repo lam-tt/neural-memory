@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-02-06
+
+### Added
+
+- **Codebase indexing** (`nmem_index`): Index Python files into neural graph for code-aware recall
+- **Python AST extractor**: Parse functions, classes, methods, imports, constants via stdlib `ast`
+- **Codebase encoder**: Map code symbols to neurons (SPATIAL/ACTION/CONCEPT/ENTITY) and synapses (CONTAINS/IS_A/RELATED_TO/CO_OCCURS)
+- **Branch-aware sessions**: `nmem_session` auto-detects git branch/commit/repo and stores in metadata + tags
+- **Git context utility**: Detect branch, commit SHA, repo root via subprocess (zero deps)
+- **CLI `nmem index` command**: Index codebase from command line with `--ext`, `--status`, `--json` options
+- 16 new tests for extraction, encoding, and git context
+
+## [0.8.0]
+
 ### Added
 
 - Initial project structure

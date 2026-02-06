@@ -37,7 +37,7 @@ class TestMCPServer:
         """Test that get_tools returns all expected tools."""
         tools = server.get_tools()
 
-        assert len(tools) == 8
+        assert len(tools) == 9
         tool_names = {tool["name"] for tool in tools}
         assert tool_names == {
             "nmem_remember",
@@ -48,6 +48,7 @@ class TestMCPServer:
             "nmem_auto",
             "nmem_suggest",
             "nmem_session",
+            "nmem_index",
         }
 
     def test_tool_schemas(self, server: MCPServer) -> None:
@@ -135,6 +136,17 @@ class TestMCPServer:
         assert "task" in schema["properties"]
         assert "progress" in schema["properties"]
         assert "notes" in schema["properties"]
+        assert schema["required"] == ["action"]
+
+    def test_index_tool_schema(self, server: MCPServer) -> None:
+        """Test nmem_index tool schema."""
+        tools = server.get_tools()
+        index_tool = next(t for t in tools if t["name"] == "nmem_index")
+
+        schema = index_tool["inputSchema"]
+        assert "action" in schema["properties"]
+        assert "path" in schema["properties"]
+        assert "extensions" in schema["properties"]
         assert schema["required"] == ["action"]
 
 
@@ -514,6 +526,49 @@ class TestMCPToolCalls:
         assert call_kwargs.kwargs["limit"] == 2
 
     @pytest.mark.asyncio
+    async def test_index_scan(self, server: MCPServer) -> None:
+        """Test nmem_index scan action returns file/neuron counts."""
+        mock_storage = AsyncMock()
+        mock_brain = MagicMock(id="test-brain", name="test", config=MagicMock())
+        mock_storage.get_brain = AsyncMock(return_value=mock_brain)
+        mock_storage._current_brain_id = "test-brain"
+
+        mock_fiber = MagicMock(id="idx-123")
+        mock_result = MagicMock(
+            fiber=mock_fiber,
+            neurons_created=[MagicMock(), MagicMock()],
+            synapses_created=[MagicMock()],
+        )
+        mock_encoder = MagicMock()
+        mock_encoder.index_directory = AsyncMock(return_value=[mock_result])
+
+        with (
+            patch.object(server, "get_storage", return_value=mock_storage),
+            patch(
+                "neural_memory.engine.codebase_encoder.CodebaseEncoder",
+                return_value=mock_encoder,
+            ),
+        ):
+            result = await server.call_tool("nmem_index", {"action": "scan", "path": "."})
+
+        assert result["files_indexed"] == 1
+        assert result["neurons_created"] == 2
+        assert result["synapses_created"] == 1
+        assert "message" in result
+
+    @pytest.mark.asyncio
+    async def test_index_status_empty(self, server: MCPServer) -> None:
+        """Test nmem_index status when nothing indexed."""
+        mock_storage = AsyncMock()
+        mock_storage.find_neurons = AsyncMock(return_value=[])
+
+        with patch.object(server, "get_storage", return_value=mock_storage):
+            result = await server.call_tool("nmem_index", {"action": "status"})
+
+        assert result["indexed_files"] == 0
+        assert "No codebase indexed" in result["message"]
+
+    @pytest.mark.asyncio
     async def test_session_get_empty(self, server: MCPServer) -> None:
         """Test nmem_session get with no active session."""
         mock_storage = AsyncMock()
@@ -652,7 +707,7 @@ class TestMCPProtocol:
         assert response["id"] == 2
         assert "result" in response
         assert "tools" in response["result"]
-        assert len(response["result"]["tools"]) == 8
+        assert len(response["result"]["tools"]) == 9
 
     @pytest.mark.asyncio
     async def test_tools_call_message(self, server: MCPServer) -> None:

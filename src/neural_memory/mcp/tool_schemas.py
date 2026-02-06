@@ -206,4 +206,28 @@ def get_tool_schemas() -> list[dict[str, Any]]:
                 "required": ["action"],
             },
         },
+        {
+            "name": "nmem_index",
+            "description": "Index codebase into neural memory for code-aware recall. Scans Python files and creates neurons for functions, classes, imports. Enables 'where is X implemented?' queries.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["scan", "status"],
+                        "description": "scan=index codebase, status=show what's indexed",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Directory to index (default: current working directory)",
+                    },
+                    "extensions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": 'File extensions to index (default: [".py"])',
+                    },
+                },
+                "required": ["action"],
+            },
+        },
     ]

@@ -100,6 +100,15 @@ User: "I always use 4-space indentation"
 -> nmem_remember(content="Bug fix: Missing await before fetch() caused race condition", type="error", priority=7)
 ```
 
+## Codebase Indexing (nmem_index)
+
+Index code for code-aware recall:
+- **First time**: `nmem_index(action="scan", path="./src")` to index codebase
+- **Check status**: `nmem_index(action="status")` to see what's indexed
+- **After indexing**: `nmem_recall(query="authentication")` finds related files, functions, classes
+
+Indexed code becomes neurons in the memory graph. Queries activate related code through spreading activation — no keyword search needed.
+
 ## Memory Types
 
 - `fact`: Objective information
@@ -122,6 +131,7 @@ COMPACT_PROMPT = """You have NeuralMemory for persistent memory across sessions.
 **Auto-capture** (nmem_auto): Call `nmem_auto(action="process", text="...")` after important conversations to auto-save decisions, errors, and todos.
 
 **Session** (nmem_session): Track current task/feature/progress. Call `get` at start, `set` during work, `end` when done.
+**Index** (nmem_index): Scan codebase into memory. Call `scan` once, then `nmem_recall` finds code structure.
 
 Be proactive: remember important info without being asked. Use auto-capture after solving bugs or making decisions."""
 

@@ -8,8 +8,8 @@
 
 | # | File | Line | What | When |
 |---|------|------|------|------|
-| 1 | `pyproject.toml` | 7 | `version = "0.8.0"` | Every release |
-| 2 | `src/neural_memory/__init__.py` | 17 | `__version__ = "0.8.0"` | Every release (must match #1) |
+| 1 | `pyproject.toml` | 7 | `version = "0.9.0"` | Every release |
+| 2 | `src/neural_memory/__init__.py` | 17 | `__version__ = "0.9.0"` | Every release (must match #1) |
 | 3 | `CHANGELOG.md` | 8 | Move `[Unreleased]` to `[X.Y.Z]` | Every release |
 | 4 | `vscode-extension/package.json` | 5 | `"version": "0.1.2"` | Every extension release |
 | 5 | `vscode-extension/CHANGELOG.md` | 3 | Add `[X.Y.Z] - date` section | Every extension release |
@@ -96,6 +96,7 @@
 | `nmem shared status` | Show shared mode status | — |
 | `nmem shared test` | Test shared connection | — |
 | `nmem shared sync` | Sync local with remote | — |
+| `nmem index` | Index codebase into neural memory | --ext, --status, --json |
 
 ---
 
@@ -136,7 +137,8 @@
 | `nmem_stats` | — | Brain statistics |
 | `nmem_auto` | action (status/enable/disable/analyze/process), text?, save? | Auto-capture from text (with passive recall learning) |
 | `nmem_suggest` | prefix, limit?, type_filter? | Prefix-based autocomplete suggestions ranked by relevance + frequency |
-| `nmem_session` | action (get/set/end), feature?, task?, progress?, notes? | Track current working session state for cross-session resume |
+| `nmem_session` | action (get/set/end), feature?, task?, progress?, notes? | Track current working session state for cross-session resume (auto-detects git branch) |
+| `nmem_index` | action (scan/status), path?, extensions? | Index codebase into neural memory for code-aware recall |
 
 **MCP Resources:**
 - `neuralmemory://prompt/system` — Full system prompt
@@ -293,12 +295,13 @@ nmem-mcp = neural_memory.mcp:main
 
 ---
 
-## Test Files (24)
+## Test Files (25)
 
-### Unit Tests (16)
+### Unit Tests (17)
 - test_neuron, test_synapse, test_fiber, test_brain_mode, test_project
 - test_memory_types, test_activation, test_consolidation, test_hebbian
-- test_mcp (62 tests: schemas, tool calls, protocol, resources, storage, auto-capture, passive capture, session, tokens_used)
+- test_mcp (65 tests: schemas, tool calls, protocol, resources, storage, auto-capture, passive capture, session, index, tokens_used)
+- test_codebase (16 tests: git context, AST extraction, codebase encoding)
 - test_router, test_safety, test_sqlite_storage
 - test_sync, test_temporal, test_typed_memory_storage
 
@@ -344,7 +347,7 @@ nmem-mcp = neural_memory.mcp:main
 
 | Component | Version |
 |-----------|---------|
-| Python Package | 0.8.0 |
+| Python Package | 0.9.0 |
 | VS Code Extension | 0.1.2 |
 | Database Schema | 3 |
 | Brain Snapshot Format | 0.1.0 |

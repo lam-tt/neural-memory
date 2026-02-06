@@ -35,6 +35,7 @@ from neural_memory import __version__
 from neural_memory.core.memory_types import MemoryType, Priority, TypedMemory, suggest_memory_type
 from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
+from neural_memory.git_context import detect_git_context
 from neural_memory.mcp.auto_capture import analyze_text_for_memories
 from neural_memory.mcp.prompt import get_system_prompt
 from neural_memory.mcp.tool_schemas import get_tool_schemas
@@ -109,6 +110,8 @@ class MCPServer:
             return await self._suggest(arguments)
         elif name == "nmem_session":
             return await self._session(arguments)
+        elif name == "nmem_index":
+            return await self._index(arguments)
         else:
             return {"error": f"Unknown tool: {name}"}
 
@@ -470,12 +473,18 @@ class MCPServer:
                 "progress": session.metadata.get("progress", 0.0),
                 "started_at": session.metadata.get("started_at", ""),
                 "notes": session.metadata.get("notes", ""),
+                "branch": session.metadata.get("branch", ""),
+                "commit": session.metadata.get("commit", ""),
+                "repo": session.metadata.get("repo", ""),
             }
 
         elif action == "set":
             # Build metadata from args
             now = datetime.now()
             existing = await _find_current_session()
+
+            # Auto-detect git context
+            git_ctx = detect_git_context()
 
             metadata: dict[str, Any] = {
                 "feature": args.get(
@@ -492,12 +501,23 @@ class MCPServer:
                 "updated_at": now.isoformat(),
             }
 
+            # Add git context if available
+            if git_ctx:
+                metadata["branch"] = git_ctx.branch
+                metadata["commit"] = git_ctx.commit
+                metadata["repo"] = git_ctx.repo_name
+
             # Build content summary
             content = f"Session: {metadata['feature']}"
             if metadata["task"]:
                 content += f" — {metadata['task']}"
             if metadata["progress"]:
                 content += f" ({int(metadata['progress'] * 100)}%)"
+
+            # Include branch in tags for filtering
+            session_tags: set[str] = {"session_state"}
+            if git_ctx:
+                session_tags.add(f"branch:{git_ctx.branch}")
 
             # Encode as a new CONTEXT memory (immutable pattern)
             brain = await storage.get_brain(storage._current_brain_id)
@@ -510,7 +530,7 @@ class MCPServer:
             result = await encoder.encode(
                 content=content,
                 timestamp=now,
-                tags={"session_state"},
+                tags=session_tags,
             )
 
             typed_mem = TypedMemory.create(
@@ -519,7 +539,7 @@ class MCPServer:
                 priority=Priority.from_int(7),
                 source="mcp_session",
                 expires_in_days=1,
-                tags={"session_state"},
+                tags=session_tags,
                 metadata=metadata,
             )
             await storage.add_typed_memory(typed_mem)
@@ -532,6 +552,9 @@ class MCPServer:
                 "progress": metadata["progress"],
                 "started_at": metadata["started_at"],
                 "notes": metadata["notes"],
+                "branch": metadata.get("branch", ""),
+                "commit": metadata.get("commit", ""),
+                "repo": metadata.get("repo", ""),
                 "message": "Session state updated",
             }
 
@@ -599,6 +622,60 @@ class MCPServer:
             }
 
         return {"error": f"Unknown session action: {action}"}
+
+    async def _index(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Index codebase into neural memory."""
+        from pathlib import Path
+
+        from neural_memory.core.neuron import NeuronType
+        from neural_memory.engine.codebase_encoder import CodebaseEncoder
+
+        action = args.get("action", "status")
+        storage = await self.get_storage()
+
+        if action == "scan":
+            brain = await storage.get_brain(storage._current_brain_id)
+            if not brain:
+                return {"error": "No brain configured"}
+
+            path = Path(args.get("path", ".")).resolve()
+            if not path.is_dir():
+                return {"error": f"Not a directory: {path}"}
+
+            extensions = set(args.get("extensions", [".py"]))
+
+            encoder = CodebaseEncoder(storage, brain.config)
+            storage.disable_auto_save()
+            results = await encoder.index_directory(path, extensions=extensions)
+            await storage.batch_save()
+
+            total_neurons = sum(len(r.neurons_created) for r in results)
+            total_synapses = sum(len(r.synapses_created) for r in results)
+
+            return {
+                "files_indexed": len(results),
+                "neurons_created": total_neurons,
+                "synapses_created": total_synapses,
+                "path": str(path),
+                "message": f"Indexed {len(results)} files → {total_neurons} neurons, {total_synapses} synapses",
+            }
+
+        elif action == "status":
+            indexed_files = await storage.find_neurons(
+                type=NeuronType.SPATIAL,
+                limit=1000,
+            )
+            code_files = [n for n in indexed_files if n.metadata.get("indexed")]
+
+            return {
+                "indexed_files": len(code_files),
+                "file_list": [n.content for n in code_files[:20]],
+                "message": f"{len(code_files)} files indexed"
+                if code_files
+                else "No codebase indexed yet. Use scan action.",
+            }
+
+        return {"error": f"Unknown index action: {action}"}
 
     async def _save_detected_memories(self, detected: list[dict[str, Any]]) -> list[str]:
         """Save detected memories that meet confidence threshold."""
