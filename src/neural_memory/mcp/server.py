@@ -460,7 +460,7 @@ class MCPServer:
 
         if action == "get":
             session = await _find_current_session()
-            if not session:
+            if not session or not session.metadata.get("active", True):
                 return {"active": False, "message": "No active session"}
 
             return {
@@ -537,7 +537,7 @@ class MCPServer:
 
         elif action == "end":
             existing = await _find_current_session()
-            if not existing:
+            if not existing or not existing.metadata.get("active", True):
                 return {"active": False, "message": "No active session to end"}
 
             feature = existing.metadata.get("feature", "unknown")
@@ -557,21 +557,39 @@ class MCPServer:
             encoder = MemoryEncoder(storage, brain.config)
             storage.disable_auto_save()
 
-            result = await encoder.encode(
+            # Write tombstone session_state so GET returns inactive
+            now = datetime.now()
+            tombstone_result = await encoder.encode(
                 content=summary,
-                timestamp=datetime.now(),
+                timestamp=now,
+                tags={"session_state"},
+            )
+            tombstone_mem = TypedMemory.create(
+                fiber_id=tombstone_result.fiber.id,
+                memory_type=MemoryType.CONTEXT,
+                priority=Priority.from_int(7),
+                source="mcp_session",
+                expires_in_days=1,
+                tags={"session_state"},
+                metadata={"active": False, "ended_at": now.isoformat()},
+            )
+            await storage.add_typed_memory(tombstone_mem)
+
+            # Also save a longer-lived summary for future recall
+            summary_result = await encoder.encode(
+                content=summary,
+                timestamp=now,
                 tags={"session_summary"},
             )
-
-            typed_mem = TypedMemory.create(
-                fiber_id=result.fiber.id,
+            summary_mem = TypedMemory.create(
+                fiber_id=summary_result.fiber.id,
                 memory_type=MemoryType.CONTEXT,
                 priority=Priority.from_int(5),
                 source="mcp_session",
                 expires_in_days=7,
                 tags={"session_summary"},
             )
-            await storage.add_typed_memory(typed_mem)
+            await storage.add_typed_memory(summary_mem)
             await storage.batch_save()
 
             return {

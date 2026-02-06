@@ -564,7 +564,7 @@ class TestMCPToolCalls:
 
     @pytest.mark.asyncio
     async def test_session_end(self, server: MCPServer) -> None:
-        """Test nmem_session end creates summary."""
+        """Test nmem_session end creates tombstone and summary."""
         mock_storage = AsyncMock()
         mock_brain = MagicMock(id="test-brain", name="test", config=MagicMock())
         mock_storage.get_brain = AsyncMock(return_value=mock_brain)
@@ -580,10 +580,12 @@ class TestMCPToolCalls:
         )
         mock_storage.find_typed_memories = AsyncMock(return_value=[mock_existing])
 
-        mock_fiber = MagicMock(id="summary-123")
         mock_encoder = AsyncMock()
         mock_encoder.encode = AsyncMock(
-            return_value=MagicMock(fiber=mock_fiber, neurons_created=[])
+            side_effect=[
+                MagicMock(fiber=MagicMock(id="tombstone-123"), neurons_created=[]),
+                MagicMock(fiber=MagicMock(id="summary-123"), neurons_created=[]),
+            ]
         )
 
         with (
@@ -596,6 +598,8 @@ class TestMCPToolCalls:
         assert "auth" in result["summary"]
         assert "75%" in result["summary"]
         assert "message" in result
+        # Two typed memories: tombstone + summary
+        assert mock_storage.add_typed_memory.call_count == 2
 
     @pytest.mark.asyncio
     async def test_session_end_no_active(self, server: MCPServer) -> None:
