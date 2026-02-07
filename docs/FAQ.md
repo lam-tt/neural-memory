@@ -106,62 +106,66 @@ The VS Code sidebar is the main way to browse your neurons and fibers.
 
 ## Per-Project Configuration
 
-### Q: How do I keep AI instructions/memories separate between projects?
+### Q: How do I keep memories from different projects separate?
 
-**Short answer: NeuralMemory already handles this automatically.**
+**You don't need to do anything.** NeuralMemory auto-detects which git repo and branch you're in, then tags your memories accordingly. When you recall, it prioritizes memories from your current context.
 
-When you start a session (`nmem_session`), NeuralMemory auto-detects your git branch, commit, and repo name. Memories are tagged with `branch:<name>`, and recall queries are enriched with your current session context (feature, task, branch). This means relevant memories naturally surface for the project/branch you're working in.
+Just use NeuralMemory normally — the right memories surface for the right project.
 
-**No configuration needed** — just use NeuralMemory normally and it will prioritize context from your current branch and feature.
+### Q: What if I want complete separation between projects?
 
-For **full isolation** between completely unrelated projects, use separate brains:
+Think of a **brain** as a separate notebook. By default, everything goes into one notebook called `default`. If you want a completely separate notebook for a different project:
 
 ```bash
-nmem brain create my-web-app
-nmem brain create my-ml-pipeline
-nmem brain switch my-web-app
+nmem brain create work-api       # new empty notebook
+nmem brain switch work-api       # now all memories go here
 ```
 
-Or configure per-project in `.mcp.json` (for Claude Code):
+To switch back:
+
+```bash
+nmem brain switch default        # back to your main notebook
+```
+
+That's it. Memories in `work-api` and `default` never mix.
+
+### Q: Can I make Claude Code auto-pick the right brain per project?
+
+Yes. Drop a `.mcp.json` file in each project root:
 
 ```jsonc
-// my-web-app/.mcp.json
+// ~/projects/work-api/.mcp.json
 {
   "mcpServers": {
     "neuralmemory": {
       "command": "python",
       "args": ["-m", "neural_memory.mcp"],
-      "env": {
-        "NEURALMEMORY_BRAIN": "my-web-app"
-      }
+      "env": { "NEURALMEMORY_BRAIN": "work-api" }
     }
   }
 }
 ```
 
-| Approach | When to use |
-|----------|------------|
-| Auto branch tagging (default) | Same project, different features/branches |
-| Separate brains | Completely unrelated projects |
+Now when you open that project in Claude Code, it automatically uses the `work-api` brain.
 
-### Q: Can I store project-specific instructions that persist across AI sessions?
+### Q: Can I save project rules that the AI always follows?
 
-Yes. Use `nmem_remember` with type `instruction`:
+Yes. Tell the AI to remember instructions:
 
 ```
-nmem_remember(content="Always use Redis for caching in this project", type="instruction", priority=9)
-nmem_remember(content="API responses must follow the {success, data, error} format", type="instruction", priority=9)
+nmem_remember(content="Use PostgreSQL, never SQLite", type="instruction", priority=9)
+nmem_remember(content="All API responses use {data, error, meta} format", type="instruction", priority=9)
 ```
 
-Instructions are stored in the current brain and automatically recalled when relevant. Combined with per-project brains, each project gets its own set of persistent instructions.
+These are saved in your current brain and automatically surface when relevant.
 
-You can also use the **Eternal Context** system to save critical project facts that survive across sessions:
+For bigger project context (tech stack, key decisions), use Eternal Context:
 
 ```
-nmem_eternal(action="save", project_name="my-web-app", tech_stack=["Python", "FastAPI", "Redis"])
+nmem_eternal(action="save", project_name="work-api", tech_stack=["Python", "FastAPI", "PostgreSQL"])
 ```
 
-On next session start, call `nmem_recap()` to reload all saved context instantly.
+Next session, call `nmem_recap()` to reload everything instantly.
 
 ## Data & Multi-tool Sharing
 
