@@ -146,6 +146,10 @@ cython_debug/
 # OS
 .DS_Store
 Thumbs.db
+nul
+
+# VS Code extension packages
+*.vsix
 
 # Project specific
 *.db
