@@ -104,6 +104,74 @@ The root URL (`/`) only shows basic API info. To view your data:
 
 The VS Code sidebar is the main way to browse your neurons and fibers.
 
+## Per-Project Configuration
+
+### Q: How do I keep AI instructions/memories separate between projects?
+
+Use **one brain per project** so context never leaks across projects:
+
+```bash
+# Create a brain for each project
+nmem brain create my-web-app
+nmem brain create my-ml-pipeline
+
+# Switch when you change projects
+nmem brain switch my-web-app
+```
+
+If you use Claude Code, configure the MCP server per-project in each project's `.mcp.json`:
+
+```jsonc
+// my-web-app/.mcp.json
+{
+  "mcpServers": {
+    "neuralmemory": {
+      "command": "python",
+      "args": ["-m", "neural_memory.mcp"],
+      "env": {
+        "NEURALMEMORY_BRAIN": "my-web-app"
+      }
+    }
+  }
+}
+```
+
+```jsonc
+// my-ml-pipeline/.mcp.json
+{
+  "mcpServers": {
+    "neuralmemory": {
+      "command": "python",
+      "args": ["-m", "neural_memory.mcp"],
+      "env": {
+        "NEURALMEMORY_BRAIN": "my-ml-pipeline"
+      }
+    }
+  }
+}
+```
+
+This way each project automatically loads the correct brain — decisions, errors, and context from project A never appear in project B.
+
+### Q: Can I store project-specific instructions that persist across AI sessions?
+
+Yes. Use `nmem_remember` with type `instruction`:
+
+```
+nmem_remember(content="Always use Redis for caching in this project", type="instruction", priority=9)
+nmem_remember(content="API responses must follow the {success, data, error} format", type="instruction", priority=9)
+```
+
+Instructions are stored in the current brain and automatically recalled when relevant. Combined with per-project brains, each project gets its own set of persistent instructions.
+
+You can also use the **Eternal Context** system to save critical project facts that survive across sessions:
+
+```
+nmem_eternal(action="save", project_name="my-web-app", tech_stack=["Python", "FastAPI", "Redis"])
+```
+
+On next session start, call `nmem_recap()` to reload all saved context instantly.
+
 ## Data & Multi-tool Sharing
 
 ### Q: Do I need to install NeuralMemory per project?
