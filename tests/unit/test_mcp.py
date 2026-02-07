@@ -1168,7 +1168,9 @@ class TestMCPEternal:
             token_estimate=5000,
         )
         ctx.estimate_context_usage = MagicMock(return_value=0.042)
-        ctx.get_injection = MagicMock(return_value="## Project: TestProject\nStack: Python, FastAPI")
+        ctx.get_injection = MagicMock(
+            return_value="## Project: TestProject\nStack: Python, FastAPI"
+        )
         ctx.compact = MagicMock(return_value="Compacted summary of tier 3")
         return ctx
 
@@ -1517,9 +1519,7 @@ class TestMCPImport:
             patch("neural_memory.integration.sync_engine.SyncEngine", return_value=mock_engine),
         ):
             mock_get_adapter.return_value = MagicMock()
-            await server.call_tool(
-                "nmem_import", {"source": "awf", "connection": "/path/to/brain"}
-            )
+            await server.call_tool("nmem_import", {"source": "awf", "connection": "/path/to/brain"})
 
         mock_get_adapter.assert_called_once_with("awf", brain_dir="/path/to/brain")
 
@@ -1682,9 +1682,7 @@ class TestMCPContextExtended:
         mock_storage = AsyncMock()
         fiber = MagicMock(summary=None, anchor_neuron_id="anchor-1")
         mock_storage.get_fibers = AsyncMock(return_value=[fiber])
-        mock_storage.get_neuron = AsyncMock(
-            return_value=MagicMock(content="Anchor content")
-        )
+        mock_storage.get_neuron = AsyncMock(return_value=MagicMock(content="Anchor content"))
 
         with patch.object(server, "get_storage", return_value=mock_storage):
             result = await server.call_tool("nmem_context", {})
@@ -1744,9 +1742,7 @@ class TestMCPRecallExtended:
         mock_storage._current_brain_id = "test-brain"
 
         # Simulate active session
-        mock_session = MagicMock(
-            metadata={"feature": "auth", "task": "login", "active": True}
-        )
+        mock_session = MagicMock(metadata={"feature": "auth", "task": "login", "active": True})
         mock_storage.find_typed_memories = AsyncMock(return_value=[mock_session])
 
         mock_pipeline = AsyncMock()
@@ -2005,8 +2001,6 @@ class TestMCPFireTrigger:
         """Test _fire_eternal_trigger swallows exceptions."""
         server = self._make_server(eternal_enabled=True)
 
-        with patch.object(
-            server, "get_eternal_context", side_effect=RuntimeError("boom")
-        ):
+        with patch.object(server, "get_eternal_context", side_effect=RuntimeError("boom")):
             # Should not raise
             server._fire_eternal_trigger("Some text")
