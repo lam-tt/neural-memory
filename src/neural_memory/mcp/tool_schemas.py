@@ -75,6 +75,10 @@ def get_tool_schemas() -> list[dict[str, Any]]:
                         "maximum": 1,
                         "description": "Minimum confidence threshold",
                     },
+                    "valid_at": {
+                        "type": "string",
+                        "description": "ISO datetime string to filter memories valid at that point in time (e.g. '2026-02-01T12:00:00')",
+                    },
                 },
                 "required": ["query"],
             },

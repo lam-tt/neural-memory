@@ -18,6 +18,7 @@ def dict_to_neuron(data: dict[str, Any]) -> Neuron:
         type=NeuronType(data["type"]),
         content=data["content"],
         metadata=data.get("metadata", {}),
+        content_hash=data.get("content_hash", 0),
         created_at=datetime.fromisoformat(data["created_at"]),
     )
 

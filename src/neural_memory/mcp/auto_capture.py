@@ -6,6 +6,8 @@ import hashlib
 import re
 from typing import Any
 
+from neural_memory.utils.simhash import is_near_duplicate, simhash
+
 # Minimum text length to avoid false positives on tiny inputs
 _MIN_TEXT_LENGTH = 20
 
@@ -182,13 +184,22 @@ def analyze_text_for_memories(
             _detect_patterns(text_lower, INSIGHT_PATTERNS, "insight", 0.8, 6, 15, "Insight: ")
         )
 
-    # Remove duplicates with improved key extraction
-    seen: set[str] = set()
+    # Remove duplicates: exact MD5 match + SimHash near-duplicate
+    seen_exact: set[str] = set()
+    seen_hashes: list[int] = []
     unique_detected: list[dict[str, Any]] = []
     for item in detected:
         content_key = _dedup_key(item["content"])
-        if content_key not in seen:
-            seen.add(content_key)
-            unique_detected.append(item)
+        if content_key in seen_exact:
+            continue
+
+        # Check simhash near-duplicate against already-seen items
+        item_hash = simhash(item["content"])
+        if any(is_near_duplicate(item_hash, h) for h in seen_hashes):
+            continue
+
+        seen_exact.add(content_key)
+        seen_hashes.append(item_hash)
+        unique_detected.append(item)
 
     return unique_detected

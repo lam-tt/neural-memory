@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-02-07
+
+### Added
+
+- **Type-aware decay rates**: Different memory types now decay at biologically-inspired rates (facts: 0.02/day, todos: 0.15/day). `DEFAULT_DECAY_RATES` dict and `get_decay_rate()` helper in `memory_types.py`
+- **Retrieval score breakdown**: `ScoreBreakdown` dataclass exposes confidence components (base_activation, intersection_boost, freshness_boost, frequency_boost) in `RetrievalResult` and MCP `nmem_recall` response
+- **SimHash near-duplicate detection**: 64-bit locality-sensitive hashing via `utils/simhash.py`. New `content_hash` field on `Neuron` model. Encoder and auto-capture use SimHash to catch paraphrased duplicates
+- **Point-in-time temporal queries**: `valid_at` parameter on `nmem_recall` filters fibers by temporal validity window (`time_start <= valid_at <= time_end`)
+- Schema migration v4→v5: `content_hash INTEGER` column on neurons table
+
+### Changed
+
+- `DecayManager.apply_decay()` now uses per-neuron `state.decay_rate` instead of global rate
+- `reconstitute_answer()` returns `ScoreBreakdown` as third tuple element
+- `_remember()` MCP handler sets type-specific decay rates on neuron states after encoding
+
 ## [0.9.4] - 2026-02-07
 
 ### Performance

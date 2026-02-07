@@ -65,14 +65,15 @@ class SQLiteNeuronMixin:
 
         try:
             await conn.execute(
-                """INSERT INTO neurons (id, brain_id, type, content, metadata, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO neurons (id, brain_id, type, content, metadata, content_hash, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (
                     neuron.id,
                     brain_id,
                     neuron.type.value,
                     neuron.content,
                     json.dumps(neuron.metadata),
+                    neuron.content_hash,
                     neuron.created_at.isoformat(),
                 ),
             )

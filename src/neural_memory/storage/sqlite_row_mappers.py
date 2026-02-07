@@ -25,11 +25,14 @@ from neural_memory.core.synapse import Direction, Synapse, SynapseType
 
 def row_to_neuron(row: aiosqlite.Row) -> Neuron:
     """Convert database row to Neuron."""
+    row_keys = row.keys()
+    content_hash = row["content_hash"] if "content_hash" in row_keys else 0
     return Neuron(
         id=row["id"],
         type=NeuronType(row["type"]),
         content=row["content"],
         metadata=json.loads(row["metadata"]),
+        content_hash=content_hash,
         created_at=datetime.fromisoformat(row["created_at"]),
     )
 

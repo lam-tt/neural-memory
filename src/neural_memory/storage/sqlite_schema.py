@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Schema version for migrations
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # ── Migrations ──────────────────────────────────────────────────────
 # Each entry maps (from_version -> to_version) with a list of SQL statements.
@@ -84,6 +84,11 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
         ),
         # Index for hot neurons query in get_enhanced_stats
         "CREATE INDEX IF NOT EXISTS idx_neuron_states_freq ON neuron_states(brain_id, access_frequency DESC)",
+    ],
+    (4, 5): [
+        # SimHash content fingerprint for near-duplicate detection
+        "ALTER TABLE neurons ADD COLUMN content_hash INTEGER DEFAULT 0",
+        "CREATE INDEX IF NOT EXISTS idx_neurons_hash ON neurons(brain_id, content_hash)",
     ],
 }
 
@@ -165,12 +170,14 @@ CREATE TABLE IF NOT EXISTS neurons (
     type TEXT NOT NULL,
     content TEXT NOT NULL,
     metadata TEXT DEFAULT '{}',  -- JSON
+    content_hash INTEGER DEFAULT 0,  -- SimHash fingerprint for near-duplicate detection
     created_at TEXT NOT NULL,
     PRIMARY KEY (brain_id, id),
     FOREIGN KEY (brain_id) REFERENCES brains(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_neurons_type ON neurons(brain_id, type);
 CREATE INDEX IF NOT EXISTS idx_neurons_created ON neurons(brain_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_neurons_hash ON neurons(brain_id, content_hash);
 
 -- Neuron states table
 CREATE TABLE IF NOT EXISTS neuron_states (

@@ -33,7 +33,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from neural_memory import __version__
-from neural_memory.core.memory_types import MemoryType, Priority, TypedMemory, suggest_memory_type
+from neural_memory.core.memory_types import (
+    MemoryType,
+    Priority,
+    TypedMemory,
+    get_decay_rate,
+    suggest_memory_type,
+)
 from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
 from neural_memory.mcp.auto_handler import AutoHandler
@@ -180,6 +186,24 @@ class MCPServer(SessionHandler, EternalHandler, AutoHandler, IndexHandler):
             tags=tags if tags else None,
         )
         await storage.add_typed_memory(typed_mem)
+
+        # Set type-specific decay rate on neuron states
+        type_decay_rate = get_decay_rate(mem_type.value)
+        for neuron in result.neurons_created:
+            state = await storage.get_neuron_state(neuron.id)
+            if state and state.decay_rate != type_decay_rate:
+                from neural_memory.core.neuron import NeuronState
+
+                updated_state = NeuronState(
+                    neuron_id=state.neuron_id,
+                    activation_level=state.activation_level,
+                    access_frequency=state.access_frequency,
+                    last_activated=state.last_activated,
+                    decay_rate=type_decay_rate,
+                    created_at=state.created_at,
+                )
+                await storage.update_neuron_state(updated_state)
+
         await storage.batch_save()
 
         self._fire_eternal_trigger(content)
@@ -224,9 +248,21 @@ class MCPServer(SessionHandler, EternalHandler, AutoHandler, IndexHandler):
         except Exception:
             logger.debug("Session context injection failed", exc_info=True)
 
+        # Parse optional temporal filter
+        valid_at = None
+        if "valid_at" in args:
+            try:
+                valid_at = datetime.fromisoformat(args["valid_at"])
+            except (ValueError, TypeError):
+                return {"error": f"Invalid valid_at datetime: {args['valid_at']}"}
+
         pipeline = ReflexPipeline(storage, brain.config)
         result = await pipeline.query(
-            query=effective_query, depth=depth, max_tokens=max_tokens, reference_time=datetime.now()
+            query=effective_query,
+            depth=depth,
+            max_tokens=max_tokens,
+            reference_time=datetime.now(),
+            valid_at=valid_at,
         )
 
         # Passive auto-capture on long queries
@@ -242,7 +278,7 @@ class MCPServer(SessionHandler, EternalHandler, AutoHandler, IndexHandler):
                 "confidence": result.confidence,
             }
 
-        return {
+        response: dict[str, Any] = {
             "answer": result.context or "No relevant memories found.",
             "confidence": result.confidence,
             "neurons_activated": result.neurons_activated,
@@ -250,6 +286,16 @@ class MCPServer(SessionHandler, EternalHandler, AutoHandler, IndexHandler):
             "depth_used": result.depth_used.value,
             "tokens_used": result.tokens_used,
         }
+
+        if result.score_breakdown is not None:
+            response["score_breakdown"] = {
+                "base_activation": round(result.score_breakdown.base_activation, 4),
+                "intersection_boost": round(result.score_breakdown.intersection_boost, 4),
+                "freshness_boost": round(result.score_breakdown.freshness_boost, 4),
+                "frequency_boost": round(result.score_breakdown.frequency_boost, 4),
+            }
+
+        return response
 
     async def _context(self, args: dict[str, Any]) -> dict[str, Any]:
         """Get recent context."""

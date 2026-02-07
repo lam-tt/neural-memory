@@ -13,6 +13,7 @@ from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.extraction.entities import EntityExtractor, EntityType
 from neural_memory.extraction.keywords import extract_keywords, extract_weighted_keywords
 from neural_memory.extraction.temporal import TemporalExtractor
+from neural_memory.utils.simhash import is_near_duplicate, simhash
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +122,7 @@ class MemoryEncoder:
                 "timestamp": timestamp.isoformat(),
                 **(metadata or {}),
             },
+            content_hash=simhash(content),
         )
         await self._storage.add_neuron(anchor_neuron)
         neurons_created.append(anchor_neuron)
@@ -303,6 +305,7 @@ class MemoryEncoder:
                     "entity_type": entity.type.value,
                     "confidence": entity.confidence,
                 },
+                content_hash=simhash(entity.text),
             )
             await self._storage.add_neuron(neuron)
             neurons.append(neuron)
@@ -345,6 +348,22 @@ class MemoryEncoder:
             candidate_norm = candidate.content.lower().replace("-", " ").replace("_", " ").strip()
             if candidate_norm == normalized:
                 return candidate
+
+        # Try SimHash near-duplicate detection
+        text_hash = simhash(text)
+        if text_hash != 0:
+            # Check content_contains with first word as approximation
+            first_word = text.split()[0] if text.split() else ""
+            if len(first_word) >= 3:
+                nearby = await self._storage.find_neurons(
+                    content_contains=first_word,
+                    limit=10,
+                )
+                for candidate in nearby:
+                    if candidate.content_hash and is_near_duplicate(
+                        text_hash, candidate.content_hash
+                    ):
+                        return candidate
 
         return None
 

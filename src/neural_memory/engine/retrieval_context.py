@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from neural_memory.core.neuron import NeuronType
 from neural_memory.engine.activation import ActivationResult
+from neural_memory.engine.retrieval_types import ScoreBreakdown
 
 # Average tokens per whitespace-separated word (accounts for subword tokenization)
 _TOKEN_RATIO = 1.3
@@ -29,14 +30,14 @@ async def reconstitute_answer(
     activations: dict[str, ActivationResult],
     intersections: list[str],
     stimulus: Stimulus,
-) -> tuple[str | None, float]:
+) -> tuple[str | None, float, ScoreBreakdown | None]:
     """
     Attempt to reconstitute an answer from activated neurons.
 
-    Returns (answer_text, confidence)
+    Returns (answer_text, confidence, score_breakdown)
     """
     if not activations:
-        return None, 0.0
+        return None, 0.0, None
 
     # Find the most relevant neurons
     candidates: list[tuple[str, float]] = []
@@ -55,14 +56,14 @@ async def reconstitute_answer(
     candidates.sort(key=lambda x: x[1], reverse=True)
 
     if not candidates:
-        return None, 0.0
+        return None, 0.0, None
 
     # Get the top neuron's content as answer
     top_neuron_id = candidates[0][0]
     top_neuron = await storage.get_neuron(top_neuron_id)
 
     if top_neuron is None:
-        return None, 0.0
+        return None, 0.0, None
 
     # Multi-factor confidence scoring
     base_confidence = min(1.0, candidates[0][1])
@@ -84,9 +85,18 @@ async def reconstitute_answer(
         if top_state.access_frequency > 0:
             frequency_boost = min(0.1, 0.03 * math.log1p(top_state.access_frequency))
 
-    confidence = min(1.0, base_confidence + intersection_boost + freshness_boost + frequency_boost)
+    raw_total = base_confidence + intersection_boost + freshness_boost + frequency_boost
+    confidence = min(1.0, raw_total)
 
-    return top_neuron.content, confidence
+    breakdown = ScoreBreakdown(
+        base_activation=base_confidence,
+        intersection_boost=intersection_boost,
+        freshness_boost=freshness_boost,
+        frequency_boost=frequency_boost,
+        raw_total=raw_total,
+    )
+
+    return top_neuron.content, confidence, breakdown
 
 
 async def format_context(

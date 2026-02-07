@@ -42,6 +42,7 @@ class Neuron:
     type: NeuronType
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
+    content_hash: int = 0
     created_at: datetime = field(default_factory=datetime.utcnow)
 
     @classmethod
@@ -51,6 +52,7 @@ class Neuron:
         content: str,
         metadata: dict[str, Any] | None = None,
         neuron_id: str | None = None,
+        content_hash: int = 0,
     ) -> Neuron:
         """
         Factory method to create a new Neuron.
@@ -60,6 +62,7 @@ class Neuron:
             content: The content/value
             metadata: Optional metadata dict
             neuron_id: Optional explicit ID (generates UUID if not provided)
+            content_hash: SimHash fingerprint for near-duplicate detection
 
         Returns:
             A new Neuron instance
@@ -69,6 +72,7 @@ class Neuron:
             type=type,
             content=content,
             metadata=metadata or {},
+            content_hash=content_hash,
             created_at=datetime.utcnow(),
         )
 
@@ -87,6 +91,7 @@ class Neuron:
             type=self.type,
             content=self.content,
             metadata={**self.metadata, **kwargs},
+            content_hash=self.content_hash,
             created_at=self.created_at,
         )
 

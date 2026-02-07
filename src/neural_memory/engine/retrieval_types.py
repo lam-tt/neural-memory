@@ -38,6 +38,27 @@ class Subgraph:
     anchor_ids: list[str]
 
 
+@dataclass(frozen=True)
+class ScoreBreakdown:
+    """Breakdown of confidence score components.
+
+    Exposes why a memory ranked high so users can understand retrieval decisions.
+
+    Attributes:
+        base_activation: Raw activation level from spreading activation
+        intersection_boost: Bonus from neurons reached via multiple anchor sets
+        freshness_boost: Bonus for recently accessed memories
+        frequency_boost: Bonus for frequently accessed memories
+        raw_total: Sum of all components before clamping to [0, 1]
+    """
+
+    base_activation: float
+    intersection_boost: float
+    freshness_boost: float
+    frequency_boost: float
+    raw_total: float
+
+
 @dataclass
 class RetrievalResult:
     """
@@ -67,3 +88,4 @@ class RetrievalResult:
     tokens_used: int = 0
     co_activations: list[CoActivation] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    score_breakdown: ScoreBreakdown | None = None

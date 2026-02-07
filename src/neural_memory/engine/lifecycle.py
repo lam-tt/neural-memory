@@ -104,8 +104,8 @@ class DecayManager:
             if days_elapsed < self.min_age_days:
                 continue
 
-            # Calculate decay
-            decay_factor = math.exp(-self.decay_rate * days_elapsed)
+            # Calculate decay using per-neuron rate (type-aware)
+            decay_factor = math.exp(-state.decay_rate * days_elapsed)
             new_level = state.activation_level * decay_factor
 
             if new_level < state.activation_level:

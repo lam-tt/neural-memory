@@ -27,6 +27,19 @@ if TYPE_CHECKING:
     from neural_memory.storage.base import NeuralStorage
 
 
+def _fiber_valid_at(fiber: Fiber, dt: datetime) -> bool:
+    """Check if a fiber is temporally valid at the given datetime.
+
+    A fiber is valid if its time window contains dt. Missing bounds
+    are treated as unbounded (open interval).
+    """
+    if fiber.time_start is not None and fiber.time_start > dt:
+        return False
+    if fiber.time_end is not None and fiber.time_end < dt:
+        return False
+    return True
+
+
 class ReflexPipeline:
     """
     Main retrieval engine - the "consciousness" of the memory system.
@@ -76,6 +89,7 @@ class ReflexPipeline:
         depth: DepthLevel | None = None,
         max_tokens: int | None = None,
         reference_time: datetime | None = None,
+        valid_at: datetime | None = None,
     ) -> RetrievalResult:
         """
         Execute the retrieval pipeline.
@@ -123,7 +137,7 @@ class ReflexPipeline:
             co_activations = []
 
         # 5. Find matching fibers
-        fibers_matched = await self._find_matching_fibers(activations)
+        fibers_matched = await self._find_matching_fibers(activations, valid_at=valid_at)
 
         # 6. Extract subgraph
         neuron_ids, synapse_ids = await self._activator.get_activated_subgraph(
@@ -145,7 +159,7 @@ class ReflexPipeline:
             n for n in intersections if n not in co_activated_ids
         ]
 
-        answer, confidence = await reconstitute_answer(
+        answer, confidence, score_breakdown = await reconstitute_answer(
             self._storage,
             activations,
             all_intersections,
@@ -190,6 +204,7 @@ class ReflexPipeline:
             latency_ms=latency_ms,
             tokens_used=tokens_used,
             co_activations=co_activations,
+            score_breakdown=score_breakdown,
             metadata={
                 "query_intent": stimulus.intent.value,
                 "anchors_found": sum(len(a) for a in anchor_sets),
@@ -435,6 +450,7 @@ class ReflexPipeline:
     async def _find_matching_fibers(
         self,
         activations: dict[str, ActivationResult],
+        valid_at: datetime | None = None,
     ) -> list[Fiber]:
         """Find fibers that contain activated neurons (batch query)."""
         # Get highly activated neurons
@@ -446,6 +462,10 @@ class ReflexPipeline:
 
         top_neuron_ids = [a.neuron_id for a in top_neurons]
         fibers = await self._storage.find_fibers_batch(top_neuron_ids, limit_per_neuron=3)
+
+        # Apply point-in-time temporal filter
+        if valid_at is not None:
+            fibers = [f for f in fibers if _fiber_valid_at(f, valid_at)]
 
         # Sort by composite score: salience * freshness * conductivity
         def _fiber_score(fiber: Fiber) -> float:

@@ -259,6 +259,38 @@ DEFAULT_EXPIRY_DAYS: dict[MemoryType, int | None] = {
 }
 
 
+# Default decay rates per memory type (per day, for Ebbinghaus curve).
+# Lower = slower decay = longer retention.
+DEFAULT_DECAY_RATES: dict[MemoryType, float] = {
+    MemoryType.FACT: 0.02,  # Facts persist longest
+    MemoryType.DECISION: 0.03,  # Decisions are fairly stable
+    MemoryType.PREFERENCE: 0.03,  # Preferences are stable
+    MemoryType.REFERENCE: 0.04,  # References persist
+    MemoryType.INSIGHT: 0.05,  # Insights fade moderately
+    MemoryType.INSTRUCTION: 0.05,  # Instructions are semi-permanent
+    MemoryType.CONTEXT: 0.08,  # Context is short-term
+    MemoryType.WORKFLOW: 0.08,  # Workflows change over time
+    MemoryType.ERROR: 0.12,  # Errors become less relevant
+    MemoryType.TODO: 0.15,  # TODOs should be acted on quickly
+}
+
+
+def get_decay_rate(memory_type: str) -> float:
+    """Get the default decay rate for a memory type.
+
+    Args:
+        memory_type: The memory type string (e.g. "fact", "todo").
+
+    Returns:
+        Decay rate per day. Defaults to 0.1 for unknown types.
+    """
+    try:
+        mt = MemoryType(memory_type)
+        return DEFAULT_DECAY_RATES.get(mt, 0.1)
+    except ValueError:
+        return 0.1
+
+
 def suggest_memory_type(content: str) -> MemoryType:
     """Suggest a memory type based on content analysis.
 
