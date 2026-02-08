@@ -126,6 +126,7 @@ class MCPServer(SessionHandler, EternalHandler, AutoHandler, IndexHandler):
             "nmem_import": self._import,
             "nmem_eternal": self._eternal,
             "nmem_recap": self._recap,
+            "nmem_health": self._health,
         }
         handler = dispatch.get(name)
         if handler:
@@ -365,6 +366,39 @@ class MCPServer(SessionHandler, EternalHandler, AutoHandler, IndexHandler):
             "today_fibers_count": stats.get("today_fibers_count", 0),
             "hot_neurons": stats.get("hot_neurons", []),
             "newest_memory": stats.get("newest_memory"),
+        }
+
+    async def _health(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Run brain health diagnostics."""
+        storage = await self.get_storage()
+        brain = await storage.get_brain(storage._current_brain_id)
+        if not brain:
+            return {"error": "No brain configured"}
+
+        from neural_memory.engine.diagnostics import DiagnosticsEngine
+
+        engine = DiagnosticsEngine(storage)
+        report = await engine.analyze(brain.id)
+
+        return {
+            "brain": brain.name,
+            "grade": report.grade,
+            "purity_score": report.purity_score,
+            "connectivity": report.connectivity,
+            "diversity": report.diversity,
+            "freshness": report.freshness,
+            "consolidation_ratio": report.consolidation_ratio,
+            "orphan_rate": report.orphan_rate,
+            "activation_efficiency": report.activation_efficiency,
+            "recall_confidence": report.recall_confidence,
+            "neuron_count": report.neuron_count,
+            "synapse_count": report.synapse_count,
+            "fiber_count": report.fiber_count,
+            "warnings": [
+                {"severity": w.severity.value, "code": w.code, "message": w.message}
+                for w in report.warnings
+            ],
+            "recommendations": list(report.recommendations),
         }
 
     async def _suggest(self, args: dict[str, Any]) -> dict[str, Any]:

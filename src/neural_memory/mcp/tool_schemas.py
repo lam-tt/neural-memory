@@ -323,4 +323,9 @@ def get_tool_schemas() -> list[dict[str, Any]]:
                 },
             },
         },
+        {
+            "name": "nmem_health",
+            "description": "Get brain health diagnostics including purity score, grade, component metrics, and actionable warnings.",
+            "inputSchema": {"type": "object", "properties": {}},
+        },
     ]

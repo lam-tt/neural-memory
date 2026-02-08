@@ -332,6 +332,143 @@ def status(
             typer.secho(f"  > {suggestion}", fg=typer.colors.YELLOW)
 
 
+def health(
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """Show brain health diagnostics with purity score and recommendations.
+
+    Analyzes connectivity, diversity, freshness, consolidation,
+    orphan rate, and activation efficiency to produce a composite
+    health grade (A-F) and actionable recommendations.
+
+    Examples:
+        nmem health
+        nmem health --json
+    """
+
+    async def _health() -> dict:
+        config = get_config()
+        storage = await get_storage(config)
+
+        brain = await storage.get_brain(storage._current_brain_id)
+        if not brain:
+            return {"error": "No brain configured. Run: nmem init"}
+
+        from neural_memory.engine.diagnostics import DiagnosticsEngine
+
+        engine = DiagnosticsEngine(storage)
+        report = await engine.analyze(brain.id)
+
+        return {
+            "brain": brain.name,
+            "grade": report.grade,
+            "purity_score": report.purity_score,
+            "connectivity": report.connectivity,
+            "diversity": report.diversity,
+            "freshness": report.freshness,
+            "consolidation_ratio": report.consolidation_ratio,
+            "orphan_rate": report.orphan_rate,
+            "activation_efficiency": report.activation_efficiency,
+            "recall_confidence": report.recall_confidence,
+            "neuron_count": report.neuron_count,
+            "synapse_count": report.synapse_count,
+            "fiber_count": report.fiber_count,
+            "warnings": [
+                {"severity": w.severity.value, "code": w.code, "message": w.message}
+                for w in report.warnings
+            ],
+            "recommendations": list(report.recommendations),
+        }
+
+    result = run_async(_health())
+
+    if "error" in result:
+        typer.secho(result["error"], fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    if json_output:
+        output_result(result, True)
+        return
+
+    # Header
+    grade = result["grade"]
+    grade_colors = {
+        "A": typer.colors.GREEN,
+        "B": typer.colors.CYAN,
+        "C": typer.colors.YELLOW,
+        "D": typer.colors.RED,
+        "F": typer.colors.RED,
+    }
+    typer.secho(f"Brain: {result['brain']}", fg=typer.colors.CYAN, bold=True)
+    typer.secho(
+        f"Grade: {grade} ({result['purity_score']}/100)",
+        fg=grade_colors.get(grade, typer.colors.WHITE),
+        bold=True,
+    )
+    typer.echo()
+
+    # Metrics with progress bars
+    _render_bar("Connectivity", result["connectivity"])
+    _render_bar("Diversity", result["diversity"])
+    _render_bar("Freshness", result["freshness"])
+    _render_bar("Consolidation", result["consolidation_ratio"])
+    _render_bar("Orphan rate", result["orphan_rate"], invert=True)
+    _render_bar("Activation", result["activation_efficiency"])
+    _render_bar("Recall conf.", result["recall_confidence"])
+
+    # Counts
+    typer.echo(
+        f"\n  Neurons: {result['neuron_count']}  "
+        f"Synapses: {result['synapse_count']}  "
+        f"Fibers: {result['fiber_count']}"
+    )
+
+    # Warnings
+    warnings = result.get("warnings", [])
+    if warnings:
+        typer.echo("\nWarnings:")
+        for w in warnings:
+            severity = w["severity"]
+            icon = {"critical": "!!", "warning": " !", "info": " ~"}[severity]
+            color = {
+                "critical": typer.colors.RED,
+                "warning": typer.colors.YELLOW,
+                "info": typer.colors.BRIGHT_BLACK,
+            }[severity]
+            typer.secho(f"  [{icon}] {w['message']}", fg=color)
+
+    # Recommendations
+    recommendations = result.get("recommendations", [])
+    if recommendations:
+        typer.echo("\nRecommendations:")
+        for rec in recommendations:
+            typer.echo(f"  > {rec}")
+
+
+def _render_bar(label: str, value: float, *, invert: bool = False) -> None:
+    """Render an ASCII progress bar for a metric."""
+    filled = round(value * 10)
+    filled = max(0, min(10, filled))
+    bar = "#" * filled + "-" * (10 - filled)
+    pct = f"{value:.0%}"
+    quality = _quality_label(value, invert=invert)
+    typer.echo(f"  {label:<16} [{bar}]  {pct:>4} ({quality})")
+
+
+def _quality_label(value: float, *, invert: bool = False) -> str:
+    """Map a 0-1 score to a quality label."""
+    effective = (1.0 - value) if invert else value
+    if effective >= 0.8:
+        return "excellent"
+    if effective >= 0.6:
+        return "good"
+    if effective >= 0.4:
+        return "moderate"
+    if effective >= 0.2:
+        return "low"
+    return "poor"
+
+
 def version() -> None:
     """Show version information."""
     from neural_memory import __version__
@@ -344,4 +481,5 @@ def register(app: typer.Typer) -> None:
     app.command()(stats)
     app.command()(check)
     app.command()(status)
+    app.command()(health)
     app.command()(version)

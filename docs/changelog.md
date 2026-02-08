@@ -5,6 +5,24 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-02-08
+
+### Added
+
+- **Brain Diagnostics** — Health metrics, purity score, and actionable recommendations
+  - `BrainHealthReport` frozen dataclass with 7 component scores and composite purity (0-100)
+  - `DiagnosticsEngine` computes connectivity, diversity, freshness, consolidation ratio, orphan rate, activation efficiency, recall confidence
+  - Letter grade system (A/B/C/D/F) based on weighted purity score
+  - Warning system with severity levels (CRITICAL/WARNING/INFO)
+  - 7 diagnostic warning codes: EMPTY_BRAIN, STALE_BRAIN, LOW_CONNECTIVITY, LOW_DIVERSITY, HIGH_ORPHAN_RATE, NO_CONSOLIDATION, TAG_DRIFT
+  - Automatic recommendations generated from detected warnings
+  - Tag drift detection via `TagNormalizer.detect_drift()` integration
+- **MCP tool: `nmem_health`** — Brain health diagnostics via MCP protocol
+  - Returns grade, purity score, all component metrics, warnings, and recommendations
+- **CLI command: `nmem health`** — Terminal-based health report with ASCII progress bars
+  - Color-coded grade display and warning severity
+  - `--json` flag for machine-readable output
+
 ## [0.16.0] - 2026-02-08
 
 ### Added
