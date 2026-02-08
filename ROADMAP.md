@@ -4,8 +4,9 @@
 > Every feature passes the VISION.md 4-question test + brain test.
 > ZERO LLM dependency — pure algorithmic, regex, graph-based.
 
-**Current state**: v0.13.0 (791 tests, cognitive runtime phases 1-4).
-Auto-tags implemented (unreleased).
+**Current state**: v0.15.0 (908 tests, schema v9).
+v0.14.0 shipped: relation extraction, tag origin, confirmatory boost.
+v0.15.0 shipped: associative inference, co-activation persistence, tag normalization.
 
 ---
 
@@ -410,17 +411,19 @@ Recommendations:
 
 ---
 
-## v0.18.0 — Advanced Consolidation
+## v0.18.0 — Advanced Consolidation + Workflow Detection
 
-> The brain sleeps, dreams, and wakes up smarter.
+> The brain sleeps, dreams, learns habits, and wakes up smarter.
 
-**Depends on**: v0.14.0 (needs relation extraction for richer consolidation input), v0.15.0 (needs associative inference for co-activation data).
+**Depends on**: v0.14.0 (relation extraction), v0.15.0 (associative inference + co-activation data).
 
-### The Gap
+### The Gaps
 
-No `ENRICH` strategy, no transitive inference, no dream-like consolidation. Current consolidation (PRUNE/MERGE/SUMMARIZE/MATURE) handles cleanup and compression but doesn't **create new knowledge** from existing knowledge. A brain that can't dream can't make novel connections.
+**Gap 1 — No knowledge creation**: No `ENRICH` strategy, no transitive inference, no dream-like consolidation. Current consolidation (PRUNE/MERGE/SUMMARIZE/MATURE/INFER) handles cleanup, compression, and co-activation inference but doesn't create **new knowledge from existing knowledge**. A brain that can't dream can't make novel connections.
 
-### Solution
+**Gap 2 — No habit learning**: The brain tracks frequency (fiber.frequency, neuron.access_frequency) and co-activation (pairs) but cannot detect **ordered sequences of repeated actions**. A brain that can't recognize habits can't suggest workflows.
+
+### Solution — Part A: Advanced Consolidation
 
 #### 1. `ENRICH` consolidation strategy
 
@@ -455,27 +458,125 @@ During PRUNE strategy:
 - Fibers with many inbound synapses (hub neurons) get decay protection
 - Emotional fibers (from v0.16.0, if available) decay slower
 
+### Solution — Part B: Workflow Detection
+
+> "Actions that sequence together template together."
+
+Transform repeated user behavior patterns into named workflow templates with proactive suggestions.
+
+#### 4. Action event log (`storage/action_log.py`)
+
+Persistent, ordered log of user actions within sessions:
+
+```python
+@dataclass(frozen=True)
+class ActionEvent:
+    id: str
+    brain_id: str
+    session_id: str          # Groups actions within a session
+    action_type: str         # "remember", "recall", "encode", "consolidate", etc.
+    action_context: str      # Content summary / query text (truncated)
+    tags: frozenset[str]     # Tags involved in this action
+    fiber_id: str | None     # Fiber created/accessed (if applicable)
+    created_at: datetime
+```
+
+Schema migration adds `action_events` table. Storage interface: `record_action()`, `get_action_sequences()`, `prune_action_events()`.
+
+#### 5. Sequence mining engine (`engine/sequence_mining.py`)
+
+Detects repeated ordered subsequences across sessions:
+
+```python
+@dataclass(frozen=True)
+class WorkflowCandidate:
+    steps: tuple[str, ...]       # Ordered action types: ("recall", "encode", "consolidate")
+    frequency: int               # Number of sessions containing this sequence
+    avg_duration_seconds: float  # Avg time from first to last step
+    context_tags: frozenset[str] # Common tags across occurrences
+    confidence: float            # 0.0–1.0 based on frequency + consistency
+
+@dataclass(frozen=True)
+class WorkflowTemplate:
+    id: str
+    name: str                    # Auto-generated: "dev-cycle", "debug-fix-verify"
+    steps: tuple[str, ...]
+    trigger_context: frozenset[str]  # Tags/actions that trigger suggestion
+    frequency: int
+    confidence: float
+```
+
+**Algorithm**: Sliding-window subsequence extraction → frequency counting → filter by min_frequency (default: 3 sessions) → rank by confidence → deduplicate overlapping sequences.
+
+- **No LLM dependency**: Pure frequency-based pattern mining (inspired by PrefixSpan but simplified for action sequences)
+- **Naming heuristic**: Join action types with "-" → "recall-encode-consolidate" → shorten common patterns ("dev-cycle", "debug-fix", etc.)
+
+#### 6. `LEARN_HABITS` consolidation strategy
+
+```python
+LEARN_HABITS = "learn_habits"  # Extract workflow templates from action logs
+```
+
+Run during consolidation alongside ENRICH/DREAM:
+1. Query action sequences from last N days (configurable window)
+2. Run sequence mining → workflow candidates
+3. Promote candidates above confidence threshold to `WorkflowTemplate`
+4. Store templates as special WORKFLOW-typed fibers with `_workflow_template: True` metadata
+5. Prune old action events outside the window
+
+#### 7. Proactive workflow suggestion
+
+During retrieval, after assembling the response:
+1. Check current action context (what the user just did)
+2. Match against stored workflow templates by trigger_context overlap
+3. If match found with confidence > 0.7: include suggestion in retrieval metadata
+
+```python
+@dataclass(frozen=True)
+class WorkflowSuggestion:
+    template_id: str
+    template_name: str
+    next_steps: tuple[str, ...]   # Remaining steps in the workflow
+    confidence: float
+    message: str                  # "You usually do X next. Continue?"
+```
+
+Exposed via:
+- **MCP tool**: `nmem_suggest` → returns active workflow suggestions
+- **CLI**: `nmem suggest` → show current workflow suggestions
+- **Retrieval metadata**: `RetrievalResult.workflow_suggestions: list[WorkflowSuggestion]`
+
 ### Files
 
 | Action | File | Changes |
 |--------|------|---------|
-| **Modified** | `engine/consolidation.py` | ENRICH + DREAM strategies (~250 lines) |
+| **Modified** | `engine/consolidation.py` | ENRICH + DREAM + LEARN_HABITS strategies (~350 lines) |
 | **Modified** | `engine/pattern_extraction.py` | Transitive closure helper (~100 lines) |
+| **New** | `storage/action_log.py` | ActionEvent storage mixin (~80 lines) |
+| **New** | `engine/sequence_mining.py` | Sequence mining + WorkflowTemplate (~250 lines) |
+| **New** | `engine/workflow_suggest.py` | Proactive suggestion engine (~100 lines) |
+| **Modified** | `engine/retrieval.py` | Attach workflow suggestions to results (~30 lines) |
+| **Modified** | `storage/sqlite_schema.py` | action_events table migration (~20 lines) |
+| **Modified** | `storage/base.py` | Action log abstract methods (~20 lines) |
+| **Modified** | `mcp/tool_schemas.py` | `nmem_suggest` tool schema (~15 lines) |
+| **Modified** | `mcp/server.py` | `nmem_suggest` handler (~20 lines) |
 | **New** | `tests/unit/test_enrichment.py` | Transitive inference + dream tests (~200 lines) |
+| **New** | `tests/unit/test_sequence_mining.py` | Sequence extraction + workflow template tests (~200 lines) |
+| **New** | `tests/unit/test_workflow_suggest.py` | Proactive suggestion tests (~150 lines) |
 
 ### Scope
 
-~400 new lines (including modifications) + ~200 test lines
+~950 new lines + ~555 modified lines + ~550 test lines
 
 ### VISION.md Check
 
 | Question | Answer |
 |----------|--------|
-| Activation or Search? | Activation — new synapses from consolidation enrich the graph |
-| Spreading activation still central? | Yes — DREAM literally uses spreading activation |
-| Works without embeddings? | Yes — graph traversal + random activation |
-| More detailed query = faster? | Yes — enrichment creates shortcuts in the graph |
-| Brain test? | Yes — dreaming and transitive inference are core brain functions |
+| Activation or Search? | Activation — DREAM uses spreading activation; workflow templates create new activation shortcuts |
+| Spreading activation still central? | Yes — DREAM literally uses it; workflow suggestions augment retrieval results |
+| Works without embeddings? | Yes — graph traversal + frequency-based sequence mining |
+| More detailed query = faster? | Yes — enrichment creates shortcuts; workflows predict next action |
+| Brain test? | Yes — dreaming, transitive inference, and habit formation are core brain functions |
 
 ---
 
@@ -633,9 +734,9 @@ Enhance `extraction/router.py` to route:
 ## Dependency Graph
 
 ```
-v0.14.0 (Relation Extraction)
-  ├──→ v0.15.0 (Associative Inference)
-  │       └──→ v0.18.0 (Advanced Consolidation)
+v0.14.0 ✅ (Relation Extraction)
+  ├──→ v0.15.0 ✅ (Associative Inference)
+  │       └──→ v0.18.0 (Advanced Consolidation + Workflow Detection)
   └──→ v0.19.0 (Temporal Reasoning)
 
 v0.16.0 (Emotional Valence)        ← independent
@@ -643,11 +744,11 @@ v0.17.0 (Brain Diagnostics)        ← independent
   └──→ v1.0.0 (Portable Consciousness v2)
 ```
 
-**Critical path**: v0.14.0 → v0.15.0 → v0.18.0
+**Critical path**: ~~v0.14.0 → v0.15.0~~ → v0.18.0 (v0.14 + v0.15 shipped)
 
 **Parallelizable**:
 - v0.16.0 and v0.17.0 can be built at any time (no dependencies)
-- v0.19.0 only needs v0.14.0 (can run parallel with v0.15.0+)
+- v0.19.0 only needs v0.14.0 ✅ (can start now)
 
 ---
 
@@ -657,13 +758,14 @@ v0.17.0 (Brain Diagnostics)        ← independent
 
 | # | Gap | Status Before | Resolved In |
 |---|-----|---------------|-------------|
-| G1 | Causal/temporal synapses never auto-created | 29 synapse types defined, 0 auto-created | **v0.14.0** |
-| G2 | Co-activation never synthesized into synapses | Data collected, never used | **v0.15.0** |
+| G1 | Causal/temporal synapses never auto-created | 29 synapse types defined, 0 auto-created | **v0.14.0** ✅ |
+| G2 | Co-activation never synthesized into synapses | Data collected, never used | **v0.15.0** ✅ |
 | G3 | Emotional synapses (`FELT`/`EVOKES`) never created | Types exist, unused | **v0.16.0** |
 | G4 | No brain health metrics or diagnostics | Flying blind | **v0.17.0** |
-| G5 | No enrichment or dream consolidation | Only PRUNE/MERGE/SUMMARIZE/MATURE | **v0.18.0** |
+| G5 | No enrichment or dream consolidation | Only PRUNE/MERGE/SUMMARIZE/MATURE/INFER | **v0.18.0** |
 | G6 | "Why?" and "When?" queries can't trace chains | Router detects intent, no traversal | **v0.19.0** |
 | G7 | No brain versioning or partial transplant | Export/import only (all-or-nothing) | **v1.0.0** |
+| G8 | No habit/workflow detection from repeated actions | Frequency tracked but sequences ignored | **v0.18.0** |
 
 ### Expert 4's 3 New Gaps
 
@@ -718,24 +820,24 @@ Ranked by impact × feasibility:
 
 | Rank | Phase | Impact | Feasibility | Rationale |
 |------|-------|--------|-------------|-----------|
-| 1 | **v0.14.0** | Critical | High | Unblocks v0.15.0, v0.18.0, v0.19.0. Addresses the biggest gap (unused synapse types). |
-| 2 | **v0.15.0** | High | Medium | Hebbian learning is the core promise. Unblocks v0.18.0. |
+| 1 | **v0.14.0** ✅ | Critical | High | Shipped. Relation extraction, tag origin, confirmatory boost. |
+| 2 | **v0.15.0** ✅ | High | Medium | Shipped. Associative inference, co-activation, tag normalization. |
 | 3 | **v0.17.0** | High | High | Independent, high user value, required for v1.0.0 quality rating. |
 | 4 | **v0.16.0** | Medium | High | Independent, small scope, fills VISION.md emotional valence direction. |
 | 5 | **v0.19.0** | High | Medium | Fills VISION.md Pillar 2 (Temporal & Causal). Needs v0.14.0 first. |
-| 6 | **v0.18.0** | Medium | Medium | Novel but speculative (DREAM). Needs v0.14.0 + v0.15.0. |
+| 6 | **v0.18.0** | High | Medium | DREAM + ENRICH + Workflow Detection. Largest scope but high differentiator (habit learning). Needs v0.14.0 ✅ + v0.15.0 ✅. |
 | 7 | **v1.0.0** | Critical | Low | Largest scope. Marketplace foundations. Needs everything else stable. |
 
 ### Recommended execution order
 
 ```
-v0.14.0 → v0.15.0 → v0.17.0 → v0.16.0 → v0.19.0 → v0.18.0 → v1.0.0
-    │                   ↑          ↑
-    │         (parallel) │          │
-    └───────────────────┘──────────┘
+v0.14.0 ✅ → v0.15.0 ✅ → v0.17.0 → v0.16.0 → v0.19.0 → v0.18.0 → v1.0.0
+                             ↑          ↑
+                   (parallel) │          │
+                   ───────────┘──────────┘
 ```
 
-v0.16.0 and v0.17.0 can be developed in parallel with v0.15.0 if resources allow.
+v0.16.0 and v0.17.0 can be developed in parallel — all dependencies met.
 
 ---
 
@@ -747,14 +849,14 @@ v0.16.0 and v0.17.0 can be developed in parallel with v0.15.0 if resources allow
 | v0.15.0 | ~500 | ~120 | ~300 | ~1,341 |
 | v0.16.0 | ~250 | ~80 | ~200 | ~1,541 |
 | v0.17.0 | ~450 | ~60 | ~200 | ~1,741 |
-| v0.18.0 | ~400 | — | ~200 | ~1,941 |
-| v0.19.0 | ~300 | ~100 | ~200 | ~2,141 |
-| v1.0.0 | ~500 | ~150 | ~350 | ~2,491 |
-| **Total** | **~3,000** | **~590** | **~1,700** | **~2,491** |
+| v0.18.0 | ~950 | ~555 | ~550 | ~2,008 |
+| v0.19.0 | ~300 | ~100 | ~200 | ~2,208 |
+| v1.0.0 | ~500 | ~150 | ~350 | ~2,558 |
+| **Total** | **~3,550** | **~1,145** | **~2,050** | **~2,558** |
 
-Starting from 791 tests → targeting ~2,491 tests at v1.0.0.
+Starting from 908 tests (v0.15.0) → targeting ~2,558 tests at v1.0.0.
 
 ---
 
 *See [VISION.md](VISION.md) for the north star guiding all decisions.*
-*Last updated: 2026-02-08*
+*Last updated: 2026-02-08 (v0.15.0 shipped, v0.18.0 expanded with Workflow Detection)*
