@@ -80,9 +80,11 @@ class SQLiteNeuronMixin:
 
             # Initialize state
             await conn.execute(
-                """INSERT INTO neuron_states (neuron_id, brain_id, created_at)
-                   VALUES (?, ?, ?)""",
-                (neuron.id, brain_id, datetime.utcnow().isoformat()),
+                """INSERT INTO neuron_states
+                   (neuron_id, brain_id, firing_threshold, refractory_period_ms,
+                    homeostatic_target, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (neuron.id, brain_id, 0.3, 500.0, 0.5, datetime.utcnow().isoformat()),
             )
 
             await conn.commit()
@@ -259,8 +261,9 @@ class SQLiteNeuronMixin:
         await conn.execute(
             """INSERT OR REPLACE INTO neuron_states
                (neuron_id, brain_id, activation_level, access_frequency,
-                last_activated, decay_rate, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                last_activated, decay_rate, firing_threshold, refractory_until,
+                refractory_period_ms, homeostatic_target, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 state.neuron_id,
                 brain_id,
@@ -268,6 +271,10 @@ class SQLiteNeuronMixin:
                 state.access_frequency,
                 state.last_activated.isoformat() if state.last_activated else None,
                 state.decay_rate,
+                state.firing_threshold,
+                state.refractory_until.isoformat() if state.refractory_until else None,
+                state.refractory_period_ms,
+                state.homeostatic_target,
                 state.created_at.isoformat(),
             ),
         )

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from neural_memory.core.fiber import Fiber
     from neural_memory.core.neuron import Neuron, NeuronState, NeuronType
     from neural_memory.core.synapse import Synapse, SynapseType
+    from neural_memory.engine.memory_stages import MaturationRecord, MemoryStage
 
 
 class NeuralStorage(ABC):
@@ -546,6 +547,44 @@ class NeuralStorage(ABC):
             Dict with enhanced statistics
         """
         ...
+
+    # ========== Maturation Operations ==========
+
+    async def save_maturation(self, record: MaturationRecord) -> None:  # noqa: B027
+        """Save or update a maturation record.
+
+        Default no-op — backends that support maturation should override.
+
+        Args:
+            record: The maturation record to save
+        """
+
+    async def get_maturation(self, fiber_id: str) -> MaturationRecord | None:
+        """Get a maturation record for a fiber.
+
+        Args:
+            fiber_id: The fiber ID
+
+        Returns:
+            The maturation record if found, None otherwise
+        """
+        return None
+
+    async def find_maturations(
+        self,
+        stage: MemoryStage | None = None,
+        min_rehearsal_count: int = 0,
+    ) -> list[MaturationRecord]:
+        """Find maturation records matching criteria.
+
+        Args:
+            stage: Optional stage filter
+            min_rehearsal_count: Minimum rehearsal count filter
+
+        Returns:
+            List of matching maturation records
+        """
+        return []
 
     # ========== Cleanup ==========
 

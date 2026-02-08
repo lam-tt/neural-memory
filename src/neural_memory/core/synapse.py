@@ -44,6 +44,9 @@ class SynapseType(StrEnum):
     FELT = "felt"  # Event -> Emotion
     EVOKES = "evokes"  # Stimulus -> Emotion
 
+    # Conflict relationships
+    CONTRADICTS = "contradicts"  # Memory A contradicts Memory B
+
 
 class Direction(StrEnum):
     """Direction of synapse connection."""
@@ -148,36 +151,57 @@ class Synapse:
             created_at=datetime.utcnow(),
         )
 
-    def reinforce(self, delta: float = 0.05) -> Synapse:
+    def reinforce(
+        self,
+        delta: float = 0.05,
+        pre_activation: float | None = None,
+        post_activation: float | None = None,
+        now: datetime | None = None,
+    ) -> Synapse:
         """
         Create a new Synapse with reinforced weight.
 
-        Includes dormancy bonus: synapses reactivated after long dormancy
-        get an extra boost (re-learning effect).
+        When pre/post activation levels are provided, uses the formal
+        Hebbian learning rule: Δw = η_eff * pre * post * (w_max - w).
+        Otherwise falls back to direct delta addition (backward compatible).
 
         Args:
-            delta: Amount to increase weight by
+            delta: Amount to increase weight by (used as learning rate for Hebbian)
+            pre_activation: Pre-synaptic neuron activation level [0, 1]
+            post_activation: Post-synaptic neuron activation level [0, 1]
+            now: Reference time (default: utcnow)
 
         Returns:
             New Synapse with increased weight (capped at 1.0)
         """
-        dormancy_bonus = 0.0
-        if self.last_activated:
-            hours_dormant = (datetime.utcnow() - self.last_activated).total_seconds() / 3600
-            if hours_dormant > 168:  # > 1 week dormant
-                dormancy_bonus = min(0.1, 0.02 * math.log1p(hours_dormant / 168))
+        now = now or datetime.utcnow()
 
-        effective_delta = delta + dormancy_bonus
+        if pre_activation is not None and post_activation is not None:
+            from neural_memory.engine.learning_rule import LearningConfig, hebbian_update
+
+            config = LearningConfig(learning_rate=delta)
+            update = hebbian_update(
+                current_weight=self.weight,
+                pre_activation=pre_activation,
+                post_activation=post_activation,
+                reinforced_count=self.reinforced_count,
+                config=config,
+            )
+            new_weight = update.new_weight
+        else:
+            # Backward-compatible: direct delta addition
+            new_weight = min(1.0, self.weight + delta)
+
         return Synapse(
             id=self.id,
             source_id=self.source_id,
             target_id=self.target_id,
             type=self.type,
-            weight=min(1.0, self.weight + effective_delta),
+            weight=new_weight,
             direction=self.direction,
             metadata=self.metadata,
             reinforced_count=self.reinforced_count + 1,
-            last_activated=datetime.utcnow(),
+            last_activated=now,
             created_at=self.created_at,
         )
 

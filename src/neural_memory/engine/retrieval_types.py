@@ -89,3 +89,5 @@ class RetrievalResult:
     co_activations: list[CoActivation] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     score_breakdown: ScoreBreakdown | None = None
+    contributing_neurons: list[str] = field(default_factory=list)
+    synthesis_method: str = "single"

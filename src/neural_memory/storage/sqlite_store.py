@@ -11,6 +11,7 @@ import aiosqlite
 from neural_memory.storage.base import NeuralStorage
 from neural_memory.storage.sqlite_brain_ops import SQLiteBrainMixin
 from neural_memory.storage.sqlite_fibers import SQLiteFiberMixin
+from neural_memory.storage.sqlite_maturation import SQLiteMaturationMixin
 from neural_memory.storage.sqlite_neurons import SQLiteNeuronMixin
 from neural_memory.storage.sqlite_projects import SQLiteProjectMixin
 from neural_memory.storage.sqlite_schema import (
@@ -31,6 +32,7 @@ class SQLiteStorage(
     SQLiteFiberMixin,
     SQLiteTypedMemoryMixin,
     SQLiteProjectMixin,
+    SQLiteMaturationMixin,
     SQLiteBrainMixin,
     NeuralStorage,
 ):

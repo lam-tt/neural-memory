@@ -172,7 +172,18 @@ class SpreadingActivation:
                     state = batch_states.get(nid)
                     freq_cache[nid] = state.access_frequency if state else 0
 
+            # Build set of refractory neuron IDs for quick lookup
+            refractory_ids: set[str] = set()
+            if uncached_ids:
+                for nid in uncached_ids:
+                    state = batch_states.get(nid)
+                    if state and state.in_refractory:
+                        refractory_ids.add(nid)
+
             for neighbor_neuron, synapse in neighbors:
+                # Skip neurons in refractory cooldown
+                if neighbor_neuron.id in refractory_ids:
+                    continue
                 # Frequency boost: frequently accessed neurons conduct stronger
                 # (myelination metaphor — well-used pathways transmit faster)
                 freq = freq_cache.get(neighbor_neuron.id, 0)

@@ -183,11 +183,31 @@ class MemoryEncoder:
                 await self._storage.add_synapse(synapse)
                 synapses_created.append(synapse)
 
-        # 6. Link to nearby temporal memories
+        # 6. Detect and resolve conflicts with existing memories
+        from neural_memory.engine.conflict_detection import detect_conflicts, resolve_conflicts
+
+        conflict_tags = tags or set()
+        memory_type_str = (metadata or {}).get("type", "")
+        conflicts = await detect_conflicts(
+            content=content,
+            tags=conflict_tags,
+            storage=self._storage,
+            memory_type=memory_type_str,
+        )
+        if conflicts:
+            resolutions = await resolve_conflicts(
+                conflicts=conflicts,
+                new_neuron_id=anchor_neuron.id,
+                storage=self._storage,
+            )
+            for resolution in resolutions:
+                synapses_created.append(resolution.contradicts_synapse)
+
+        # 7. Link to nearby temporal memories
         linked = await self._link_temporal_neighbors(anchor_neuron, timestamp)
         neurons_linked.extend(linked)
 
-        # 7. Create fiber
+        # 8. Create fiber
         neuron_ids = {n.id for n in all_neurons}
         synapse_ids = {s.id for s in synapses_created}
 
@@ -207,6 +227,18 @@ class MemoryEncoder:
         fiber = fiber.with_salience(min(1.0, coherence + 0.3))
 
         await self._storage.add_fiber(fiber)
+
+        # Initialize maturation tracking (start as SHORT_TERM)
+        from neural_memory.engine.memory_stages import MaturationRecord
+
+        maturation = MaturationRecord(
+            fiber_id=fiber.id,
+            brain_id=self._storage._current_brain_id or "",
+        )
+        try:
+            await self._storage.save_maturation(maturation)
+        except Exception:
+            logger.debug("Maturation init failed (non-critical)", exc_info=True)
 
         return EncodingResult(
             fiber=fiber,

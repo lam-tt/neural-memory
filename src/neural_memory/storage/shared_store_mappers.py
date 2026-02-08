@@ -25,6 +25,11 @@ def dict_to_neuron(data: dict[str, Any]) -> Neuron:
 
 def dict_to_neuron_state(data: dict[str, Any]) -> NeuronState:
     """Convert API response dict to NeuronState."""
+    refractory_until_raw = data.get("refractory_until")
+    refractory_until = (
+        datetime.fromisoformat(refractory_until_raw) if refractory_until_raw else None
+    )
+
     return NeuronState(
         neuron_id=data["neuron_id"],
         activation_level=data.get("activation_level", 0.0),
@@ -36,6 +41,10 @@ def dict_to_neuron_state(data: dict[str, Any]) -> NeuronState:
         created_at=datetime.fromisoformat(data["created_at"])
         if data.get("created_at")
         else datetime.now(),
+        firing_threshold=data.get("firing_threshold", 0.3),
+        refractory_until=refractory_until,
+        refractory_period_ms=data.get("refractory_period_ms", 500.0),
+        homeostatic_target=data.get("homeostatic_target", 0.5),
     )
 
 
@@ -93,6 +102,15 @@ def dict_to_brain(data: dict[str, Any]) -> Brain:
             hebbian_delta=config_data.get("hebbian_delta", 0.03),
             hebbian_threshold=config_data.get("hebbian_threshold", 0.5),
             hebbian_initial_weight=config_data.get("hebbian_initial_weight", 0.2),
+            sigmoid_steepness=config_data.get("sigmoid_steepness", 6.0),
+            default_firing_threshold=config_data.get("default_firing_threshold", 0.3),
+            default_refractory_ms=config_data.get("default_refractory_ms", 500.0),
+            lateral_inhibition_k=config_data.get("lateral_inhibition_k", 10),
+            lateral_inhibition_factor=config_data.get("lateral_inhibition_factor", 0.3),
+            learning_rate=config_data.get("learning_rate", 0.05),
+            weight_normalization_budget=config_data.get("weight_normalization_budget", 5.0),
+            novelty_boost_max=config_data.get("novelty_boost_max", 3.0),
+            novelty_decay_rate=config_data.get("novelty_decay_rate", 0.06),
         )
     else:
         config = BrainConfig()

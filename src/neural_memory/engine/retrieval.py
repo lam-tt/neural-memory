@@ -14,9 +14,11 @@ from neural_memory.core.neuron import NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.activation import ActivationResult, SpreadingActivation
 from neural_memory.engine.lifecycle import ReinforcementManager
+from neural_memory.engine.reconstruction import reconstruct_answer
 from neural_memory.engine.reflex_activation import CoActivation, ReflexActivation
-from neural_memory.engine.retrieval_context import format_context, reconstitute_answer
+from neural_memory.engine.retrieval_context import format_context
 from neural_memory.engine.retrieval_types import DepthLevel, RetrievalResult, Subgraph
+from neural_memory.engine.stabilization import StabilizationConfig, stabilize
 from neural_memory.engine.write_queue import DeferredWriteQueue
 from neural_memory.extraction.parser import QueryIntent, QueryParser, Stimulus
 
@@ -136,6 +138,15 @@ class ReflexPipeline:
             )
             co_activations = []
 
+        # 4.5 Lateral inhibition: top-K winners suppress competitors
+        activations = self._apply_lateral_inhibition(activations)
+
+        # 4.6 Stabilization: iterative dampening until convergence
+        activations, _stab_report = stabilize(activations, StabilizationConfig())
+
+        # 4.7 Deprioritize disputed neurons (conflict resolution)
+        activations = await self._deprioritize_disputed(activations)
+
         # 5. Find matching fibers
         fibers_matched = await self._find_matching_fibers(activations, valid_at=valid_at)
 
@@ -152,18 +163,17 @@ class ReflexPipeline:
             anchor_ids=[a for anchors in anchor_sets for a in anchors],
         )
 
-        # 7. Reconstitute answer and context
-        # Use co-activated neurons as priority intersections
+        # 7. Reconstruct answer from activated subgraph
         co_activated_ids = [neuron_id for co in co_activations for neuron_id in co.neuron_ids]
         all_intersections = co_activated_ids + [
             n for n in intersections if n not in co_activated_ids
         ]
 
-        answer, confidence, score_breakdown = await reconstitute_answer(
+        reconstruction = await reconstruct_answer(
             self._storage,
             activations,
             all_intersections,
-            stimulus,
+            fibers_matched,
         )
 
         context, tokens_used = await format_context(
@@ -176,9 +186,7 @@ class ReflexPipeline:
         latency_ms = (time.perf_counter() - start_time) * 1000
 
         # 8. Reinforce accessed memories (deferred to after response)
-        # "Neurons that fire together wire together" — recalled memories
-        # become easier to find next time
-        if activations and confidence > 0.3:
+        if activations and reconstruction.confidence > 0.3:
             try:
                 top_neuron_ids = [
                     nid
@@ -194,8 +202,8 @@ class ReflexPipeline:
                 logger.debug("Reinforcement failed (non-critical)", exc_info=True)
 
         result = RetrievalResult(
-            answer=answer,
-            confidence=confidence,
+            answer=reconstruction.answer,
+            confidence=reconstruction.confidence,
             depth_used=depth,
             neurons_activated=len(activations),
             fibers_matched=[f.id for f in fibers_matched],
@@ -204,13 +212,17 @@ class ReflexPipeline:
             latency_ms=latency_ms,
             tokens_used=tokens_used,
             co_activations=co_activations,
-            score_breakdown=score_breakdown,
+            score_breakdown=reconstruction.score_breakdown,
+            contributing_neurons=reconstruction.contributing_neuron_ids,
+            synthesis_method=reconstruction.method.value,
             metadata={
                 "query_intent": stimulus.intent.value,
                 "anchors_found": sum(len(a) for a in anchor_sets),
                 "intersections": len(all_intersections),
                 "co_activations": len(co_activations),
                 "use_reflex": self._use_reflex,
+                "stabilization_iterations": _stab_report.iterations,
+                "stabilization_converged": _stab_report.converged,
             },
         )
 
@@ -332,18 +344,22 @@ class ReflexPipeline:
 
         # Defer Hebbian strengthening (non-blocking)
         if co_activations:
-            await self._defer_co_activated(co_activations)
+            await self._defer_co_activated(co_activations, activations=activations)
 
         return activations, intersections, co_activations
 
     async def _defer_co_activated(
         self,
         co_activations: list[CoActivation],
+        activations: dict[str, ActivationResult] | None = None,
     ) -> None:
         """Defer Hebbian strengthening writes to the write queue.
 
         Reads existing synapses to determine update vs create, but
         defers the actual writes to flush time.
+
+        When activation levels are available, passes them to the formal
+        Hebbian learning rule for principled weight updates.
         """
         threshold = self._config.hebbian_threshold
         delta = self._config.hebbian_delta
@@ -360,7 +376,24 @@ class ReflexPipeline:
             for i in range(len(neuron_ids)):
                 for j in range(i + 1, len(neuron_ids)):
                     a, b = neuron_ids[i], neuron_ids[j]
-                    await self._defer_reinforce_or_create(a, b, delta, initial_weight)
+                    pre_act = (
+                        activations[a].activation_level
+                        if activations and a in activations
+                        else None
+                    )
+                    post_act = (
+                        activations[b].activation_level
+                        if activations and b in activations
+                        else None
+                    )
+                    await self._defer_reinforce_or_create(
+                        a,
+                        b,
+                        delta,
+                        initial_weight,
+                        pre_act,
+                        post_act,
+                    )
 
     async def _defer_reinforce_or_create(
         self,
@@ -368,19 +401,29 @@ class ReflexPipeline:
         neuron_b: str,
         delta: float,
         initial_weight: float,
+        pre_activation: float | None = None,
+        post_activation: float | None = None,
     ) -> None:
         """Check synapse existence (read) and defer the write."""
         # Check A->B
         forward = await self._storage.get_synapses(source_id=neuron_a, target_id=neuron_b)
         if forward:
-            reinforced = forward[0].reinforce(delta)
+            reinforced = forward[0].reinforce(
+                delta,
+                pre_activation=pre_activation,
+                post_activation=post_activation,
+            )
             self._write_queue.defer_synapse_update(reinforced)
             return
 
         # Check B->A
         reverse = await self._storage.get_synapses(source_id=neuron_b, target_id=neuron_a)
         if reverse:
-            reinforced = reverse[0].reinforce(delta)
+            reinforced = reverse[0].reinforce(
+                delta,
+                pre_activation=post_activation,
+                post_activation=pre_activation,
+            )
             self._write_queue.defer_synapse_update(reinforced)
             return
 
@@ -392,6 +435,102 @@ class ReflexPipeline:
             weight=initial_weight,
         )
         self._write_queue.defer_synapse_create(synapse)
+
+    def _apply_lateral_inhibition(
+        self,
+        activations: dict[str, ActivationResult],
+    ) -> dict[str, ActivationResult]:
+        """Apply lateral inhibition: top-K neurons survive, rest are suppressed.
+
+        This is the competition phase — highly activated neurons inhibit
+        weaker competitors, sharpening the activation landscape.
+
+        Args:
+            activations: Current activation results
+
+        Returns:
+            New dict with suppressed activations applied
+        """
+        k = self._config.lateral_inhibition_k
+        factor = self._config.lateral_inhibition_factor
+        threshold = self._config.activation_threshold
+
+        if len(activations) <= k:
+            return activations
+
+        # Sort by activation level descending
+        sorted_items = sorted(
+            activations.items(),
+            key=lambda x: x[1].activation_level,
+            reverse=True,
+        )
+
+        # Top-K survive unchanged
+        winner_ids = {item[0] for item in sorted_items[:k]}
+
+        result: dict[str, ActivationResult] = {}
+        for neuron_id, activation in sorted_items:
+            if neuron_id in winner_ids:
+                result[neuron_id] = activation
+            else:
+                suppressed_level = activation.activation_level * factor
+                if suppressed_level >= threshold:
+                    result[neuron_id] = ActivationResult(
+                        neuron_id=neuron_id,
+                        activation_level=suppressed_level,
+                        hop_distance=activation.hop_distance,
+                        path=activation.path,
+                        source_anchor=activation.source_anchor,
+                    )
+
+        return result
+
+    async def _deprioritize_disputed(
+        self,
+        activations: dict[str, ActivationResult],
+    ) -> dict[str, ActivationResult]:
+        """Reduce activation of disputed neurons by 50%.
+
+        Neurons marked with _disputed metadata get their activation
+        halved, making them less likely to appear in results. Superseded
+        neurons are suppressed even further (75% reduction).
+
+        Args:
+            activations: Current activation results
+
+        Returns:
+            New dict with disputed neurons deprioritized
+        """
+        if not activations:
+            return activations
+
+        disputed_factor = 0.5
+        superseded_factor = 0.25
+
+        # Batch-fetch neurons to check for disputed metadata
+        neuron_ids = list(activations.keys())
+        neurons = await self._storage.get_neurons_batch(neuron_ids)
+
+        result: dict[str, ActivationResult] = {}
+        for neuron_id, activation in activations.items():
+            neuron = neurons.get(neuron_id)
+            if neuron is not None and neuron.metadata.get("_disputed"):
+                factor = (
+                    superseded_factor if neuron.metadata.get("_superseded") else disputed_factor
+                )
+                new_level = activation.activation_level * factor
+                if new_level >= self._config.activation_threshold:
+                    result[neuron_id] = ActivationResult(
+                        neuron_id=neuron_id,
+                        activation_level=new_level,
+                        hop_distance=activation.hop_distance,
+                        path=activation.path,
+                        source_anchor=activation.source_anchor,
+                    )
+            else:
+                result[neuron_id] = activation
+
+        return result
 
     async def _find_anchors_time_first(self, stimulus: Stimulus) -> list[list[str]]:
         """

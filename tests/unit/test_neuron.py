@@ -82,7 +82,7 @@ class TestNeuronState:
         assert state.decay_rate == 0.1
 
     def test_activate(self) -> None:
-        """Test activating a neuron state."""
+        """Test activating a neuron state (sigmoid-gated)."""
         state = NeuronState(neuron_id="test-1")
         activated = state.activate(level=0.8)
 
@@ -90,22 +90,23 @@ class TestNeuronState:
         assert state.activation_level == 0.0
         assert state.access_frequency == 0
 
-        # New state updated
-        assert activated.activation_level == 0.8
+        # New state updated (sigmoid maps 0.8 → ~0.858)
+        assert activated.activation_level > 0.8
+        assert activated.activation_level < 0.9
         assert activated.access_frequency == 1
         assert activated.last_activated is not None
 
     def test_activate_clamps_level(self) -> None:
-        """Test activation level is clamped to 0.0-1.0."""
+        """Test activation level is clamped before sigmoid."""
         state = NeuronState(neuron_id="test-1")
 
-        # Test upper bound
+        # Input > 1.0 is clamped to 1.0, then sigmoid(1.0) ≈ 0.953
         high = state.activate(level=1.5)
-        assert high.activation_level == 1.0
+        assert high.activation_level == pytest.approx(0.9526, abs=0.01)
 
-        # Test lower bound
+        # Input < 0.0 is clamped to 0.0, then sigmoid(0.0) ≈ 0.047
         low = state.activate(level=-0.5)
-        assert low.activation_level == 0.0
+        assert low.activation_level == pytest.approx(0.0474, abs=0.01)
 
     def test_decay(self) -> None:
         """Test decay over time."""
@@ -127,9 +128,15 @@ class TestNeuronState:
 
     def test_multiple_activations_increment_frequency(self) -> None:
         """Test that multiple activations increment frequency."""
+        from datetime import timedelta
+
         state = NeuronState(neuron_id="test-1")
-        state = state.activate(0.5)
-        state = state.activate(0.7)
-        state = state.activate(0.9)
+        t = datetime(2026, 1, 1)
+        state = state.activate(0.5, now=t)
+        # Wait past refractory period for subsequent activations
+        t2 = t + timedelta(seconds=1)
+        state = state.activate(0.7, now=t2)
+        t3 = t2 + timedelta(seconds=1)
+        state = state.activate(0.9, now=t3)
 
         assert state.access_frequency == 3

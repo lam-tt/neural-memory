@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any
 from uuid import uuid4
@@ -119,25 +120,57 @@ class NeuronState:
     last_activated: datetime | None = None
     decay_rate: float = 0.1
     created_at: datetime = field(default_factory=datetime.utcnow)
+    firing_threshold: float = 0.3
+    refractory_until: datetime | None = None
+    refractory_period_ms: float = 500.0
+    homeostatic_target: float = 0.5
 
-    def activate(self, level: float = 1.0) -> NeuronState:
+    def activate(
+        self,
+        level: float = 1.0,
+        now: datetime | None = None,
+        sigmoid_steepness: float = 6.0,
+    ) -> NeuronState:
         """
-        Create a new state with updated activation.
+        Create a new state with sigmoid-gated activation.
+
+        Applies a sigmoid function to produce bio-realistic nonlinear
+        gating. If the neuron is in its refractory period, returns self
+        unchanged (no activation, no frequency increment).
 
         Args:
-            level: Activation level to set (clamped to 0.0-1.0)
+            level: Activation level to set (clamped to 0.0-1.0 before sigmoid)
+            now: Current time (for testability; defaults to utcnow)
+            sigmoid_steepness: Steepness of sigmoid curve (default 6.0)
 
         Returns:
             New NeuronState with updated activation
         """
+        now = now or datetime.utcnow()
+
+        # Refractory check: neuron cannot fire during cooldown
+        if self.refractory_until is not None and now < self.refractory_until:
+            return self
+
         clamped_level = max(0.0, min(1.0, level))
+        sigmoid_level = 1.0 / (1.0 + math.exp(-sigmoid_steepness * (clamped_level - 0.5)))
+
+        # Set refractory period if neuron fires
+        new_refractory = self.refractory_until
+        if sigmoid_level >= self.firing_threshold:
+            new_refractory = now + timedelta(milliseconds=self.refractory_period_ms)
+
         return NeuronState(
             neuron_id=self.neuron_id,
-            activation_level=clamped_level,
+            activation_level=sigmoid_level,
             access_frequency=self.access_frequency + 1,
-            last_activated=datetime.utcnow(),
+            last_activated=now,
             decay_rate=self.decay_rate,
             created_at=self.created_at,
+            firing_threshold=self.firing_threshold,
+            refractory_until=new_refractory,
+            refractory_period_ms=self.refractory_period_ms,
+            homeostatic_target=self.homeostatic_target,
         )
 
     def decay(self, time_delta_seconds: float) -> NeuronState:
@@ -152,8 +185,6 @@ class NeuronState:
         Returns:
             New NeuronState with decayed activation
         """
-        import math
-
         days_elapsed = time_delta_seconds / 86400  # Convert to days
         decay_factor = math.exp(-self.decay_rate * days_elapsed)
         new_level = self.activation_level * decay_factor
@@ -165,9 +196,25 @@ class NeuronState:
             last_activated=self.last_activated,
             decay_rate=self.decay_rate,
             created_at=self.created_at,
+            firing_threshold=self.firing_threshold,
+            refractory_until=self.refractory_until,
+            refractory_period_ms=self.refractory_period_ms,
+            homeostatic_target=self.homeostatic_target,
         )
 
     @property
     def is_active(self) -> bool:
         """Check if neuron is currently active (above threshold)."""
         return self.activation_level > 0.1
+
+    @property
+    def fired(self) -> bool:
+        """Check if neuron activation meets firing threshold."""
+        return self.activation_level >= self.firing_threshold
+
+    @property
+    def in_refractory(self) -> bool:
+        """Check if neuron is in refractory cooldown period."""
+        if self.refractory_until is None:
+            return False
+        return datetime.utcnow() < self.refractory_until

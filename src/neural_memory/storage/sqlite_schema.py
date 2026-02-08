@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Schema version for migrations
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 7
 
 # ── Migrations ──────────────────────────────────────────────────────
 # Each entry maps (from_version -> to_version) with a list of SQL statements.
@@ -89,6 +89,27 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
         # SimHash content fingerprint for near-duplicate detection
         "ALTER TABLE neurons ADD COLUMN content_hash INTEGER DEFAULT 0",
         "CREATE INDEX IF NOT EXISTS idx_neurons_hash ON neurons(brain_id, content_hash)",
+    ],
+    (5, 6): [
+        # NeuronSpec v1: activation units with sigmoid, firing threshold, refractory period
+        "ALTER TABLE neuron_states ADD COLUMN firing_threshold REAL DEFAULT 0.3",
+        "ALTER TABLE neuron_states ADD COLUMN refractory_until TEXT",
+        "ALTER TABLE neuron_states ADD COLUMN refractory_period_ms REAL DEFAULT 500.0",
+        "ALTER TABLE neuron_states ADD COLUMN homeostatic_target REAL DEFAULT 0.5",
+    ],
+    (6, 7): [
+        # Memory maturation lifecycle: STM → Working → Episodic → Semantic
+        """CREATE TABLE IF NOT EXISTS memory_maturations (
+            fiber_id TEXT NOT NULL,
+            brain_id TEXT NOT NULL,
+            stage TEXT NOT NULL DEFAULT 'stm',
+            stage_entered_at TEXT NOT NULL,
+            rehearsal_count INTEGER DEFAULT 0,
+            reinforcement_timestamps TEXT DEFAULT '[]',
+            PRIMARY KEY (brain_id, fiber_id),
+            FOREIGN KEY (brain_id, fiber_id) REFERENCES fibers(brain_id, id) ON DELETE CASCADE
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_maturations_stage ON memory_maturations(brain_id, stage)",
     ],
 }
 
@@ -187,6 +208,10 @@ CREATE TABLE IF NOT EXISTS neuron_states (
     access_frequency INTEGER DEFAULT 0,
     last_activated TEXT,
     decay_rate REAL DEFAULT 0.1,
+    firing_threshold REAL DEFAULT 0.3,
+    refractory_until TEXT,
+    refractory_period_ms REAL DEFAULT 500.0,
+    homeostatic_target REAL DEFAULT 0.5,
     created_at TEXT NOT NULL,
     PRIMARY KEY (brain_id, neuron_id),
     FOREIGN KEY (brain_id, neuron_id) REFERENCES neurons(brain_id, id) ON DELETE CASCADE
@@ -288,4 +313,17 @@ CREATE TABLE IF NOT EXISTS projects (
     FOREIGN KEY (brain_id) REFERENCES brains(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(brain_id, name);
+
+-- Memory maturation lifecycle tracking
+CREATE TABLE IF NOT EXISTS memory_maturations (
+    fiber_id TEXT NOT NULL,
+    brain_id TEXT NOT NULL,
+    stage TEXT NOT NULL DEFAULT 'stm',
+    stage_entered_at TEXT NOT NULL,
+    rehearsal_count INTEGER DEFAULT 0,
+    reinforcement_timestamps TEXT DEFAULT '[]',  -- JSON array of ISO timestamps
+    PRIMARY KEY (brain_id, fiber_id),
+    FOREIGN KEY (brain_id, fiber_id) REFERENCES fibers(brain_id, id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_maturations_stage ON memory_maturations(brain_id, stage);
 """

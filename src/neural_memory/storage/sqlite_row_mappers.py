@@ -39,6 +39,19 @@ def row_to_neuron(row: aiosqlite.Row) -> Neuron:
 
 def row_to_neuron_state(row: aiosqlite.Row) -> NeuronState:
     """Convert database row to NeuronState."""
+    row_keys = row.keys()
+
+    # Handle new NeuronSpec v1 fields with fallback for pre-migration DBs
+    firing_threshold = row["firing_threshold"] if "firing_threshold" in row_keys else 0.3
+    refractory_until_raw = row["refractory_until"] if "refractory_until" in row_keys else None
+    refractory_until = (
+        datetime.fromisoformat(refractory_until_raw) if refractory_until_raw else None
+    )
+    refractory_period_ms = (
+        row["refractory_period_ms"] if "refractory_period_ms" in row_keys else 500.0
+    )
+    homeostatic_target = row["homeostatic_target"] if "homeostatic_target" in row_keys else 0.5
+
     return NeuronState(
         neuron_id=row["neuron_id"],
         activation_level=row["activation_level"],
@@ -48,6 +61,10 @@ def row_to_neuron_state(row: aiosqlite.Row) -> NeuronState:
         ),
         decay_rate=row["decay_rate"],
         created_at=datetime.fromisoformat(row["created_at"]),
+        firing_threshold=firing_threshold,
+        refractory_until=refractory_until,
+        refractory_period_ms=refractory_period_ms,
+        homeostatic_target=homeostatic_target,
     )
 
 
@@ -168,6 +185,15 @@ def row_to_brain(row: aiosqlite.Row) -> Brain:
         consolidation_prune_threshold=config_data.get("consolidation_prune_threshold", 0.05),
         prune_min_inactive_days=config_data.get("prune_min_inactive_days", 7.0),
         merge_overlap_threshold=config_data.get("merge_overlap_threshold", 0.5),
+        sigmoid_steepness=config_data.get("sigmoid_steepness", 6.0),
+        default_firing_threshold=config_data.get("default_firing_threshold", 0.3),
+        default_refractory_ms=config_data.get("default_refractory_ms", 500.0),
+        lateral_inhibition_k=config_data.get("lateral_inhibition_k", 10),
+        lateral_inhibition_factor=config_data.get("lateral_inhibition_factor", 0.3),
+        learning_rate=config_data.get("learning_rate", 0.05),
+        weight_normalization_budget=config_data.get("weight_normalization_budget", 5.0),
+        novelty_boost_max=config_data.get("novelty_boost_max", 3.0),
+        novelty_decay_rate=config_data.get("novelty_decay_rate", 0.06),
     )
 
     return Brain(

@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from neural_memory.core.neuron import NeuronState
+
 if TYPE_CHECKING:
     from neural_memory.storage.base import NeuralStorage
 
@@ -111,20 +113,27 @@ class DecayManager:
             if new_level < state.activation_level:
                 report.neurons_decayed += 1
 
-                if new_level < self.prune_threshold:
+                pruned = new_level < self.prune_threshold
+                if pruned:
                     report.neurons_pruned += 1
-                    new_level = 0.0
 
                 if not dry_run:
-                    updated_state = type(state)(
-                        neuron_id=state.neuron_id,
-                        activation_level=new_level,
-                        access_frequency=state.access_frequency,
-                        last_activated=state.last_activated,
-                        decay_rate=state.decay_rate,
-                        created_at=state.created_at,
-                    )
-                    await storage.update_neuron_state(updated_state)
+                    decayed_state = state.decay(time_diff.total_seconds())
+                    if pruned:
+                        # Override to zero for pruned neurons
+                        decayed_state = NeuronState(
+                            neuron_id=decayed_state.neuron_id,
+                            activation_level=0.0,
+                            access_frequency=decayed_state.access_frequency,
+                            last_activated=decayed_state.last_activated,
+                            decay_rate=decayed_state.decay_rate,
+                            created_at=decayed_state.created_at,
+                            firing_threshold=decayed_state.firing_threshold,
+                            refractory_until=decayed_state.refractory_until,
+                            refractory_period_ms=decayed_state.refractory_period_ms,
+                            homeostatic_target=decayed_state.homeostatic_target,
+                        )
+                    await storage.update_neuron_state(decayed_state)
 
         # Get all synapses and apply decay
         synapses = await storage.get_all_synapses()
@@ -253,8 +262,20 @@ class ReinforcementManager:
                     state.activation_level + self.reinforcement_delta,
                     self.max_activation,
                 )
-                activated_state = state.activate(new_level - state.activation_level)
-                await storage.update_neuron_state(activated_state)
+                # Directly set activation level (bypass sigmoid for reinforcement)
+                reinforced_state = NeuronState(
+                    neuron_id=state.neuron_id,
+                    activation_level=new_level,
+                    access_frequency=state.access_frequency + 1,
+                    last_activated=datetime.utcnow(),
+                    decay_rate=state.decay_rate,
+                    created_at=state.created_at,
+                    firing_threshold=state.firing_threshold,
+                    refractory_until=state.refractory_until,
+                    refractory_period_ms=state.refractory_period_ms,
+                    homeostatic_target=state.homeostatic_target,
+                )
+                await storage.update_neuron_state(reinforced_state)
                 reinforced += 1
 
         if synapse_ids:

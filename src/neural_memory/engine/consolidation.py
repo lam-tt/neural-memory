@@ -29,6 +29,7 @@ class ConsolidationStrategy(StrEnum):
     PRUNE = "prune"
     MERGE = "merge"
     SUMMARIZE = "summarize"
+    MATURE = "mature"
     ALL = "all"
 
 
@@ -67,6 +68,8 @@ class ConsolidationReport:
     fibers_removed: int = 0
     fibers_created: int = 0
     summaries_created: int = 0
+    stages_advanced: int = 0
+    patterns_extracted: int = 0
     merge_details: list[MergeDetail] = field(default_factory=list)
     dry_run: bool = False
 
@@ -142,6 +145,9 @@ class ConsolidationEngine:
 
         if run_all or ConsolidationStrategy.SUMMARIZE in strategies:
             await self._summarize(report, dry_run)
+
+        if run_all or ConsolidationStrategy.MATURE in strategies:
+            await self._mature(report, reference_time, dry_run)
 
         report.duration_ms = (time.perf_counter() - start) * 1000
         return report
@@ -474,3 +480,53 @@ class ConsolidationEngine:
             )
             await self._storage.add_fiber(summary_fiber)
             report.summaries_created += 1
+
+    async def _mature(
+        self,
+        report: ConsolidationReport,
+        reference_time: datetime,
+        dry_run: bool,
+    ) -> None:
+        """Advance memory maturation stages and extract semantic patterns.
+
+        1. Advance all maturation records through stage transitions
+        2. Extract patterns from episodic memories ready for semantic promotion
+        """
+        from neural_memory.engine.memory_stages import (
+            compute_stage_transition,
+        )
+        from neural_memory.engine.pattern_extraction import extract_patterns
+
+        # Get all maturation records
+        all_maturations = await self._storage.find_maturations()
+
+        # Phase 1: Advance stages
+        for record in all_maturations:
+            advanced = compute_stage_transition(record, now=reference_time)
+            if advanced.stage != record.stage:
+                report.stages_advanced += 1
+                if not dry_run:
+                    await self._storage.save_maturation(advanced)
+
+        # Phase 2: Extract patterns from mature episodic fibers
+        if dry_run:
+            return
+
+        # Re-fetch after stage updates
+        maturations = await self._storage.find_maturations()
+        maturation_map = {m.fiber_id: m for m in maturations}
+
+        fibers = await self._storage.get_fibers(limit=10000)
+        patterns, extraction_report = extract_patterns(
+            fibers=fibers,
+            maturations=maturation_map,
+            min_cluster_size=self._config.summarize_min_cluster_size,
+            tag_overlap_threshold=self._config.summarize_tag_overlap_threshold,
+        )
+
+        report.patterns_extracted = extraction_report.patterns_extracted
+
+        for pattern in patterns:
+            await self._storage.add_neuron(pattern.concept_neuron)
+            for synapse in pattern.synapses:
+                await self._storage.add_synapse(synapse)

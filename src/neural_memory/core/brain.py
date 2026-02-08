@@ -34,6 +34,15 @@ class BrainConfig:
     consolidation_prune_threshold: float = 0.05
     prune_min_inactive_days: float = 7.0
     merge_overlap_threshold: float = 0.5
+    sigmoid_steepness: float = 6.0
+    default_firing_threshold: float = 0.3
+    default_refractory_ms: float = 500.0
+    lateral_inhibition_k: int = 10
+    lateral_inhibition_factor: float = 0.3
+    learning_rate: float = 0.05
+    weight_normalization_budget: float = 5.0
+    novelty_boost_max: float = 3.0
+    novelty_decay_rate: float = 0.06
 
     def with_updates(self, **kwargs: Any) -> BrainConfig:
         """Create a new config with updated values."""
@@ -60,6 +69,21 @@ class BrainConfig:
             merge_overlap_threshold=kwargs.get(
                 "merge_overlap_threshold", self.merge_overlap_threshold
             ),
+            sigmoid_steepness=kwargs.get("sigmoid_steepness", self.sigmoid_steepness),
+            default_firing_threshold=kwargs.get(
+                "default_firing_threshold", self.default_firing_threshold
+            ),
+            default_refractory_ms=kwargs.get("default_refractory_ms", self.default_refractory_ms),
+            lateral_inhibition_k=kwargs.get("lateral_inhibition_k", self.lateral_inhibition_k),
+            lateral_inhibition_factor=kwargs.get(
+                "lateral_inhibition_factor", self.lateral_inhibition_factor
+            ),
+            learning_rate=kwargs.get("learning_rate", self.learning_rate),
+            weight_normalization_budget=kwargs.get(
+                "weight_normalization_budget", self.weight_normalization_budget
+            ),
+            novelty_boost_max=kwargs.get("novelty_boost_max", self.novelty_boost_max),
+            novelty_decay_rate=kwargs.get("novelty_decay_rate", self.novelty_decay_rate),
         )
 
 

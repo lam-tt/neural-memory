@@ -1,5 +1,5 @@
 """
-Run activation benchmarks and generate docs/benchmarks.md.
+Run activation benchmarks, ground-truth evaluation, and coherence tests.
 
 Usage:
     python benchmarks/run_benchmarks.py
@@ -20,23 +20,39 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from benchmarks.ground_truth import MEMORIES as GT_MEMORIES
+from benchmarks.ground_truth import QUERIES as GT_QUERIES
+from benchmarks.metrics import BenchmarkReport, evaluate_query
+from benchmarks.naive_baseline import evaluate_baseline
 from neural_memory.core.brain import Brain, BrainConfig
 from neural_memory.core.fiber import Fiber
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.activation import SpreadingActivation
-from neural_memory.engine.reflex_activation import ReflexActivation
 from neural_memory.engine.encoder import MemoryEncoder
+from neural_memory.engine.reflex_activation import ReflexActivation
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
 from neural_memory.storage.memory_store import InMemoryStorage
 
-NEURON_TYPES = [NeuronType.TIME, NeuronType.ENTITY, NeuronType.ACTION, NeuronType.CONCEPT, NeuronType.SPATIAL]
-SYNAPSE_TYPES = [SynapseType.RELATED_TO, SynapseType.CAUSED_BY, SynapseType.INVOLVES, SynapseType.HAPPENED_AT]
+NEURON_TYPES = [
+    NeuronType.TIME,
+    NeuronType.ENTITY,
+    NeuronType.ACTION,
+    NeuronType.CONCEPT,
+    NeuronType.SPATIAL,
+]
+SYNAPSE_TYPES = [
+    SynapseType.RELATED_TO,
+    SynapseType.CAUSED_BY,
+    SynapseType.INVOLVES,
+    SynapseType.HAPPENED_AT,
+]
 
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 
 
 # ── Graph builder ─────────────────────────────────────────────────────────────
+
 
 async def build_graph(
     n_neurons: int,
@@ -65,7 +81,7 @@ async def build_graph(
     sid = 0
     # Sequential chain
     for i in range(n_neurons - 1):
-        src, tgt = f"n{i}", f"n{i+1}"
+        src, tgt = f"n{i}", f"n{i + 1}"
         edges.add((src, tgt))
         s = Synapse.create(src, tgt, SynapseType.RELATED_TO, weight=0.8, synapse_id=f"s{sid}")
         await storage.add_synapse(s)
@@ -77,7 +93,13 @@ async def build_graph(
         if src == tgt or (src, tgt) in edges:
             continue
         edges.add((src, tgt))
-        s = Synapse.create(src, tgt, random.choice(SYNAPSE_TYPES), weight=round(random.uniform(0.3, 0.9), 2), synapse_id=f"s{sid}")
+        s = Synapse.create(
+            src,
+            tgt,
+            random.choice(SYNAPSE_TYPES),
+            weight=round(random.uniform(0.3, 0.9), 2),
+            synapse_id=f"s{sid}",
+        )
         await storage.add_synapse(s)
         synapse_ids.append(s.id)
         sid += 1
@@ -91,15 +113,23 @@ async def build_graph(
         n_h = max(1, int(pathway_length * overlap))
         n_u = pathway_length - n_h
         hubs = random.sample(hub_ids, min(n_h, len(hub_ids)))
-        unique = random.sample([x for x in neuron_ids if x not in hubs], min(n_u, len(neuron_ids) - len(hubs)))
+        unique = random.sample(
+            [x for x in neuron_ids if x not in hubs], min(n_u, len(neuron_ids) - len(hubs))
+        )
         pathway = hubs + unique
         random.shuffle(pathway)
         fsyn = set(random.sample(synapse_ids, min(pathway_length, len(synapse_ids))))
         f = Fiber.create(
-            neuron_ids=set(pathway), synapse_ids=fsyn,
-            anchor_neuron_id=pathway[0], pathway=pathway, fiber_id=f"fiber_{i}",
+            neuron_ids=set(pathway),
+            synapse_ids=fsyn,
+            anchor_neuron_id=pathway[0],
+            pathway=pathway,
+            fiber_id=f"fiber_{i}",
         )
-        f = f.conduct(conducted_at=datetime.now(tz=UTC) - timedelta(hours=random.uniform(0, 48)), reinforce=False)
+        f = f.conduct(
+            conducted_at=datetime.now(tz=UTC) - timedelta(hours=random.uniform(0, 48)),
+            reinforce=False,
+        )
         f = f.with_conductivity(round(random.uniform(0.6, 1.0), 2))
         await storage.add_fiber(f)
         fibers.append(f)
@@ -109,6 +139,7 @@ async def build_graph(
 
 
 # ── Timing helper ─────────────────────────────────────────────────────────────
+
 
 async def timed(coro_factory, n: int = 10) -> list[float]:
     await coro_factory()  # warmup
@@ -121,6 +152,7 @@ async def timed(coro_factory, n: int = 10) -> list[float]:
 
 
 # ── Benchmark: synthetic activation ───────────────────────────────────────────
+
 
 async def bench_activation(sizes: list[dict], n_runs: int) -> list[dict]:
     rows: list[dict] = []
@@ -142,11 +174,18 @@ async def bench_activation(sizes: list[dict], n_runs: int) -> list[dict]:
         reflex_act = ReflexActivation(storage, config)
 
         # Classic
-        t_c = await timed(lambda _c=classic_act, _a=all_anchors: _c.activate(_a, max_hops=4), n_runs)
+        t_c = await timed(
+            lambda _c=classic_act, _a=all_anchors: _c.activate(_a, max_hops=4), n_runs
+        )
         r_c = await classic_act.activate(all_anchors, max_hops=4)
 
         # Reflex
-        t_r = await timed(lambda _r=reflex_act, _a=all_anchors, _f=rel_fibers: _r.activate_trail(_a, _f, datetime.now(tz=UTC)), n_runs)
+        t_r = await timed(
+            lambda _r=reflex_act, _a=all_anchors, _f=rel_fibers: _r.activate_trail(
+                _a, _f, datetime.now(tz=UTC)
+            ),
+            n_runs,
+        )
         r_r = await reflex_act.activate_trail(all_anchors, rel_fibers, datetime.now(tz=UTC))
 
         # Hybrid (simulated: reflex + limited classic merged)
@@ -174,18 +213,20 @@ async def bench_activation(sizes: list[dict], n_runs: int) -> list[dict]:
         recall_reflex = len(reflex_ids & classic_ids) / max(1, len(classic_ids)) * 100
         recall_hybrid = len(hybrid_ids & classic_ids) / max(1, len(classic_ids)) * 100
 
-        rows.append({
-            "neurons": n,
-            "fibers": nf,
-            "classic_ms": round(statistics.median(t_c), 2),
-            "reflex_ms": round(statistics.median(t_r), 2),
-            "hybrid_ms": round(statistics.median(t_h), 2),
-            "classic_n": len(r_c),
-            "reflex_n": len(r_r),
-            "hybrid_n": len(r_h),
-            "recall_reflex": round(recall_reflex, 1),
-            "recall_hybrid": round(recall_hybrid, 1),
-        })
+        rows.append(
+            {
+                "neurons": n,
+                "fibers": nf,
+                "classic_ms": round(statistics.median(t_c), 2),
+                "reflex_ms": round(statistics.median(t_r), 2),
+                "hybrid_ms": round(statistics.median(t_h), 2),
+                "classic_n": len(r_c),
+                "reflex_n": len(r_r),
+                "hybrid_n": len(r_h),
+                "recall_reflex": round(recall_reflex, 1),
+                "recall_hybrid": round(recall_hybrid, 1),
+            }
+        )
     return rows
 
 
@@ -243,20 +284,76 @@ async def bench_pipeline(n_runs: int) -> list[dict]:
                 times.append((time.perf_counter() - t0) * 1000)
                 last = result
 
-            rows.append({
-                "mode": label,
-                "query": query_text,
-                "depth": depth.name,
-                "median_ms": round(statistics.median(times), 2),
-                "neurons": last.neurons_activated if last else 0,
-                "confidence": round(last.confidence, 2) if last else 0,
-                "answer": (last.answer or "")[:50] if last else "",
-            })
+            rows.append(
+                {
+                    "mode": label,
+                    "query": query_text,
+                    "depth": depth.name,
+                    "median_ms": round(statistics.median(times), 2),
+                    "neurons": last.neurons_activated if last else 0,
+                    "confidence": round(last.confidence, 2) if last else 0,
+                    "answer": (last.answer or "")[:50] if last else "",
+                }
+            )
 
     return rows
 
 
+# ── Ground-truth evaluation ───────────────────────────────────────────────────
+
+
+async def bench_ground_truth(k: int = 5) -> tuple[BenchmarkReport, dict[str, dict[str, float]]]:
+    """Run ground-truth evaluation: NeuralMemory vs naive baseline.
+
+    Returns:
+        Tuple of (neural_report, baseline_results)
+    """
+    # Set up NeuralMemory
+    config = BrainConfig(activation_threshold=0.1, max_spread_hops=4, max_context_tokens=500)
+    storage = InMemoryStorage()
+    brain = Brain.create(name="ground-truth-bench", config=config)
+    await storage.save_brain(brain)
+    storage.set_brain(brain.id)
+
+    encoder = MemoryEncoder(storage, config)
+    pipeline = ReflexPipeline(storage, config, use_reflex=True)
+
+    # Encode all ground-truth memories
+    gt_id_to_fiber: dict[str, str] = {}
+    for mem in GT_MEMORIES:
+        result = await encoder.encode(mem.content, tags=mem.tags)
+        gt_id_to_fiber[mem.id] = result.fiber.id
+
+    # Evaluate NeuralMemory
+    neural_report = BenchmarkReport()
+    for query in GT_QUERIES:
+        result = await pipeline.query(query.query)
+        retrieved_fiber_ids = result.fibers_matched
+
+        # Map expected IDs to fiber IDs
+        expected_fiber_ids = {gt_id_to_fiber.get(eid, eid) for eid in query.expected_ids}
+
+        qm = evaluate_query(
+            query=query.query,
+            category=query.category,
+            retrieved_ids=retrieved_fiber_ids,
+            relevant_ids=expected_fiber_ids,
+            k=k,
+        )
+        neural_report.query_metrics.append(qm)
+
+    neural_report.compute_aggregates()
+
+    # Evaluate naive baseline
+    memories_for_baseline = [(m.id, m.content) for m in GT_MEMORIES]
+    queries_for_baseline = [(q.query, q.category, q.expected_ids) for q in GT_QUERIES]
+    baseline_results = evaluate_baseline(queries_for_baseline, memories_for_baseline, k=k)
+
+    return neural_report, baseline_results
+
+
 # ── Markdown generation ───────────────────────────────────────────────────────
+
 
 def md_table(headers: list[str], rows: list[list[str]]) -> str:
     lines = [
@@ -272,6 +369,8 @@ def generate_markdown(
     act_rows: list[dict],
     pipe_rows: list[dict],
     timestamp: str,
+    neural_report: BenchmarkReport | None = None,
+    baseline_results: dict[str, dict[str, float]] | None = None,
 ) -> str:
     sections: list[str] = []
 
@@ -281,26 +380,43 @@ def generate_markdown(
 
     # ── Activation benchmark ──
     sections.append("## Activation Engine\n")
-    sections.append("Compares three activation modes on synthetic graphs with overlapping fiber pathways:\n")
+    sections.append(
+        "Compares three activation modes on synthetic graphs with overlapping fiber pathways:\n"
+    )
     sections.append("- **Classic**: BFS spreading activation with distance-based decay")
     sections.append("- **Reflex**: Trail-based activation through fiber pathways only")
-    sections.append("- **Hybrid**: Reflex primary + limited classic BFS for discovery (default in v0.6.0+)\n")
+    sections.append(
+        "- **Hybrid**: Reflex primary + limited classic BFS for discovery (default in v0.6.0+)\n"
+    )
 
-    headers = ["Neurons", "Fibers", "Classic (ms)", "Reflex (ms)", "Hybrid (ms)", "Classic #", "Reflex #", "Hybrid #", "Reflex Recall", "Hybrid Recall"]
+    headers = [
+        "Neurons",
+        "Fibers",
+        "Classic (ms)",
+        "Reflex (ms)",
+        "Hybrid (ms)",
+        "Classic #",
+        "Reflex #",
+        "Hybrid #",
+        "Reflex Recall",
+        "Hybrid Recall",
+    ]
     table_rows = []
     for r in act_rows:
-        table_rows.append([
-            str(r["neurons"]),
-            str(r["fibers"]),
-            str(r["classic_ms"]),
-            str(r["reflex_ms"]),
-            str(r["hybrid_ms"]),
-            str(r["classic_n"]),
-            str(r["reflex_n"]),
-            str(r["hybrid_n"]),
-            f"{r['recall_reflex']}%",
-            f"{r['recall_hybrid']}%",
-        ])
+        table_rows.append(
+            [
+                str(r["neurons"]),
+                str(r["fibers"]),
+                str(r["classic_ms"]),
+                str(r["reflex_ms"]),
+                str(r["hybrid_ms"]),
+                str(r["classic_n"]),
+                str(r["reflex_n"]),
+                str(r["hybrid_n"]),
+                f"{r['recall_reflex']}%",
+                f"{r['recall_hybrid']}%",
+            ]
+        )
     sections.append(md_table(headers, table_rows))
 
     # Speedup summary
@@ -316,13 +432,25 @@ def generate_markdown(
     # Recall improvement
     avg_recall_reflex = statistics.mean(r["recall_reflex"] for r in act_rows)
     avg_recall_hybrid = statistics.mean(r["recall_hybrid"] for r in act_rows)
-    sections.append(f"\n**Average recall** -- Reflex only: {avg_recall_reflex:.1f}% | Hybrid: {avg_recall_hybrid:.1f}%\n")
+    sections.append(
+        f"\n**Average recall** -- Reflex only: {avg_recall_reflex:.1f}% | Hybrid: {avg_recall_hybrid:.1f}%\n"
+    )
 
     # ── Pipeline benchmark ──
     sections.append("## Full Pipeline\n")
     sections.append("End-to-end benchmark: 15 encoded memories, 5 queries, 10 runs each.\n")
 
-    headers3 = ["Query", "Depth", "Classic (ms)", "Hybrid (ms)", "Speedup", "C-Neurons", "H-Neurons", "C-Conf", "H-Conf"]
+    headers3 = [
+        "Query",
+        "Depth",
+        "Classic (ms)",
+        "Hybrid (ms)",
+        "Speedup",
+        "C-Neurons",
+        "H-Neurons",
+        "C-Conf",
+        "H-Conf",
+    ]
     pipe_table: list[list[str]] = []
 
     queries_seen: list[str] = []
@@ -346,23 +474,83 @@ def generate_markdown(
         total_c += c_ms
         total_h += h_ms
         sp = round(c_ms / max(h_ms, 0.001), 1)
-        pipe_table.append([
-            q, c.get("depth", ""), str(c_ms), str(h_ms), f"{sp}x",
-            str(c.get("neurons", 0)), str(h.get("neurons", 0)),
-            str(c.get("confidence", 0)), str(h.get("confidence", 0)),
-        ])
+        pipe_table.append(
+            [
+                q,
+                c.get("depth", ""),
+                str(c_ms),
+                str(h_ms),
+                f"{sp}x",
+                str(c.get("neurons", 0)),
+                str(h.get("neurons", 0)),
+                str(c.get("confidence", 0)),
+                str(h.get("confidence", 0)),
+            ]
+        )
 
-    pipe_table.append([
-        "**Total**", "", f"**{round(total_c, 2)}**", f"**{round(total_h, 2)}**",
-        f"**{round(total_c / max(total_h, 0.001), 1)}x**",
-        "", "", "", "",
-    ])
+    pipe_table.append(
+        [
+            "**Total**",
+            "",
+            f"**{round(total_c, 2)}**",
+            f"**{round(total_h, 2)}**",
+            f"**{round(total_c / max(total_h, 0.001), 1)}x**",
+            "",
+            "",
+            "",
+            "",
+        ]
+    )
 
     sections.append(md_table(headers3, pipe_table))
 
+    # ── Ground-truth evaluation ──
+    if neural_report is not None and baseline_results is not None:
+        sections.append("## Ground-Truth Evaluation\n")
+        sections.append(f"30 curated memories, {len(neural_report.query_metrics)} queries, K=5.\n")
+
+        # Overall comparison
+        bl = baseline_results.get("overall", {})
+        sections.append("### Overall (NeuralMemory vs Naive Baseline)\n")
+        headers_gt = ["Metric", "NeuralMemory", "Naive Baseline", "Winner"]
+        rows_gt = []
+        for metric_name, neural_val, baseline_val in [
+            ("Precision@5", neural_report.mean_precision, bl.get("precision", 0)),
+            ("Recall@5", neural_report.mean_recall, bl.get("recall", 0)),
+            ("MRR", neural_report.mrr, bl.get("mrr", 0)),
+            ("NDCG@5", neural_report.mean_ndcg, bl.get("ndcg", 0)),
+        ]:
+            winner = "NeuralMemory" if neural_val >= baseline_val else "Baseline"
+            rows_gt.append(
+                [
+                    metric_name,
+                    f"{neural_val:.3f}",
+                    f"{baseline_val:.3f}",
+                    f"**{winner}**",
+                ]
+            )
+        sections.append(md_table(headers_gt, rows_gt))
+
+        # Per-category breakdown
+        sections.append("\n### Per-Category Recall\n")
+        headers_cat = ["Category", "NeuralMemory", "Baseline", "Count"]
+        rows_cat = []
+        for cat, cat_metrics in sorted(neural_report.category_breakdown.items()):
+            bl_cat = baseline_results.get(cat, {})
+            rows_cat.append(
+                [
+                    cat,
+                    f"{cat_metrics.get('recall', 0):.3f}",
+                    f"{bl_cat.get('recall', 0):.3f}",
+                    str(int(cat_metrics.get("count", 0))),
+                ]
+            )
+        sections.append(md_table(headers_cat, rows_cat))
+
     # ── Methodology ──
     sections.append("\n## Methodology\n")
-    sections.append("""
+    sections.append(
+        """
 - **Platform**: InMemoryStorage (NetworkX), single-threaded async
 - **Runs**: 10 per measurement (median reported)
 - **Warmup**: 1 warmup run excluded from timing
@@ -376,12 +564,14 @@ python benchmarks/run_benchmarks.py
 ```
 
 Results are written to `docs/benchmarks.md`.
-""".strip())
+""".strip()
+    )
 
     return "\n\n".join(sections) + "\n"
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+
 
 async def main() -> None:
     random.seed(42)
@@ -399,17 +589,37 @@ async def main() -> None:
 
     for r in act_rows:
         sp = round(r["classic_ms"] / max(r["hybrid_ms"], 0.001), 1)
-        print(f"  {r['neurons']:>5} neurons: classic={r['classic_ms']}ms hybrid={r['hybrid_ms']}ms ({sp}x) recall={r['recall_hybrid']}%")
+        print(
+            f"  {r['neurons']:>5} neurons: classic={r['classic_ms']}ms hybrid={r['hybrid_ms']}ms ({sp}x) recall={r['recall_hybrid']}%"
+        )
 
     print("\nRunning pipeline benchmarks...")
     pipe_rows = await bench_pipeline(n_runs)
 
     for r in pipe_rows:
-        print(f"  [{r['mode']:>7}] {r['query'][:35]:35s} {r['median_ms']}ms  neurons={r['neurons']}  conf={r['confidence']}")
+        print(
+            f"  [{r['mode']:>7}] {r['query'][:35]:35s} {r['median_ms']}ms  neurons={r['neurons']}  conf={r['confidence']}"
+        )
+
+    print("\nRunning ground-truth evaluation...")
+    neural_report, baseline_results = await bench_ground_truth(k=5)
+    bl = baseline_results.get("overall", {})
+    print(
+        f"  NeuralMemory -- P@5={neural_report.mean_precision:.3f}  R@5={neural_report.mean_recall:.3f}  MRR={neural_report.mrr:.3f}  NDCG@5={neural_report.mean_ndcg:.3f}"
+    )
+    print(
+        f"  Baseline     -- P@5={bl.get('precision', 0):.3f}  R@5={bl.get('recall', 0):.3f}  MRR={bl.get('mrr', 0):.3f}  NDCG@5={bl.get('ndcg', 0):.3f}"
+    )
+
+    for cat, metrics in sorted(neural_report.category_breakdown.items()):
+        bl_cat = baseline_results.get(cat, {})
+        print(
+            f"    {cat:12s}  neural_recall={metrics.get('recall', 0):.3f}  baseline_recall={bl_cat.get('recall', 0):.3f}"
+        )
 
     # Generate docs
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    md = generate_markdown(act_rows, pipe_rows, timestamp)
+    md = generate_markdown(act_rows, pipe_rows, timestamp, neural_report, baseline_results)
 
     out_path = DOCS_DIR / "benchmarks.md"
     out_path.write_text(md, encoding="utf-8")

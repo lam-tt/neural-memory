@@ -256,6 +256,12 @@ class SharedStorage(SharedFiberBrainMixin, NeuralStorage):
             "access_frequency": state.access_frequency,
             "last_activated": state.last_activated.isoformat() if state.last_activated else None,
             "decay_rate": state.decay_rate,
+            "firing_threshold": state.firing_threshold,
+            "refractory_until": (
+                state.refractory_until.isoformat() if state.refractory_until else None
+            ),
+            "refractory_period_ms": state.refractory_period_ms,
+            "homeostatic_target": state.homeostatic_target,
         }
         await self._request(
             "PUT",
