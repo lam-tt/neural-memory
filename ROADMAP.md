@@ -4,12 +4,13 @@
 > Every feature passes the VISION.md 4-question test + brain test.
 > ZERO LLM dependency — pure algorithmic, regex, graph-based.
 
-**Current state**: v0.19.0 (1019 tests, schema v9).
+**Current state**: v0.20.0 (1105 tests, schema v10).
 v0.14.0 shipped: relation extraction, tag origin, confirmatory boost.
 v0.15.0 shipped: associative inference, co-activation persistence, tag normalization.
 v0.16.0 shipped: emotional valence, sentiment extraction, FELT synapses, emotional decay.
 v0.17.0 shipped: brain diagnostics, purity score, nmem_health MCP tool + CLI.
 v0.19.0 shipped: temporal reasoning, causal chain traversal, event sequence tracing.
+v0.20.0 shipped: habitual recall — ENRICH, DREAM, habit learning, workflow suggestions, nmem update.
 
 ---
 
@@ -22,6 +23,7 @@ v0.19.0 shipped: temporal reasoning, causal chain traversal, event sequence trac
 - [v0.17.0 — Brain Diagnostics](#v0170--brain-diagnostics)
 - [v0.18.0 — Advanced Consolidation](#v0180--advanced-consolidation)
 - [v0.19.0 — Temporal Reasoning](#v0190--temporal-reasoning)
+- [v0.20.0 — Habitual Recall](#v0200--habitual-recall)
 - [v1.0.0 — Portable Consciousness v2](#v100--portable-consciousness-v2)
 - [Dependency Graph](#dependency-graph)
 - [Gap Coverage Matrix](#gap-coverage-matrix)
@@ -414,12 +416,13 @@ Recommendations:
 
 ---
 
-## v0.18.0 — Habitual Recall
+## v0.18.0 — Habitual Recall ✅
 
 > The brain sleeps, dreams, learns habits, and wakes up smarter.
 > "A workflow in NeuralMemory is not stored. It is a stabilized activation path
 > that may optionally be reified as a WORKFLOW fiber for interaction."
 
+**Status**: ✅ Shipped as v0.20.0 (2026-02-09). 86 new tests, schema v10, 1105 total tests.
 **Depends on**: v0.14.0 ✅ (relation extraction), v0.15.0 ✅ (associative inference + co-activation data).
 
 ### Design Philosophy (refined through 3 rounds of expert feedback)
@@ -693,6 +696,40 @@ Enhance `extraction/router.py` to route:
 
 ---
 
+## v0.20.0 — Habitual Recall (shipped)
+
+> Implements the v0.18.0 plan. Knowledge creation + habit learning + self-update.
+
+**Shipped**: 2026-02-09. 86 new tests (1105 total), schema v9 → v10.
+
+### What shipped
+
+| Feature | Files |
+|---------|-------|
+| **ENRICH consolidation** — transitive closure on CAUSED_BY chains + cross-cluster linking | `engine/enrichment.py` |
+| **DREAM consolidation** — random exploration via spreading activation, 10x decay | `engine/dream.py` |
+| **Action event log** — hippocampal buffer (schema v10), session-grouped action tracking | `core/action_event.py`, `storage/sqlite_action_log.py` |
+| **Sequence mining** — detect repeated action patterns, create WORKFLOW fibers + BEFORE synapses | `engine/sequence_mining.py` |
+| **Workflow suggestions** — proactive next-action hints via dual-threshold activation | `engine/workflow_suggest.py` |
+| **nmem_habits MCP tool** — suggest/list/clear learned habits | `mcp/server.py`, `mcp/tool_schemas.py` |
+| **nmem habits CLI** — list, show, clear subcommands | `cli/commands/habits.py` |
+| **nmem update CLI** — self-update with auto-detect pip/git source | `cli/commands/update.py` |
+| **Salience-based prune protection** — high-salience fibers resist pruning | `engine/consolidation.py` |
+| **Action recording** — MCP server records remember/recall/context actions | `mcp/server.py` |
+
+### BrainConfig additions
+
+`sequential_window_seconds`, `dream_neuron_count`, `dream_decay_multiplier`, `habit_min_frequency`, `habit_suggestion_min_weight`, `habit_suggestion_min_count`
+
+### Design decisions
+
+- Zero new synapse/neuron types — reuses BEFORE, CAUSED_BY, RELATED_TO, CO_OCCURS + ACTION, CONCEPT
+- Hippocampal buffer — action events are lightweight DB rows (not neurons) to avoid graph bloat
+- Zero LLM dependency — pure frequency-based pattern detection
+- Dream synapses decay 10x faster unless reinforced
+
+---
+
 ## v1.0.0 — Portable Consciousness v2
 
 > Marketplace foundations: brains become products.
@@ -764,7 +801,7 @@ Enhance `extraction/router.py` to route:
 ```
 v0.14.0 ✅ (Relation Extraction)
   ├──→ v0.15.0 ✅ (Associative Inference)
-  │       └──→ v0.18.0 (Advanced Consolidation + Workflow Detection)
+  │       └──→ v0.20.0 ✅ (Habitual Recall — shipped as v0.18.0 plan)
   └──→ v0.19.0 ✅ (Temporal Reasoning)
 
 v0.16.0 ✅ (Emotional Valence)     ← shipped
@@ -772,11 +809,9 @@ v0.17.0 ✅ (Brain Diagnostics)     ← shipped
   └──→ v1.0.0 (Portable Consciousness v2)
 ```
 
-**Critical path**: ~~v0.14.0 → v0.15.0~~ → v0.18.0 (v0.14-v0.17 shipped)
+**All pre-v1.0 versions shipped.** Only v1.0.0 remains.
 
-**Parallelizable**:
-- v0.19.0 ✅ (shipped)
-- v0.18.0 needs v0.14.0 ✅ + v0.15.0 ✅ (can start now)
+**Critical path**: v0.14.0 ✅ → v0.15.0 ✅ → v0.20.0 ✅ → v1.0.0
 
 ---
 
@@ -790,10 +825,10 @@ v0.17.0 ✅ (Brain Diagnostics)     ← shipped
 | G2 | Co-activation never synthesized into synapses | Data collected, never used | **v0.15.0** ✅ |
 | G3 | Emotional synapses (`FELT`/`EVOKES`) never created | Types exist, unused | **v0.16.0** ✅ |
 | G4 | No brain health metrics or diagnostics | Flying blind | **v0.17.0** ✅ |
-| G5 | No enrichment or dream consolidation | Only PRUNE/MERGE/SUMMARIZE/MATURE/INFER | **v0.18.0** |
+| G5 | No enrichment or dream consolidation | Only PRUNE/MERGE/SUMMARIZE/MATURE/INFER | **v0.20.0** ✅ |
 | G6 | "Why?" and "When?" queries can't trace chains | Router detects intent, no traversal | **v0.19.0** ✅ |
 | G7 | No brain versioning or partial transplant | Export/import only (all-or-nothing) | **v1.0.0** |
-| G8 | No habit/workflow detection from repeated actions | Frequency tracked but sequences ignored | **v0.18.0** |
+| G8 | No habit/workflow detection from repeated actions | Frequency tracked but sequences ignored | **v0.20.0** ✅ |
 
 ### Expert 4's 3 New Gaps
 
@@ -853,16 +888,16 @@ Ranked by impact × feasibility:
 | 3 | **v0.17.0** ✅ | High | High | Shipped. Brain diagnostics, purity score, nmem_health MCP + CLI. |
 | 4 | **v0.16.0** ✅ | Medium | High | Shipped. Emotional valence, sentiment extraction, FELT synapses, emotional decay. |
 | 5 | **v0.19.0** ✅ | High | Medium | Shipped. Temporal reasoning, causal/event traversal, pipeline integration. |
-| 6 | **v0.18.0** | High | Medium | DREAM + ENRICH + Workflow Detection. Largest scope but high differentiator (habit learning). Needs v0.14.0 ✅ + v0.15.0 ✅. |
+| 6 | **v0.20.0** ✅ | High | Medium | Shipped. DREAM + ENRICH + habit learning + workflow suggestions + nmem update. |
 | 7 | **v1.0.0** | Critical | Low | Largest scope. Marketplace foundations. Needs everything else stable. |
 
 ### Recommended execution order
 
 ```
-v0.14.0 ✅ → v0.15.0 ✅ → v0.16.0 ✅ → v0.17.0 ✅ → v0.19.0 ✅ → v0.18.0 → v1.0.0
+v0.14.0 ✅ → v0.15.0 ✅ → v0.16.0 ✅ → v0.17.0 ✅ → v0.19.0 ✅ → v0.20.0 ✅ → v1.0.0
 ```
 
-v0.18.0 is the only remaining pre-v1.0 version — all dependencies met.
+All pre-v1.0 versions shipped. Only v1.0.0 remains.
 
 ---
 
@@ -874,14 +909,14 @@ v0.18.0 is the only remaining pre-v1.0 version — all dependencies met.
 | v0.15.0 | ~500 | ~120 | ~300 | ~1,341 |
 | v0.16.0 | ~250 | ~80 | ~200 | ~1,541 |
 | v0.17.0 | ~450 | ~60 | ~200 | ~1,741 |
-| v0.18.0 | ~950 | ~555 | ~550 | ~2,008 |
+| v0.18.0/v0.20.0 | ~990 | ~290 | ~900 | 1,105 (actual) |
 | v0.19.0 | ~300 | ~100 | ~200 | ~2,208 |
 | v1.0.0 | ~500 | ~150 | ~350 | ~2,558 |
 | **Total** | **~3,550** | **~1,145** | **~2,050** | **~2,558** |
 
-Starting from 1019 tests (v0.19.0) → targeting ~2,558 tests at v1.0.0.
+Starting from 1105 tests (v0.20.0) → targeting ~1,455+ tests at v1.0.0.
 
 ---
 
 *See [VISION.md](VISION.md) for the north star guiding all decisions.*
-*Last updated: 2026-02-08 (v0.19.0 shipped: temporal reasoning)*
+*Last updated: 2026-02-09 (v0.20.0 shipped: habitual recall + nmem update)*
