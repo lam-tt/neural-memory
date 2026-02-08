@@ -59,100 +59,116 @@ def _build_causal_patterns() -> list[_PatternEntry]:
 
     # English: "X because Y" → X is CAUSED_BY Y (source=X, target=Y)
     # "because" indicates the cause follows the marker
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+because\s+(.{5,80}?)(?:\.|;|,\s+(?:and|but)|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.CAUSED_BY,
-        RelationType.CAUSAL,
-        0.80,
-        False,  # groups are (source, target) — source CAUSED_BY target
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+because\s+(.{5,80}?)(?:\.|;|,\s+(?:and|but)|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.CAUSED_BY,
+            RelationType.CAUSAL,
+            0.80,
+            False,  # groups are (source, target) — source CAUSED_BY target
+        )
+    )
 
     # "X caused by Y" → X CAUSED_BY Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+(?:caused\s+by|due\s+to)\s+(.{5,80}?)(?:\.|;|,\s+(?:and|but)|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.CAUSED_BY,
-        RelationType.CAUSAL,
-        0.85,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+(?:caused\s+by|due\s+to)\s+(.{5,80}?)(?:\.|;|,\s+(?:and|but)|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.CAUSED_BY,
+            RelationType.CAUSAL,
+            0.85,
+            False,
+        )
+    )
 
     # "X as a result of Y" → X CAUSED_BY Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+as\s+a\s+result\s+of\s+(.{5,80}?)(?:\.|;|,\s+(?:and|but)|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.CAUSED_BY,
-        RelationType.CAUSAL,
-        0.80,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+as\s+a\s+result\s+of\s+(.{5,80}?)(?:\.|;|,\s+(?:and|but)|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.CAUSED_BY,
+            RelationType.CAUSAL,
+            0.80,
+            False,
+        )
+    )
 
     # "X therefore Y" → X LEADS_TO Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+(?:therefore|thus|hence|consequently)\s+(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.LEADS_TO,
-        RelationType.CAUSAL,
-        0.75,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+(?:therefore|thus|hence|consequently)\s+(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.LEADS_TO,
+            RelationType.CAUSAL,
+            0.75,
+            False,
+        )
+    )
 
     # "X so Y" / "X so that Y" → X LEADS_TO Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+so\s+(?:that\s+)?(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.LEADS_TO,
-        RelationType.CAUSAL,
-        0.65,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+so\s+(?:that\s+)?(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.LEADS_TO,
+            RelationType.CAUSAL,
+            0.65,
+            False,
+        )
+    )
 
     # "X leads to Y" / "X results in Y" → X LEADS_TO Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+(?:leads?\s+to|results?\s+in|causes?)\s+(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.LEADS_TO,
-        RelationType.CAUSAL,
-        0.85,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+(?:leads?\s+to|results?\s+in|causes?)\s+(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.LEADS_TO,
+            RelationType.CAUSAL,
+            0.85,
+            False,
+        )
+    )
 
     # Vietnamese: "X vì Y" → X CAUSED_BY Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+(?:vì|do|bởi\s+vì)\s+(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.CAUSED_BY,
-        RelationType.CAUSAL,
-        0.80,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+(?:vì|do|bởi\s+vì)\s+(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.CAUSED_BY,
+            RelationType.CAUSAL,
+            0.80,
+            False,
+        )
+    )
 
     # Vietnamese: "X nên Y" / "X cho nên Y" → X LEADS_TO Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+(?:nên|cho\s+nên|vì\s+vậy|do\s+đó)\s+(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.LEADS_TO,
-        RelationType.CAUSAL,
-        0.80,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+(?:nên|cho\s+nên|vì\s+vậy|do\s+đó)\s+(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.LEADS_TO,
+            RelationType.CAUSAL,
+            0.80,
+            False,
+        )
+    )
 
     return patterns
 
@@ -162,79 +178,91 @@ def _build_comparative_patterns() -> list[_PatternEntry]:
     patterns: list[_PatternEntry] = []
 
     # "X better than Y" / "X worse than Y" / "X faster than Y"
-    patterns.append((
-        re.compile(
-            r"(.{3,60}?)\s+(?:better|worse|faster|slower|bigger|smaller|more\s+\w+|less\s+\w+)"
-            r"\s+than\s+(.{3,60}?)(?:\.|;|,\s+(?:and|but)|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.SIMILAR_TO,
-        RelationType.COMPARATIVE,
-        0.70,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{3,60}?)\s+(?:better|worse|faster|slower|bigger|smaller|more\s+\w+|less\s+\w+)"
+                r"\s+than\s+(.{3,60}?)(?:\.|;|,\s+(?:and|but)|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.SIMILAR_TO,
+            RelationType.COMPARATIVE,
+            0.70,
+            False,
+        )
+    )
 
     # "X similar to Y" / "X like Y" (not "would like")
-    patterns.append((
-        re.compile(
-            r"(.{3,60}?)\s+(?:similar\s+to|comparable\s+to|resembles?)\s+(.{3,60}?)(?:\.|;|,\s+(?:and|but)|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.SIMILAR_TO,
-        RelationType.COMPARATIVE,
-        0.75,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{3,60}?)\s+(?:similar\s+to|comparable\s+to|resembles?)\s+(.{3,60}?)(?:\.|;|,\s+(?:and|but)|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.SIMILAR_TO,
+            RelationType.COMPARATIVE,
+            0.75,
+            False,
+        )
+    )
 
     # "X unlike Y" / "X different from Y" / "X contrary to Y"
-    patterns.append((
-        re.compile(
-            r"(.{3,60}?)\s+(?:unlike|different\s+from|contrary\s+to|opposed\s+to)"
-            r"\s+(.{3,60}?)(?:\.|;|,\s+(?:and|but)|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.CONTRADICTS,
-        RelationType.COMPARATIVE,
-        0.70,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{3,60}?)\s+(?:unlike|different\s+from|contrary\s+to|opposed\s+to)"
+                r"\s+(.{3,60}?)(?:\.|;|,\s+(?:and|but)|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.CONTRADICTS,
+            RelationType.COMPARATIVE,
+            0.70,
+            False,
+        )
+    )
 
     # Vietnamese: "X giống như Y" → SIMILAR_TO
-    patterns.append((
-        re.compile(
-            r"(.{3,60}?)\s+(?:giống\s+như|tương\s+tự|giống)\s+(.{3,60}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.SIMILAR_TO,
-        RelationType.COMPARATIVE,
-        0.75,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{3,60}?)\s+(?:giống\s+như|tương\s+tự|giống)\s+(.{3,60}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.SIMILAR_TO,
+            RelationType.COMPARATIVE,
+            0.75,
+            False,
+        )
+    )
 
     # Vietnamese: "X tốt hơn Y" / "X nhanh hơn Y"
-    patterns.append((
-        re.compile(
-            r"(.{3,60}?)\s+(?:\w+\s+hơn)\s+(.{3,60}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.SIMILAR_TO,
-        RelationType.COMPARATIVE,
-        0.65,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{3,60}?)\s+(?:\w+\s+hơn)\s+(.{3,60}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.SIMILAR_TO,
+            RelationType.COMPARATIVE,
+            0.65,
+            False,
+        )
+    )
 
     # Vietnamese: "X khác với Y" → CONTRADICTS
-    patterns.append((
-        re.compile(
-            r"(.{3,60}?)\s+(?:khác\s+với|trái\s+ngược\s+với|ngược\s+lại\s+với)"
-            r"\s+(.{3,60}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.CONTRADICTS,
-        RelationType.COMPARATIVE,
-        0.70,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{3,60}?)\s+(?:khác\s+với|trái\s+ngược\s+với|ngược\s+lại\s+với)"
+                r"\s+(.{3,60}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.CONTRADICTS,
+            RelationType.COMPARATIVE,
+            0.70,
+            False,
+        )
+    )
 
     return patterns
 
@@ -244,112 +272,130 @@ def _build_sequential_patterns() -> list[_PatternEntry]:
     patterns: list[_PatternEntry] = []
 
     # "X then Y" / "X and then Y" → X BEFORE Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+(?:and\s+)?then\s+(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.BEFORE,
-        RelationType.SEQUENTIAL,
-        0.70,
-        False,  # source BEFORE target
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+(?:and\s+)?then\s+(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.BEFORE,
+            RelationType.SEQUENTIAL,
+            0.70,
+            False,  # source BEFORE target
+        )
+    )
 
     # "X afterwards Y" → X BEFORE Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+afterwards?\s+(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.BEFORE,
-        RelationType.SEQUENTIAL,
-        0.70,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+afterwards?\s+(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.BEFORE,
+            RelationType.SEQUENTIAL,
+            0.70,
+            False,
+        )
+    )
 
     # "after X, Y" → X BEFORE Y (X happened first)
-    patterns.append((
-        re.compile(
-            r"after\s+(.{5,80}?)\s*[,;]\s*(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.BEFORE,
-        RelationType.SEQUENTIAL,
-        0.75,
-        False,  # "after X, Y" means X came first, then Y → X BEFORE Y
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"after\s+(.{5,80}?)\s*[,;]\s*(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.BEFORE,
+            RelationType.SEQUENTIAL,
+            0.75,
+            False,  # "after X, Y" means X came first, then Y → X BEFORE Y
+        )
+    )
 
     # "before X, Y" → Y BEFORE X (Y happened first, leads to X)
-    patterns.append((
-        re.compile(
-            r"before\s+(.{5,80}?)\s*[,;]\s*(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.BEFORE,
-        RelationType.SEQUENTIAL,
-        0.75,
-        True,  # reversed: "before X, Y" → Y BEFORE X
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"before\s+(.{5,80}?)\s*[,;]\s*(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.BEFORE,
+            RelationType.SEQUENTIAL,
+            0.75,
+            True,  # reversed: "before X, Y" → Y BEFORE X
+        )
+    )
 
     # "first X then Y" → X BEFORE Y
-    patterns.append((
-        re.compile(
-            r"first\s+(.{5,80}?)\s*[,;]?\s*then\s+(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.BEFORE,
-        RelationType.SEQUENTIAL,
-        0.85,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"first\s+(.{5,80}?)\s*[,;]?\s*then\s+(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.BEFORE,
+            RelationType.SEQUENTIAL,
+            0.85,
+            False,
+        )
+    )
 
     # "X followed by Y" → X BEFORE Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+followed\s+by\s+(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.BEFORE,
-        RelationType.SEQUENTIAL,
-        0.80,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+followed\s+by\s+(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.BEFORE,
+            RelationType.SEQUENTIAL,
+            0.80,
+            False,
+        )
+    )
 
     # Vietnamese: "trước khi X, Y" → Y BEFORE X
-    patterns.append((
-        re.compile(
-            r"trước\s+khi\s+(.{5,80}?)\s*[,;]\s*(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.BEFORE,
-        RelationType.SEQUENTIAL,
-        0.75,
-        True,  # reversed
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"trước\s+khi\s+(.{5,80}?)\s*[,;]\s*(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.BEFORE,
+            RelationType.SEQUENTIAL,
+            0.75,
+            True,  # reversed
+        )
+    )
 
     # Vietnamese: "sau khi X, Y" → X BEFORE Y
-    patterns.append((
-        re.compile(
-            r"sau\s+khi\s+(.{5,80}?)\s*[,;]\s*(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.BEFORE,
-        RelationType.SEQUENTIAL,
-        0.75,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"sau\s+khi\s+(.{5,80}?)\s*[,;]\s*(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.BEFORE,
+            RelationType.SEQUENTIAL,
+            0.75,
+            False,
+        )
+    )
 
     # Vietnamese: "X rồi Y" / "X sau đó Y" → X BEFORE Y
-    patterns.append((
-        re.compile(
-            r"(.{5,80}?)\s+(?:rồi|sau\s+đó)\s+(.{5,80}?)(?:\.|;|$)",
-            re.IGNORECASE,
-        ),
-        SynapseType.BEFORE,
-        RelationType.SEQUENTIAL,
-        0.70,
-        False,
-    ))
+    patterns.append(
+        (
+            re.compile(
+                r"(.{5,80}?)\s+(?:rồi|sau\s+đó)\s+(.{5,80}?)(?:\.|;|$)",
+                re.IGNORECASE,
+            ),
+            SynapseType.BEFORE,
+            RelationType.SEQUENTIAL,
+            0.70,
+            False,
+        )
+    )
 
     return patterns
 
@@ -429,17 +475,19 @@ class RelationExtractor:
                     target_start = match.start(2)
                     target_end = match.end(2)
 
-                candidates.append(RelationCandidate(
-                    source_span=source_span,
-                    target_span=target_span,
-                    relation_type=relation_type,
-                    synapse_type=synapse_type,
-                    confidence=confidence,
-                    source_start=source_start,
-                    source_end=source_end,
-                    target_start=target_start,
-                    target_end=target_end,
-                ))
+                candidates.append(
+                    RelationCandidate(
+                        source_span=source_span,
+                        target_span=target_span,
+                        relation_type=relation_type,
+                        synapse_type=synapse_type,
+                        confidence=confidence,
+                        source_start=source_start,
+                        source_end=source_end,
+                        target_start=target_start,
+                        target_end=target_end,
+                    )
+                )
 
         return candidates
 

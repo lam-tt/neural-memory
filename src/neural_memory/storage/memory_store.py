@@ -481,14 +481,16 @@ class InMemoryStorage(InMemoryCollectionsMixin, InMemoryBrainMixin, NeuralStorag
         brain_id = self._get_brain_id()
         event_id = str(uuid4())
         a, b = (neuron_a, neuron_b) if neuron_a < neuron_b else (neuron_b, neuron_a)
-        self._co_activations[brain_id].append({
-            "id": event_id,
-            "neuron_a": a,
-            "neuron_b": b,
-            "binding_strength": binding_strength,
-            "source_anchor": source_anchor,
-            "created_at": datetime.utcnow(),
-        })
+        self._co_activations[brain_id].append(
+            {
+                "id": event_id,
+                "neuron_a": a,
+                "neuron_b": b,
+                "binding_strength": binding_strength,
+                "source_anchor": source_anchor,
+                "created_at": datetime.utcnow(),
+            }
+        )
         return event_id
 
     async def get_co_activation_counts(

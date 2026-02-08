@@ -600,9 +600,7 @@ class ConsolidationEngine:
             existing_pairs.add((syn.source_id, syn.target_id))
             existing_pairs.add((syn.target_id, syn.source_id))
 
-        new_candidates, reinforce_candidates = identify_candidates(
-            counts, existing_pairs, config
-        )
+        new_candidates, reinforce_candidates = identify_candidates(counts, existing_pairs, config)
 
         if dry_run:
             report.synapses_inferred = len(new_candidates) + len(reinforce_candidates)

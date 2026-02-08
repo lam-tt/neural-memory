@@ -5,6 +5,45 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-02-08
+
+### Added
+
+- **Associative Inference Engine** — Pure-logic module that synthesizes co-activation patterns into persistent synapses
+  - `compute_inferred_weight()` — Linear scaling capped at configurable max weight
+  - `identify_candidates()` — Filters by threshold, deduplicates existing pairs, sorts by count
+  - `create_inferred_synapse()` — Creates CO_OCCURS synapses with `_inferred: True` metadata
+  - `generate_associative_tags()` — BFS clustering of co-activated neurons → named tags from content
+- **Co-Activation Persistence** — Schema v8→v9
+  - `co_activation_events` table storing individual events with canonical pair ordering (a < b)
+  - `record_co_activation()`, `get_co_activation_counts()`, `prune_co_activations()` in storage layer
+  - SQLite mixin (`SQLiteCoActivationMixin`) and InMemory implementation
+  - Automatic persistence during retrieval via deferred write queue
+- **INFER Consolidation Strategy** — New strategy in `ConsolidationEngine`
+  - Creates CO_OCCURS synapses for neuron pairs with high co-activation counts
+  - Reinforces existing synapses for pairs that already have connections
+  - Generates associative tags from inference clusters
+  - Prunes old co-activation events outside the time window
+  - Dry-run support for previewing inference results
+- **Enhanced PRUNE** — Inferred synapses with `reinforced_count < 2` get 2× accelerated decay
+- **Tag Normalizer** — Synonym mapping + SimHash fuzzy matching + drift detection
+  - ~25 canonical synonym groups (frontend, backend, database, auth, config, deploy, testing, etc.)
+  - SimHash near-match with threshold=6 for short tag strings
+  - `detect_drift()` reports multiple variants mapping to the same canonical
+  - Integrated at encoder ingestion time — both auto-tags and agent-tags normalized
+- **BrainConfig extension** — `co_activation_threshold`, `co_activation_window_days`, `max_inferences_per_run`
+- **Memory Layer Unification Docs** — Guide for NM as a unification layer for external memory systems
+  - Architecture diagram and pipeline walkthrough
+  - Quick-start examples for all 6 adapters (ChromaDB, Mem0, Cognee, Graphiti, LlamaIndex, AWF)
+  - Custom adapter guide, incremental sync, provenance tracking
+
+### Changed
+
+- SQLite schema version bumped from 8 to 9
+- Encoder normalizes all tags (auto + agent) via TagNormalizer before storage
+- Consolidation report now includes `synapses_inferred` and `co_activations_pruned`
+- Tests: 908 passed (up from 838)
+
 ## [0.7.2] - 2026-02-05
 
 ### Fixed
@@ -225,6 +264,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.15.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.15.0
 [0.7.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.7.0
 [0.6.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.6.0
 [0.5.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.5.0

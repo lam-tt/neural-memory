@@ -31,10 +31,7 @@ class TestRelationEncoding:
             "The deployment failed because the database connection timed out.",
         )
 
-        caused_by = [
-            s for s in result.synapses_created
-            if s.type == SynapseType.CAUSED_BY
-        ]
+        _caused_by = [s for s in result.synapses_created if s.type == SynapseType.CAUSED_BY]
         # May or may not match depending on entity extraction
         # but the relation extractor should have found the pattern
         # The synapse is only created if both spans match neurons
@@ -48,10 +45,7 @@ class TestRelationEncoding:
             "First backup the database, then apply the schema migration.",
         )
 
-        before = [
-            s for s in result.synapses_created
-            if s.type == SynapseType.BEFORE
-        ]
+        _before = [s for s in result.synapses_created if s.type == SynapseType.BEFORE]
         # Synapse creation depends on span-to-neuron matching
 
     @pytest.mark.asyncio
@@ -64,8 +58,7 @@ class TestRelationEncoding:
         )
 
         relation_metadata_synapses = [
-            s for s in result.synapses_created
-            if s.metadata.get("relation_type") is not None
+            s for s in result.synapses_created if s.metadata.get("relation_type") is not None
         ]
         assert len(relation_metadata_synapses) == 0
 
@@ -79,10 +72,7 @@ class TestRelationEncoding:
         )
 
         # The anchor neuron should have auto-detected type
-        anchor = next(
-            n for n in result.neurons_created
-            if n.metadata.get("is_anchor")
-        )
+        anchor = next(n for n in result.neurons_created if n.metadata.get("is_anchor"))
         assert "type" in anchor.metadata
         assert anchor.metadata["type"] == "decision"
 
@@ -96,10 +86,7 @@ class TestRelationEncoding:
             metadata={"type": "error"},
         )
 
-        anchor = next(
-            n for n in result.neurons_created
-            if n.metadata.get("is_anchor")
-        )
+        anchor = next(n for n in result.neurons_created if n.metadata.get("is_anchor"))
         # Explicit "error" should be preserved, not overridden to "todo"
         assert anchor.metadata["type"] == "error"
 
@@ -144,8 +131,5 @@ class TestRelationEncoding:
         assert len(result.fiber.auto_tags) > 0
 
         # Anchor should have auto-detected type
-        anchor = next(
-            n for n in result.neurons_created
-            if n.metadata.get("is_anchor")
-        )
+        anchor = next(n for n in result.neurons_created if n.metadata.get("is_anchor"))
         assert "type" in anchor.metadata

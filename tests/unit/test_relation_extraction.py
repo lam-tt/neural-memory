@@ -2,7 +2,6 @@
 
 from neural_memory.core.synapse import SynapseType
 from neural_memory.extraction.relations import (
-    RelationCandidate,
     RelationExtractor,
     RelationType,
 )
@@ -210,10 +209,7 @@ class TestEdgeCases:
         relations = self.extractor.extract(text)
 
         # Count unique (source, target, type) combinations
-        keys = {
-            (r.source_span.lower(), r.target_span.lower(), r.synapse_type)
-            for r in relations
-        }
+        keys = {(r.source_span.lower(), r.target_span.lower(), r.synapse_type) for r in relations}
         assert len(keys) == len(relations)
 
     def test_confidence_in_range(self) -> None:
@@ -245,7 +241,7 @@ class TestEdgeCases:
             r = relations[0]
             try:
                 r.confidence = 0.5  # type: ignore[misc]
-                assert False, "Should not allow mutation"
+                raise AssertionError("Should not allow mutation")
             except AttributeError:
                 pass  # Expected — frozen dataclass
 

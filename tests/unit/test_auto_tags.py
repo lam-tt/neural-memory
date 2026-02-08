@@ -196,9 +196,7 @@ class TestAutoTagGeneration:
         )
 
     @pytest.mark.asyncio
-    async def test_auto_tags_limit(
-        self, encoder: tuple[MemoryEncoder, InMemoryStorage]
-    ) -> None:
+    async def test_auto_tags_limit(self, encoder: tuple[MemoryEncoder, InMemoryStorage]) -> None:
         """Auto-tags should not flood fibers with too many tags."""
         enc, _storage = encoder
 
@@ -211,9 +209,7 @@ class TestAutoTagGeneration:
 
         # Auto-tags: up to 5 keywords + entities. With agent tags = 0,
         # total should be reasonable (not > 30)
-        assert len(result.fiber.tags) <= 30, (
-            f"Too many auto-tags: {len(result.fiber.tags)}"
-        )
+        assert len(result.fiber.tags) <= 30, f"Too many auto-tags: {len(result.fiber.tags)}"
 
 
 class TestAutoTagsWithConflictDetection:

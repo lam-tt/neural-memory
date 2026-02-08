@@ -39,7 +39,8 @@ class TestConfirmatoryBoost:
         if overlap:
             # Anchor synapses should have boosted weights
             anchor_synapses = [
-                s for s in result.synapses_created
+                s
+                for s in result.synapses_created
                 if s.source_id == result.fiber.anchor_neuron_id
                 and s.type != SynapseType.RELATED_TO  # exclude divergent tag synapses
             ]
@@ -60,7 +61,8 @@ class TestConfirmatoryBoost:
         if divergent:
             # Check for RELATED_TO synapses with divergent_agent_tag metadata
             divergent_synapses = [
-                s for s in result.synapses_created
+                s
+                for s in result.synapses_created
                 if s.metadata.get("divergent_agent_tag") is not None
             ]
             # Each divergent tag that matched a neuron should have a synapse
@@ -83,8 +85,7 @@ class TestConfirmatoryBoost:
         assert len(result.fiber.auto_tags) > 0
         # No divergent tag synapses
         divergent_synapses = [
-            s for s in result.synapses_created
-            if s.metadata.get("divergent_agent_tag") is not None
+            s for s in result.synapses_created if s.metadata.get("divergent_agent_tag") is not None
         ]
         assert len(divergent_synapses) == 0
 
