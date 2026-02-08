@@ -158,7 +158,7 @@ class DecayManager:
                 intensity = synapse.metadata.get("_intensity", 0.5)
                 # High-intensity: decay^0.5 (much slower), low: decay^0.8 (slightly slower)
                 emotional_factor = 0.5 + 0.3 * (1.0 - intensity)
-                decay_factor = decay_factor ** emotional_factor
+                decay_factor = decay_factor**emotional_factor
 
             new_weight = synapse.weight * decay_factor
 

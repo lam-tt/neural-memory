@@ -76,9 +76,7 @@ class TestEmotionEncoding:
         assert len(state_neurons) >= 1
         # At least one should be an emotion category
         emotion_contents = {n.content for n in state_neurons}
-        assert "frustration" in emotion_contents or any(
-            "frustrat" in c for c in emotion_contents
-        )
+        assert "frustration" in emotion_contents or any("frustrat" in c for c in emotion_contents)
 
     @pytest.mark.asyncio
     async def test_shared_emotion_neurons(self, encoder: tuple) -> None:

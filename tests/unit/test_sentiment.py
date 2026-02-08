@@ -55,7 +55,8 @@ class TestSentimentBasicEN:
     def test_mixed_sentiment_negative_majority(self) -> None:
         """Mixed text with more negative words should return NEGATIVE."""
         result = self.extractor.extract(
-            "The deploy crashed, the build is broken and the tests failed. At least logging works.")
+            "The deploy crashed, the build is broken and the tests failed. At least logging works."
+        )
         assert result.valence == Valence.NEGATIVE
 
 

@@ -202,8 +202,11 @@ async def _compute_score_breakdown(
         emotional_resonance = min(0.1, 0.05 * best_intensity)
 
     raw_total = (
-        base_confidence + intersection_boost + freshness_boost
-        + frequency_boost + emotional_resonance
+        base_confidence
+        + intersection_boost
+        + freshness_boost
+        + frequency_boost
+        + emotional_resonance
     )
     return ScoreBreakdown(
         base_activation=base_confidence,

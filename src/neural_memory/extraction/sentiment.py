@@ -41,130 +41,399 @@ class SentimentResult:
 
 # --- English lexicons ---
 
-_POSITIVE_EN: frozenset[str] = frozenset({
-    # General positive
-    "good", "great", "excellent", "amazing", "wonderful", "fantastic",
-    "awesome", "outstanding", "perfect", "brilliant", "superb",
-    "beautiful", "nice", "fine", "lovely",
-    # Emotional positive
-    "happy", "glad", "pleased", "satisfied", "delighted", "joyful",
-    "excited", "thrilled", "eager", "enthusiastic", "optimistic",
-    "grateful", "thankful", "proud", "confident", "hopeful",
-    "relieved", "comfortable", "calm", "peaceful",
-    # Achievement / progress
-    "success", "successful", "accomplished", "achieved", "completed",
-    "solved", "fixed", "resolved", "improved", "working", "done",
-    "progress", "milestone", "breakthrough", "victory", "won",
-    # Technical positive
-    "clean", "fast", "efficient", "stable", "reliable", "robust",
-    "scalable", "elegant", "optimized", "performant", "smooth",
-    # Approval
-    "love", "like", "enjoy", "appreciate", "recommend", "approve",
-    "agree", "accept", "impressive", "remarkable",
-})
+_POSITIVE_EN: frozenset[str] = frozenset(
+    {
+        # General positive
+        "good",
+        "great",
+        "excellent",
+        "amazing",
+        "wonderful",
+        "fantastic",
+        "awesome",
+        "outstanding",
+        "perfect",
+        "brilliant",
+        "superb",
+        "beautiful",
+        "nice",
+        "fine",
+        "lovely",
+        # Emotional positive
+        "happy",
+        "glad",
+        "pleased",
+        "satisfied",
+        "delighted",
+        "joyful",
+        "excited",
+        "thrilled",
+        "eager",
+        "enthusiastic",
+        "optimistic",
+        "grateful",
+        "thankful",
+        "proud",
+        "confident",
+        "hopeful",
+        "relieved",
+        "comfortable",
+        "calm",
+        "peaceful",
+        # Achievement / progress
+        "success",
+        "successful",
+        "accomplished",
+        "achieved",
+        "completed",
+        "solved",
+        "fixed",
+        "resolved",
+        "improved",
+        "working",
+        "done",
+        "progress",
+        "milestone",
+        "breakthrough",
+        "victory",
+        "won",
+        # Technical positive
+        "clean",
+        "fast",
+        "efficient",
+        "stable",
+        "reliable",
+        "robust",
+        "scalable",
+        "elegant",
+        "optimized",
+        "performant",
+        "smooth",
+        # Approval
+        "love",
+        "like",
+        "enjoy",
+        "appreciate",
+        "recommend",
+        "approve",
+        "agree",
+        "accept",
+        "impressive",
+        "remarkable",
+    }
+)
 
-_NEGATIVE_EN: frozenset[str] = frozenset({
-    # General negative
-    "bad", "terrible", "horrible", "awful", "poor", "worst",
-    "ugly", "dreadful", "miserable", "pathetic", "lousy",
-    # Emotional negative
-    "frustrated", "annoyed", "irritated", "angry", "furious",
-    "upset", "disappointed", "sad", "unhappy", "depressed",
-    "worried", "anxious", "stressed", "nervous", "scared",
-    "confused", "lost", "stuck", "overwhelmed", "exhausted",
-    # Failure / problems
-    "failed", "broken", "crashed", "error", "bug", "issue",
-    "problem", "failure", "mistake", "wrong", "fault",
-    "regression", "degraded", "corrupted", "flawed",
-    # Technical negative
-    "slow", "unstable", "unreliable", "fragile", "brittle",
-    "bloated", "messy", "hacky", "spaghetti", "legacy",
-    "deprecated", "outdated", "vulnerable", "insecure",
-    # Disapproval
-    "hate", "dislike", "reject", "refuse", "deny", "disagree",
-    "unacceptable", "painful", "nightmare",
-})
+_NEGATIVE_EN: frozenset[str] = frozenset(
+    {
+        # General negative
+        "bad",
+        "terrible",
+        "horrible",
+        "awful",
+        "poor",
+        "worst",
+        "ugly",
+        "dreadful",
+        "miserable",
+        "pathetic",
+        "lousy",
+        # Emotional negative
+        "frustrated",
+        "annoyed",
+        "irritated",
+        "angry",
+        "furious",
+        "upset",
+        "disappointed",
+        "sad",
+        "unhappy",
+        "depressed",
+        "worried",
+        "anxious",
+        "stressed",
+        "nervous",
+        "scared",
+        "confused",
+        "lost",
+        "stuck",
+        "overwhelmed",
+        "exhausted",
+        # Failure / problems
+        "failed",
+        "broken",
+        "crashed",
+        "error",
+        "bug",
+        "issue",
+        "problem",
+        "failure",
+        "mistake",
+        "wrong",
+        "fault",
+        "regression",
+        "degraded",
+        "corrupted",
+        "flawed",
+        # Technical negative
+        "slow",
+        "unstable",
+        "unreliable",
+        "fragile",
+        "brittle",
+        "bloated",
+        "messy",
+        "hacky",
+        "spaghetti",
+        "legacy",
+        "deprecated",
+        "outdated",
+        "vulnerable",
+        "insecure",
+        # Disapproval
+        "hate",
+        "dislike",
+        "reject",
+        "refuse",
+        "deny",
+        "disagree",
+        "unacceptable",
+        "painful",
+        "nightmare",
+    }
+)
 
 # --- Vietnamese lexicons ---
 
-_POSITIVE_VI: frozenset[str] = frozenset({
-    "tốt", "hay", "tuyệt", "xuất sắc", "hoàn hảo",
-    "vui", "hạnh phúc", "hài lòng", "thoải mái",
-    "thành công", "hoàn thành", "xong", "ổn",
-    "nhanh", "mạnh", "hiệu quả", "ổn định",
-    "thích", "yêu", "đẹp", "giỏi", "khá",
-    "tiến bộ", "cải thiện", "sửa được",
-    "nhẹ nhàng", "sạch", "gọn",
-})
+_POSITIVE_VI: frozenset[str] = frozenset(
+    {
+        "tốt",
+        "hay",
+        "tuyệt",
+        "xuất sắc",
+        "hoàn hảo",
+        "vui",
+        "hạnh phúc",
+        "hài lòng",
+        "thoải mái",
+        "thành công",
+        "hoàn thành",
+        "xong",
+        "ổn",
+        "nhanh",
+        "mạnh",
+        "hiệu quả",
+        "ổn định",
+        "thích",
+        "yêu",
+        "đẹp",
+        "giỏi",
+        "khá",
+        "tiến bộ",
+        "cải thiện",
+        "sửa được",
+        "nhẹ nhàng",
+        "sạch",
+        "gọn",
+    }
+)
 
-_NEGATIVE_VI: frozenset[str] = frozenset({
-    "lỗi", "hỏng", "chết", "sập", "crash",
-    "thất bại", "sai", "bug", "vấn đề",
-    "chậm", "kẹt", "treo", "lag", "đứng",
-    "buồn", "lo", "bực", "khó chịu", "mệt",
-    "tệ", "xấu", "dở", "kém", "yếu",
-    "phức tạp", "rối", "khó hiểu", "nặng",
-    "nguy hiểm", "rủi ro", "deprecated",
-})
+_NEGATIVE_VI: frozenset[str] = frozenset(
+    {
+        "lỗi",
+        "hỏng",
+        "chết",
+        "sập",
+        "crash",
+        "thất bại",
+        "sai",
+        "bug",
+        "vấn đề",
+        "chậm",
+        "kẹt",
+        "treo",
+        "lag",
+        "đứng",
+        "buồn",
+        "lo",
+        "bực",
+        "khó chịu",
+        "mệt",
+        "tệ",
+        "xấu",
+        "dở",
+        "kém",
+        "yếu",
+        "phức tạp",
+        "rối",
+        "khó hiểu",
+        "nặng",
+        "nguy hiểm",
+        "rủi ro",
+        "deprecated",
+    }
+)
 
 # --- Negators ---
 
-_NEGATORS: frozenset[str] = frozenset({
-    # English
-    "not", "no", "never", "neither", "nor", "none",
-    "don't", "doesn't", "didn't", "won't", "wouldn't",
-    "can't", "cannot", "couldn't", "shouldn't", "isn't",
-    "aren't", "wasn't", "weren't", "hasn't", "haven't",
-    "hadn't", "without", "hardly", "barely", "scarcely",
-    # Vietnamese
-    "không", "chưa", "chẳng", "chả", "đừng",
-    "chưa từng", "không hề", "không bao giờ",
-})
+_NEGATORS: frozenset[str] = frozenset(
+    {
+        # English
+        "not",
+        "no",
+        "never",
+        "neither",
+        "nor",
+        "none",
+        "don't",
+        "doesn't",
+        "didn't",
+        "won't",
+        "wouldn't",
+        "can't",
+        "cannot",
+        "couldn't",
+        "shouldn't",
+        "isn't",
+        "aren't",
+        "wasn't",
+        "weren't",
+        "hasn't",
+        "haven't",
+        "hadn't",
+        "without",
+        "hardly",
+        "barely",
+        "scarcely",
+        # Vietnamese
+        "không",
+        "chưa",
+        "chẳng",
+        "chả",
+        "đừng",
+        "chưa từng",
+        "không hề",
+        "không bao giờ",
+    }
+)
 
 # --- Intensifiers ---
 
-_INTENSIFIERS: frozenset[str] = frozenset({
-    # English
-    "very", "extremely", "highly", "really", "so",
-    "incredibly", "absolutely", "completely", "totally",
-    "utterly", "deeply", "seriously", "terribly",
-    "remarkably", "exceptionally", "particularly",
-    # Vietnamese
-    "rất", "cực", "quá", "siêu", "vô cùng",
-    "hết sức", "đặc biệt", "thật sự",
-})
+_INTENSIFIERS: frozenset[str] = frozenset(
+    {
+        # English
+        "very",
+        "extremely",
+        "highly",
+        "really",
+        "so",
+        "incredibly",
+        "absolutely",
+        "completely",
+        "totally",
+        "utterly",
+        "deeply",
+        "seriously",
+        "terribly",
+        "remarkably",
+        "exceptionally",
+        "particularly",
+        # Vietnamese
+        "rất",
+        "cực",
+        "quá",
+        "siêu",
+        "vô cùng",
+        "hết sức",
+        "đặc biệt",
+        "thật sự",
+    }
+)
 
 # --- Emotion tag mapping ---
 
 _EMOTION_MAP: dict[str, frozenset[str]] = {
-    "frustration": frozenset({
-        "frustrated", "stuck", "annoyed", "irritated", "angry",
-        "furious", "bực", "khó chịu",
-    }),
-    "satisfaction": frozenset({
-        "satisfied", "happy", "pleased", "accomplished", "glad",
-        "delighted", "proud", "hài lòng", "vui",
-    }),
-    "confusion": frozenset({
-        "confused", "unclear", "lost", "puzzling", "puzzled",
-        "bewildered", "khó hiểu", "rối",
-    }),
-    "excitement": frozenset({
-        "excited", "eager", "thrilled", "amazing", "enthusiastic",
-        "awesome", "fantastic", "brilliant",
-    }),
-    "anxiety": frozenset({
-        "worried", "concerned", "anxious", "stressed", "nervous",
-        "scared", "lo", "lo lắng",
-    }),
-    "relief": frozenset({
-        "relieved", "finally", "solved", "resolved", "fixed",
-        "sửa được", "xong",
-    }),
-    "disappointment": frozenset({
-        "disappointed", "let down", "underwhelming", "failed",
-        "thất vọng", "thất bại",
-    }),
+    "frustration": frozenset(
+        {
+            "frustrated",
+            "stuck",
+            "annoyed",
+            "irritated",
+            "angry",
+            "furious",
+            "bực",
+            "khó chịu",
+        }
+    ),
+    "satisfaction": frozenset(
+        {
+            "satisfied",
+            "happy",
+            "pleased",
+            "accomplished",
+            "glad",
+            "delighted",
+            "proud",
+            "hài lòng",
+            "vui",
+        }
+    ),
+    "confusion": frozenset(
+        {
+            "confused",
+            "unclear",
+            "lost",
+            "puzzling",
+            "puzzled",
+            "bewildered",
+            "khó hiểu",
+            "rối",
+        }
+    ),
+    "excitement": frozenset(
+        {
+            "excited",
+            "eager",
+            "thrilled",
+            "amazing",
+            "enthusiastic",
+            "awesome",
+            "fantastic",
+            "brilliant",
+        }
+    ),
+    "anxiety": frozenset(
+        {
+            "worried",
+            "concerned",
+            "anxious",
+            "stressed",
+            "nervous",
+            "scared",
+            "lo",
+            "lo lắng",
+        }
+    ),
+    "relief": frozenset(
+        {
+            "relieved",
+            "finally",
+            "solved",
+            "resolved",
+            "fixed",
+            "sửa được",
+            "xong",
+        }
+    ),
+    "disappointment": frozenset(
+        {
+            "disappointed",
+            "let down",
+            "underwhelming",
+            "failed",
+            "thất vọng",
+            "thất bại",
+        }
+    ),
 }
 
 # Build reverse lookup: word → set of emotion tags
