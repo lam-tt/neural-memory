@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Schema version for migrations
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 # ── Migrations ──────────────────────────────────────────────────────
 # Each entry maps (from_version -> to_version) with a list of SQL statements.
@@ -110,6 +110,13 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
             FOREIGN KEY (brain_id, fiber_id) REFERENCES fibers(brain_id, id) ON DELETE CASCADE
         )""",
         "CREATE INDEX IF NOT EXISTS idx_maturations_stage ON memory_maturations(brain_id, stage)",
+    ],
+    (7, 8): [
+        # Tag origin tracking: separate auto-generated tags from agent-provided tags
+        "ALTER TABLE fibers ADD COLUMN auto_tags TEXT DEFAULT '[]'",
+        "ALTER TABLE fibers ADD COLUMN agent_tags TEXT DEFAULT '[]'",
+        # Backfill: existing tags → agent_tags (conservative — can't determine origin retroactively)
+        "UPDATE fibers SET agent_tags = tags WHERE tags != '[]'",
     ],
 }
 
@@ -255,7 +262,9 @@ CREATE TABLE IF NOT EXISTS fibers (
     salience REAL DEFAULT 0.0,
     frequency INTEGER DEFAULT 0,
     summary TEXT,
-    tags TEXT DEFAULT '[]',  -- JSON array
+    tags TEXT DEFAULT '[]',  -- JSON array (union of auto_tags + agent_tags)
+    auto_tags TEXT DEFAULT '[]',  -- JSON array: tags from auto-extraction
+    agent_tags TEXT DEFAULT '[]',  -- JSON array: tags from calling agent
     metadata TEXT DEFAULT '{}',  -- JSON
     created_at TEXT NOT NULL,
     PRIMARY KEY (brain_id, id),

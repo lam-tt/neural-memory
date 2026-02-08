@@ -136,51 +136,39 @@ Create → Reinforce → Decay → Consolidate → Forget
 
 ## Roadmap Định Hướng Theo Vision
 
-### Đã có (v0.8.0)
+> **Chi tiết đầy đủ xem [ROADMAP.md](ROADMAP.md)** — versioned roadmap v0.14.0 → v1.0.0
+> với gap coverage matrix, expert feedback mapping, và VISION.md checklist per phase.
+
+### Đã có (v0.13.0)
 
 - [x] Spreading activation retrieval (4 depth levels)
 - [x] Hebbian learning (reinforcement through use)
-- [x] Memory decay over time
-- [x] Sleep & Consolidate (prune/merge/summarize)
+- [x] Memory decay over time (type-aware)
+- [x] Sleep & Consolidate (prune/merge/summarize/mature)
 - [x] Typed memories with priorities and expiry
 - [x] Brain export/import/merge (portable consciousness)
 - [x] Conflict resolution (4 strategies)
 - [x] MCP protocol (standard memory layer)
 - [x] VS Code extension
 - [x] REST API + WebSocket sync
+- [x] Cognitive runtime (firing threshold, refractory period, homeostasis)
+- [x] SimHash deduplication
+- [x] Score breakdown (activation, freshness, frequency, intersection)
+- [x] Auto-tags (entity + keyword extraction)
 
 ### Hướng phát triển tiếp theo
 
-#### Nâng cấp Spreading Activation
-- [ ] Thuật toán lan truyền nâng cao (inhibitory competition)
-- [ ] Trọng số dynamic (context-dependent weight adjustment)
-- [ ] Cơ chế ức chế cạnh tranh (lateral inhibition)
-- [ ] Multi-hop reasoning paths
+| Version | Theme | Key Deliverable |
+|---------|-------|-----------------|
+| v0.14.0 | Relation Extraction | Auto-synapses from content + tag origin tracking |
+| v0.15.0 | Associative Inference | Co-activation → persistent synapses + tag normalization |
+| v0.16.0 | Emotional Valence | Sentiment at encode time, emotion synapses |
+| v0.17.0 | Brain Diagnostics | Purity score, health report, `nmem health` |
+| v0.18.0 | Advanced Consolidation | ENRICH + DREAM strategies |
+| v0.19.0 | Temporal Reasoning | Causal chain queries, "Why?" and "When?" |
+| v1.0.0 | Portable Consciousness v2 | Brain versioning, partial transplant, marketplace |
 
-#### Temporal & Causal Reasoning
-- [ ] Causal synapses (CAUSED_BY, LED_TO synapse types)
-- [ ] Temporal chains ("sau event X nhưng trước event Y")
-- [ ] "Tại sao?" queries — trace causal paths through graph
-- [ ] "Khi nào?" queries — temporal fiber traversal
-- [ ] Event sequences as first-class structures
-
-#### Emotional Valence
-- [ ] Trọng số cảm xúc trên neurons (positive/negative/neutral)
-- [ ] Query by emotion ("lần nào đó thất vọng về bug là gì?")
-- [ ] Emotional decay (traumatic memories decay slower)
-- [ ] Sentiment-aware consolidation
-
-#### Memory Consolidation Nâng Cao
-- [ ] Auto-compress repeated events into schemas/rules
-- [ ] Pattern extraction (recurring sequences → generalized rules)
-- [ ] Dream-like consolidation (random activation during sleep)
-- [ ] Importance-based retention (high-emotion memories resist decay)
-
-#### Portable Consciousness Nâng Cao
-- [ ] Brain marketplace (share expert brains)
-- [ ] Partial brain transplant (merge specific topic areas only)
-- [ ] Brain versioning (git-like history for brains)
-- [ ] Cross-language brain compatibility
+See [ROADMAP.md](ROADMAP.md) for full details, dependency graph, and coverage matrices.
 
 ---
 
@@ -205,4 +193,4 @@ Create → Reinforce → Decay → Consolidate → Forget
 
 ---
 
-*Last updated: 2026-02-06*
+*Last updated: 2026-02-08*

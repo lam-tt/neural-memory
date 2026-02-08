@@ -7,6 +7,11 @@ from neural_memory.extraction.parser import (
     QueryParser,
     Stimulus,
 )
+from neural_memory.extraction.relations import (
+    RelationCandidate,
+    RelationExtractor,
+    RelationType,
+)
 from neural_memory.extraction.router import (
     QueryRouter,
     QueryType,
@@ -39,4 +44,8 @@ __all__ = [
     # Entities
     "Entity",
     "EntityExtractor",
+    # Relations
+    "RelationCandidate",
+    "RelationExtractor",
+    "RelationType",
 ]

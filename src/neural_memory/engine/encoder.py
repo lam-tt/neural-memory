@@ -8,10 +8,12 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from neural_memory.core.fiber import Fiber
+from neural_memory.core.memory_types import suggest_memory_type
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.extraction.entities import EntityExtractor, EntityType
 from neural_memory.extraction.keywords import extract_keywords, extract_weighted_keywords
+from neural_memory.extraction.relations import RelationExtractor
 from neural_memory.extraction.temporal import TemporalExtractor
 from neural_memory.utils.simhash import is_near_duplicate, simhash
 
@@ -58,6 +60,7 @@ class MemoryEncoder:
         config: BrainConfig,
         temporal_extractor: TemporalExtractor | None = None,
         entity_extractor: EntityExtractor | None = None,
+        relation_extractor: RelationExtractor | None = None,
     ) -> None:
         """
         Initialize the encoder.
@@ -67,11 +70,13 @@ class MemoryEncoder:
             config: Brain configuration
             temporal_extractor: Custom temporal extractor
             entity_extractor: Custom entity extractor
+            relation_extractor: Custom relation extractor
         """
         self._storage = storage
         self._config = config
         self._temporal = temporal_extractor or TemporalExtractor()
         self._entity = entity_extractor or EntityExtractor()
+        self._relation = relation_extractor or RelationExtractor()
 
     async def encode(
         self,
@@ -113,21 +118,36 @@ class MemoryEncoder:
         concept_neurons = await self._extract_concept_neurons(content, language)
         neurons_created.extend(concept_neurons)
 
-        # 4. Create the anchor neuron (main content)
+        # 4. Generate auto-tags from extracted neurons
+        auto_tags = self._generate_auto_tags(
+            entity_neurons=entity_neurons,
+            concept_neurons=concept_neurons,
+            content=content,
+            language=language,
+        )
+        agent_tags = tags or set()
+        merged_tags = auto_tags | agent_tags
+
+        # 4b. Auto-infer memory type if not provided
+        effective_metadata = dict(metadata or {})
+        if "type" not in effective_metadata or not effective_metadata["type"]:
+            effective_metadata["type"] = suggest_memory_type(content).value
+
+        # 5. Create the anchor neuron (main content)
         anchor_neuron = Neuron.create(
             type=NeuronType.CONCEPT,
             content=content,
             metadata={
                 "is_anchor": True,
                 "timestamp": timestamp.isoformat(),
-                **(metadata or {}),
+                **effective_metadata,
             },
             content_hash=simhash(content),
         )
         await self._storage.add_neuron(anchor_neuron)
         neurons_created.append(anchor_neuron)
 
-        # 5. Create synapses between neurons
+        # 6. Create synapses between neurons
         all_neurons = neurons_created
 
         # Connect anchor to time neurons
@@ -183,11 +203,32 @@ class MemoryEncoder:
                 await self._storage.add_synapse(synapse)
                 synapses_created.append(synapse)
 
-        # 6. Detect and resolve conflicts with existing memories
+        # 6b. Extract relation-based synapses (causal, comparative, sequential)
+        relation_synapses = await self._extract_relation_synapses(
+            content=content,
+            anchor_neuron=anchor_neuron,
+            entity_neurons=entity_neurons,
+            concept_neurons=concept_neurons,
+            language=language,
+        )
+        synapses_created.extend(relation_synapses)
+
+        # 6c. Confirmatory weight boost (Hebbian tag confirmation)
+        boost_synapses = await self._apply_confirmatory_boost(
+            auto_tags=auto_tags,
+            agent_tags=agent_tags,
+            anchor_neuron=anchor_neuron,
+            synapses=synapses_created,
+            entity_neurons=entity_neurons,
+            concept_neurons=concept_neurons,
+        )
+        synapses_created.extend(boost_synapses)
+
+        # 7. Detect and resolve conflicts with existing memories
         from neural_memory.engine.conflict_detection import detect_conflicts, resolve_conflicts
 
-        conflict_tags = tags or set()
-        memory_type_str = (metadata or {}).get("type", "")
+        conflict_tags = merged_tags
+        memory_type_str = effective_metadata.get("type", "")
         conflicts = await detect_conflicts(
             content=content,
             tags=conflict_tags,
@@ -203,11 +244,11 @@ class MemoryEncoder:
             for resolution in resolutions:
                 synapses_created.append(resolution.contradicts_synapse)
 
-        # 7. Link to nearby temporal memories
+        # 8. Link to nearby temporal memories
         linked = await self._link_temporal_neighbors(anchor_neuron, timestamp)
         neurons_linked.extend(linked)
 
-        # 8. Create fiber
+        # 9. Create fiber
         neuron_ids = {n.id for n in all_neurons}
         synapse_ids = {s.id for s in synapses_created}
 
@@ -217,8 +258,9 @@ class MemoryEncoder:
             anchor_neuron_id=anchor_neuron.id,
             time_start=timestamp,
             time_end=timestamp,
-            tags=tags,
-            metadata=metadata,
+            auto_tags=auto_tags,
+            agent_tags=agent_tags,
+            metadata=effective_metadata,
         )
 
         # Calculate coherence (simple: edges / possible edges)
@@ -246,6 +288,192 @@ class MemoryEncoder:
             neurons_linked=neurons_linked,
             synapses_created=synapses_created,
         )
+
+    def _generate_auto_tags(
+        self,
+        entity_neurons: list[Neuron],
+        concept_neurons: list[Neuron],
+        content: str,
+        language: str = "auto",
+    ) -> set[str]:
+        """
+        Generate tags from extracted entities and top keywords.
+
+        Auto-tags ensure every fiber has a baseline tag set for clustering
+        and pattern extraction, regardless of whether the calling agent
+        provides tags.
+
+        Args:
+            entity_neurons: Extracted entity neurons
+            concept_neurons: Extracted concept neurons
+            content: Original content text
+            language: Language hint
+
+        Returns:
+            Set of normalized tag strings
+        """
+        auto_tags: set[str] = set()
+
+        # Entity names as tags (normalized lowercase)
+        for neuron in entity_neurons:
+            tag = neuron.content.lower().strip()
+            if len(tag) >= 2:
+                auto_tags.add(tag)
+
+        # Top-5 keywords as tags
+        weighted = extract_weighted_keywords(content, language=language)
+        for kw in weighted[:5]:
+            tag = kw.text.lower().strip()
+            if len(tag) >= 2:
+                auto_tags.add(tag)
+
+        return auto_tags
+
+    async def _extract_relation_synapses(
+        self,
+        content: str,
+        anchor_neuron: Neuron,
+        entity_neurons: list[Neuron],
+        concept_neurons: list[Neuron],
+        language: str = "auto",
+    ) -> list[Synapse]:
+        """Create synapses from extracted relations between entities/concepts.
+
+        Matches relation source/target spans to existing neurons and creates
+        typed synapses (CAUSED_BY, LEADS_TO, BEFORE, AFTER, etc.).
+
+        Args:
+            content: Original content text
+            anchor_neuron: The anchor neuron for this memory
+            entity_neurons: Extracted entity neurons
+            concept_neurons: Extracted concept neurons
+            language: Language hint
+
+        Returns:
+            List of created relation synapses
+        """
+        synapses: list[Synapse] = []
+        relations = self._relation.extract(content, language=language)
+
+        all_extracted = entity_neurons + concept_neurons
+        if len(all_extracted) < 2:
+            return synapses
+
+        for relation in relations:
+            source_neuron = self._match_span_to_neuron(relation.source_span, all_extracted)
+            target_neuron = self._match_span_to_neuron(relation.target_span, all_extracted)
+
+            if source_neuron is None or target_neuron is None:
+                continue
+            if source_neuron.id == target_neuron.id:
+                continue
+
+            synapse = Synapse.create(
+                source_id=source_neuron.id,
+                target_id=target_neuron.id,
+                type=relation.synapse_type,
+                weight=relation.confidence,
+                metadata={"relation_type": relation.relation_type.value},
+            )
+            try:
+                await self._storage.add_synapse(synapse)
+                synapses.append(synapse)
+            except ValueError:
+                logger.debug("Relation synapse already exists, skipping")
+
+        return synapses
+
+    def _match_span_to_neuron(
+        self,
+        span: str,
+        neurons: list[Neuron],
+    ) -> Neuron | None:
+        """Match a text span to the best-matching neuron by content overlap.
+
+        Uses case-insensitive substring matching. Returns the neuron
+        whose content has the best overlap with the span.
+        """
+        span_lower = span.lower().strip()
+        best_match: Neuron | None = None
+        best_score: float = 0.0
+
+        for neuron in neurons:
+            neuron_lower = neuron.content.lower()
+            if neuron_lower in span_lower or span_lower in neuron_lower:
+                score = len(neuron_lower) / max(len(span_lower), 1)
+                if score > best_score:
+                    best_score = score
+                    best_match = neuron
+
+        return best_match
+
+    async def _apply_confirmatory_boost(
+        self,
+        auto_tags: set[str],
+        agent_tags: set[str],
+        anchor_neuron: Neuron,
+        synapses: list[Synapse],
+        entity_neurons: list[Neuron],
+        concept_neurons: list[Neuron],
+    ) -> list[Synapse]:
+        """Apply Hebbian confirmatory weight boost when agent tags overlap auto tags.
+
+        When agent_tag matches auto_tag (confirmation):
+            Boost weight of all synapses FROM anchor by +0.1
+
+        When agent_tag is NOT in auto_tags (divergence):
+            Create RELATED_TO synapse with weight 0.3 for novel associations
+
+        Returns:
+            List of any newly created synapses (from divergent tags)
+        """
+        new_synapses: list[Synapse] = []
+        overlap = auto_tags & agent_tags
+
+        if overlap:
+            for i, syn in enumerate(synapses):
+                if syn.source_id == anchor_neuron.id:
+                    boosted_weight = min(1.0, syn.weight + 0.1)
+                    if boosted_weight != syn.weight:
+                        boosted = Synapse(
+                            id=syn.id,
+                            source_id=syn.source_id,
+                            target_id=syn.target_id,
+                            type=syn.type,
+                            weight=boosted_weight,
+                            direction=syn.direction,
+                            metadata=syn.metadata,
+                            reinforced_count=syn.reinforced_count,
+                            last_activated=syn.last_activated,
+                            created_at=syn.created_at,
+                        )
+                        try:
+                            await self._storage.update_synapse(boosted)
+                        except (ValueError, AttributeError):
+                            logger.debug("Synapse boost update failed (non-critical)")
+                        synapses[i] = boosted
+
+        divergent = agent_tags - auto_tags
+        if divergent:
+            all_neurons = entity_neurons + concept_neurons
+            for tag in divergent:
+                tag_lower = tag.lower()
+                matching = [n for n in all_neurons if tag_lower in n.content.lower()]
+                for neuron in matching:
+                    synapse = Synapse.create(
+                        source_id=anchor_neuron.id,
+                        target_id=neuron.id,
+                        type=SynapseType.RELATED_TO,
+                        weight=0.3,
+                        metadata={"divergent_agent_tag": tag},
+                    )
+                    try:
+                        await self._storage.add_synapse(synapse)
+                        new_synapses.append(synapse)
+                    except ValueError:
+                        logger.debug("Divergent tag synapse already exists, skipping")
+
+        return new_synapses
 
     async def _extract_time_neurons(
         self,

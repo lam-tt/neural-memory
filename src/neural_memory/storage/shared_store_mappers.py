@@ -70,6 +70,12 @@ def dict_to_synapse(data: dict[str, Any]) -> Synapse:
 
 def dict_to_fiber(data: dict[str, Any]) -> Fiber:
     """Convert API response dict to Fiber."""
+    # Tag origin: read auto_tags/agent_tags, fallback to legacy tags
+    auto_tags = set(data.get("auto_tags", []))
+    agent_tags = set(data.get("agent_tags", []))
+    if not auto_tags and not agent_tags:
+        agent_tags = set(data.get("tags", []))
+
     return Fiber(
         id=data["id"],
         neuron_ids=frozenset(data.get("neuron_ids", [])),
@@ -81,7 +87,8 @@ def dict_to_fiber(data: dict[str, Any]) -> Fiber:
         salience=data.get("salience", 0.0),
         frequency=data.get("frequency", 0),
         summary=data.get("summary"),
-        tags=frozenset(data.get("tags", [])),
+        auto_tags=auto_tags,
+        agent_tags=agent_tags,
         created_at=datetime.fromisoformat(data["created_at"])
         if data.get("created_at")
         else datetime.now(),

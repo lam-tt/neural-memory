@@ -49,6 +49,8 @@ class SharedFiberBrainMixin:
             "frequency": fiber.frequency,
             "summary": fiber.summary,
             "tags": list(fiber.tags),
+            "auto_tags": list(fiber.auto_tags),
+            "agent_tags": list(fiber.agent_tags),
             "created_at": fiber.created_at.isoformat(),
         }
         result = await self._request("POST", "/memory/fibers", json_data=data)
@@ -97,6 +99,8 @@ class SharedFiberBrainMixin:
             "frequency": fiber.frequency,
             "summary": fiber.summary,
             "tags": list(fiber.tags),
+            "auto_tags": list(fiber.auto_tags),
+            "agent_tags": list(fiber.agent_tags),
         }
         await self._request("PUT", f"/memory/fibers/{fiber.id}", json_data=data)
 

@@ -186,6 +186,12 @@ class SQLiteBrainMixin:
 
     async def _import_fibers(self, fibers_data: list[dict]) -> None:
         for f_data in fibers_data:
+            # Tag origin: read auto_tags/agent_tags, fallback to legacy tags
+            auto_tags = set(f_data.get("auto_tags", []))
+            agent_tags = set(f_data.get("agent_tags", []))
+            if not auto_tags and not agent_tags:
+                agent_tags = set(f_data.get("tags", []))
+
             fiber = Fiber(
                 id=f_data["id"],
                 neuron_ids=set(f_data["neuron_ids"]),
@@ -203,7 +209,8 @@ class SQLiteBrainMixin:
                 salience=f_data.get("salience", 0.0),
                 frequency=f_data.get("frequency", 0),
                 summary=f_data.get("summary"),
-                tags=set(f_data.get("tags", [])),
+                auto_tags=auto_tags,
+                agent_tags=agent_tags,
                 metadata=f_data.get("metadata", {}),
                 created_at=datetime.fromisoformat(f_data["created_at"]),
             )

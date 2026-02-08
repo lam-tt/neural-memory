@@ -21,7 +21,7 @@ def _make_fiber(
         neuron_ids=neuron_ids,
         synapse_ids=set(),
         anchor_neuron_id=next(iter(neuron_ids)) if neuron_ids else "",
-        tags=tags or set(),
+        agent_tags=tags or set(),
         created_at=datetime(2026, 1, 1),
     )
 

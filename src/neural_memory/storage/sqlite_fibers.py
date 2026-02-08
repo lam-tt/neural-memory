@@ -30,8 +30,8 @@ class SQLiteFiberMixin:
                    (id, brain_id, neuron_ids, synapse_ids, anchor_neuron_id,
                     pathway, conductivity, last_conducted,
                     time_start, time_end, coherence, salience, frequency,
-                    summary, tags, metadata, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    summary, tags, auto_tags, agent_tags, metadata, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     fiber.id,
                     brain_id,
@@ -48,6 +48,8 @@ class SQLiteFiberMixin:
                     fiber.frequency,
                     fiber.summary,
                     json.dumps(list(fiber.tags)),
+                    json.dumps(list(fiber.auto_tags)),
+                    json.dumps(list(fiber.agent_tags)),
                     json.dumps(fiber.metadata),
                     fiber.created_at.isoformat(),
                 ),
@@ -157,7 +159,8 @@ class SQLiteFiberMixin:
                anchor_neuron_id = ?, pathway = ?, conductivity = ?,
                last_conducted = ?, time_start = ?, time_end = ?,
                coherence = ?, salience = ?, frequency = ?,
-               summary = ?, tags = ?, metadata = ?
+               summary = ?, tags = ?, auto_tags = ?, agent_tags = ?,
+               metadata = ?
                WHERE id = ? AND brain_id = ?""",
             (
                 json.dumps(list(fiber.neuron_ids)),
@@ -173,6 +176,8 @@ class SQLiteFiberMixin:
                 fiber.frequency,
                 fiber.summary,
                 json.dumps(list(fiber.tags)),
+                json.dumps(list(fiber.auto_tags)),
+                json.dumps(list(fiber.agent_tags)),
                 json.dumps(fiber.metadata),
                 fiber.id,
                 brain_id,

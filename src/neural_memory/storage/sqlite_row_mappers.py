@@ -101,6 +101,20 @@ def row_to_fiber(row: aiosqlite.Row) -> Fiber:
     last_conducted_raw = row["last_conducted"] if "last_conducted" in row_keys else None
     last_conducted = datetime.fromisoformat(last_conducted_raw) if last_conducted_raw else None
 
+    # Tag origin tracking (v0.14.0) with backward compat for pre-v8 schemas
+    tags_raw = set(json.loads(row["tags"]))
+    auto_tags: set[str] = set()
+    agent_tags: set[str] = set()
+
+    if "auto_tags" in row_keys and row["auto_tags"]:
+        auto_tags = set(json.loads(row["auto_tags"]))
+    if "agent_tags" in row_keys and row["agent_tags"]:
+        agent_tags = set(json.loads(row["agent_tags"]))
+
+    # Fallback: pre-v8 rows only have tags column → treat as agent_tags
+    if not auto_tags and not agent_tags and tags_raw:
+        agent_tags = tags_raw
+
     return Fiber(
         id=row["id"],
         neuron_ids=set(json.loads(row["neuron_ids"])),
@@ -115,7 +129,8 @@ def row_to_fiber(row: aiosqlite.Row) -> Fiber:
         salience=row["salience"],
         frequency=row["frequency"],
         summary=row["summary"],
-        tags=set(json.loads(row["tags"])),
+        auto_tags=auto_tags,
+        agent_tags=agent_tags,
         metadata=json.loads(row["metadata"]),
         created_at=datetime.fromisoformat(row["created_at"]),
     )

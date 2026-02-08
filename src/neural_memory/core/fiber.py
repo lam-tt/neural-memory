@@ -31,7 +31,8 @@ class Fiber:
         salience: Importance/relevance score (0.0 - 1.0)
         frequency: Number of times this fiber has been accessed
         summary: Optional compressed text summary
-        tags: Optional tags for categorization
+        auto_tags: Tags generated automatically (entity/keyword extraction)
+        agent_tags: Tags provided by the calling agent
         metadata: Additional fiber-specific data
         created_at: When this fiber was created
     """
@@ -52,13 +53,20 @@ class Fiber:
     salience: float = 0.0
     frequency: int = 0
     summary: str | None = None
-    tags: set[str] = field(default_factory=set)
+    # Tag origin tracking (v0.14.0)
+    auto_tags: set[str] = field(default_factory=set)
+    agent_tags: set[str] = field(default_factory=set)
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
     # Lazy pathway index cache (not part of constructor/repr/compare)
     _pathway_index: dict[str, int] | None = field(
         default=None, init=False, repr=False, compare=False
     )
+
+    @property
+    def tags(self) -> set[str]:
+        """Union of auto_tags and agent_tags (backward compatible)."""
+        return self.auto_tags | self.agent_tags
 
     @classmethod
     def create(
@@ -71,6 +79,8 @@ class Fiber:
         time_end: datetime | None = None,
         summary: str | None = None,
         tags: set[str] | None = None,
+        auto_tags: set[str] | None = None,
+        agent_tags: set[str] | None = None,
         metadata: dict[str, Any] | None = None,
         fiber_id: str | None = None,
     ) -> Fiber:
@@ -85,7 +95,9 @@ class Fiber:
             time_start: Optional start time
             time_end: Optional end time
             summary: Optional text summary
-            tags: Optional tags
+            tags: Legacy param — if provided alone, assigned to agent_tags
+            auto_tags: Tags from automatic extraction (entity/keyword)
+            agent_tags: Tags from the calling agent
             metadata: Optional metadata
             fiber_id: Optional explicit ID
 
@@ -99,6 +111,13 @@ class Fiber:
         if pathway is None:
             pathway = [anchor_neuron_id]
 
+        # Tag origin resolution: if caller uses legacy 'tags' param,
+        # treat them as agent-provided tags for backward compatibility
+        effective_auto = auto_tags or set()
+        effective_agent = agent_tags or set()
+        if tags is not None and not auto_tags and not agent_tags:
+            effective_agent = tags
+
         return cls(
             id=fiber_id or str(uuid4()),
             neuron_ids=neuron_ids,
@@ -110,7 +129,8 @@ class Fiber:
             time_start=time_start,
             time_end=time_end,
             summary=summary,
-            tags=tags or set(),
+            auto_tags=effective_auto,
+            agent_tags=effective_agent,
             metadata=metadata or {},
             created_at=datetime.utcnow(),
         )
@@ -150,15 +170,29 @@ class Fiber:
 
     def add_tags(self, *new_tags: str) -> Fiber:
         """
-        Create a new Fiber with additional tags.
+        Create a new Fiber with additional agent tags.
+
+        External tag additions are treated as agent-origin by default.
 
         Args:
             *new_tags: Tags to add
 
         Returns:
-            New Fiber with merged tags
+            New Fiber with merged agent_tags
         """
-        return replace(self, tags=self.tags | set(new_tags))
+        return replace(self, agent_tags=self.agent_tags | set(new_tags))
+
+    def add_auto_tags(self, *new_tags: str) -> Fiber:
+        """
+        Create a new Fiber with additional auto-generated tags.
+
+        Args:
+            *new_tags: Tags to add to auto_tags
+
+        Returns:
+            New Fiber with merged auto_tags
+        """
+        return replace(self, auto_tags=self.auto_tags | set(new_tags))
 
     def conduct(
         self,
