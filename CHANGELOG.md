@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-02-08
+
+### Added
+
+- **Relation extraction engine**: Regex-based causal, comparative, and sequential pattern detection from content — auto-creates CAUSED_BY, LEADS_TO, BEFORE, SIMILAR_TO, CONTRADICTS synapses during encoding
+- **Tag origin tracking**: Separate `auto_tags` (content-derived) from `agent_tags` (user-provided) with backward-compatible `fiber.tags` union property
+- **Auto memory type inference**: `suggest_memory_type()` fallback when no explicit type provided at encode time
+- **Confirmatory weight boost**: Hebbian +0.1 boost on anchor synapses when agent tags confirm auto tags; RELATED_TO synapses (weight 0.3) for divergent agent tags
+- **Bilingual pattern support**: English + Vietnamese regex patterns for causal ("because"/"vì"), comparative ("similar to"), and sequential ("then"/"sau khi") relations
+- `RelationType`, `RelationCandidate`, `RelationExtractor` in new `extraction/relations.py`
+- `Fiber.auto_tags`, `Fiber.agent_tags` fields with `Fiber.add_auto_tags()` method
+- SQLite schema migration v7→v8 with backward-compatible column additions and backfill
+- 62 new tests: relation extraction (25), tag origin (10), confirmatory boost (5), relation encoding (7), auto-tags update (15)
+- `ROADMAP.md` with versioned plan from v0.14.0 → v1.0.0
+
+### Fixed
+
+- **"Event loop is closed" noise on CLI exit**: aiosqlite connections now properly closed before event loop teardown via centralized `run_async()` helper
+- MCP server shutdown now closes storage connection in `finally` block
+
+### Changed
+
+- All 32 CLI `asyncio.run()` calls replaced with `run_async()` for proper cleanup
+- Encoder pipeline extended with relation extraction (step 6b) and confirmatory boost (step 6c)
+- `Fiber.create(tags=...)` preserved for backward compat — maps to `agent_tags`
+- 838 tests passing
+
 ## [0.13.0] - 2026-02-07
 
 ### Added

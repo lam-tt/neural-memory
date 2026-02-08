@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0] - 2026-02-08
+
+### Added
+
+- Synced with NeuralMemory v0.14.0: relation extraction engine
+- Relation extraction: auto-creates causal, comparative, and sequential synapses from content
+- Tag origin tracking: auto_tags vs agent_tags with confirmatory Hebbian boost
+- Auto memory type inference at encode time
+- Bilingual relation patterns (English + Vietnamese)
+- 62 new tests (838 total)
+
+### Fixed
+
+- "Event loop is closed" noise eliminated on CLI/MCP exit
+
 ## [0.3.0] - 2026-02-08
 
 ### Added
