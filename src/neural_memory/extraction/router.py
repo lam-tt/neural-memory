@@ -290,6 +290,9 @@ class QueryRouter:
         # Time weighting for temporal and pattern queries
         time_weighted = primary in (QueryType.TEMPORAL, QueryType.PATTERN)
 
+        # Traversal metadata for temporal reasoning (v0.19.0)
+        metadata = self._build_traversal_metadata(primary, query_lower)
+
         return RouteDecision(
             primary=primary,
             secondary=secondary,
@@ -298,7 +301,62 @@ class QueryRouter:
             suggested_depth=suggested_depth,
             use_embeddings=use_embeddings,
             time_weighted=time_weighted,
+            metadata=metadata or None,
         )
+
+    # Patterns indicating event-sequence queries (vs simple temporal range)
+    _EVENT_SEQ_PATTERNS = frozenset(
+        {
+            "what happened after",
+            "what happened before",
+            "what came after",
+            "what came before",
+            "what followed",
+            "gì xảy ra sau",
+            "gì xảy ra trước",
+        }
+    )
+
+    # Patterns indicating "effects" direction for causal queries
+    _EFFECTS_PATTERNS = frozenset(
+        {
+            "what did it cause",
+            "what does it cause",
+            "what resulted",
+            "led to what",
+            "leads to what",
+            "dẫn đến gì",
+        }
+    )
+
+    def _build_traversal_metadata(self, primary: QueryType, query_lower: str) -> dict[str, str]:
+        """Build traversal hints for temporal reasoning.
+
+        Annotates the route decision with metadata indicating which
+        specialized traversal the retrieval pipeline should attempt.
+
+        Returns:
+            Dict with traversal type and direction, or empty dict.
+        """
+        metadata: dict[str, str] = {}
+
+        if primary == QueryType.CAUSAL:
+            metadata["traversal"] = "causal"
+            if any(p in query_lower for p in self._EFFECTS_PATTERNS):
+                metadata["direction"] = "effects"
+            else:
+                metadata["direction"] = "causes"
+
+        elif primary == QueryType.TEMPORAL:
+            if any(p in query_lower for p in self._EVENT_SEQ_PATTERNS):
+                metadata["traversal"] = "event_sequence"
+                metadata["direction"] = (
+                    "backward" if "before" in query_lower or "trước" in query_lower else "forward"
+                )
+            else:
+                metadata["traversal"] = "temporal_range"
+
+        return metadata
 
     def _get_intent_boosts(self, intent: QueryIntent) -> dict[QueryType, float]:
         """Get score boosts based on query intent."""

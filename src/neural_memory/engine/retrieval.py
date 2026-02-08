@@ -13,14 +13,25 @@ from neural_memory.core.fiber import Fiber
 from neural_memory.core.neuron import NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.activation import ActivationResult, SpreadingActivation
+from neural_memory.engine.causal_traversal import (
+    trace_causal_chain,
+    trace_event_sequence,
+)
 from neural_memory.engine.lifecycle import ReinforcementManager
-from neural_memory.engine.reconstruction import reconstruct_answer
+from neural_memory.engine.reconstruction import (
+    SynthesisMethod,
+    format_causal_chain,
+    format_event_sequence,
+    format_temporal_range,
+    reconstruct_answer,
+)
 from neural_memory.engine.reflex_activation import CoActivation, ReflexActivation
 from neural_memory.engine.retrieval_context import format_context
 from neural_memory.engine.retrieval_types import DepthLevel, RetrievalResult, Subgraph
 from neural_memory.engine.stabilization import StabilizationConfig, stabilize
 from neural_memory.engine.write_queue import DeferredWriteQueue
 from neural_memory.extraction.parser import QueryIntent, QueryParser, Stimulus
+from neural_memory.extraction.router import QueryRouter
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +130,13 @@ class ReflexPipeline:
         # 2. Auto-detect depth if not specified
         if depth is None:
             depth = self._detect_depth(stimulus)
+
+        # 2.5 Temporal reasoning fast-path (v0.19.0)
+        temporal_result = await self._try_temporal_reasoning(
+            stimulus, depth, reference_time, start_time
+        )
+        if temporal_result is not None:
+            return temporal_result
 
         # 3. Find anchor neurons (time-first)
         anchor_sets = await self._find_anchors_time_first(stimulus)
@@ -264,6 +282,150 @@ class ReflexPipeline:
 
         # Simple queries use instant retrieval
         return DepthLevel.INSTANT
+
+    async def _try_temporal_reasoning(
+        self,
+        stimulus: Stimulus,
+        depth: DepthLevel,
+        reference_time: datetime,
+        start_time: float,
+    ) -> RetrievalResult | None:
+        """Attempt specialized traversal for causal/temporal queries.
+
+        This is a fast-path shortcut that bypasses the full activation
+        pipeline when the query is clearly causal or temporal AND the
+        specialized traversal finds results. Returns None to fall through
+        to the standard pipeline otherwise.
+        """
+        route = QueryRouter().route(stimulus)
+        metadata = route.metadata or {}
+        traversal = metadata.get("traversal", "")
+
+        if not traversal:
+            return None
+
+        # Find seed neuron from entities or keywords
+        seed_id = await self._find_seed_neuron(stimulus)
+        if seed_id is None and traversal != "temporal_range":
+            return None
+
+        if traversal == "causal":
+            direction = metadata.get("direction", "causes")
+            chain = await trace_causal_chain(
+                self._storage,
+                seed_id,
+                direction,
+                max_depth=5,  # type: ignore[arg-type]
+            )
+            if not chain.steps:
+                return None
+
+            answer = format_causal_chain(chain)
+            return self._build_temporal_result(
+                answer=answer,
+                confidence=min(1.0, chain.total_weight),
+                depth=depth,
+                neuron_ids=[s.neuron_id for s in chain.steps],
+                method=SynthesisMethod.CAUSAL_CHAIN,
+                start_time=start_time,
+                intent=stimulus.intent.value,
+            )
+
+        if traversal == "temporal_range" and stimulus.time_hints:
+            hint = stimulus.time_hints[0]
+            from neural_memory.engine.causal_traversal import query_temporal_range
+
+            fibers = await query_temporal_range(
+                self._storage, hint.absolute_start, hint.absolute_end
+            )
+            if not fibers:
+                return None
+
+            answer = format_temporal_range(fibers)
+            return self._build_temporal_result(
+                answer=answer,
+                confidence=min(1.0, 0.3 + 0.1 * len(fibers)),
+                depth=depth,
+                neuron_ids=[],
+                method=SynthesisMethod.TEMPORAL_SEQUENCE,
+                start_time=start_time,
+                intent=stimulus.intent.value,
+                fiber_ids=[f.id for f in fibers],
+            )
+
+        if traversal == "event_sequence" and seed_id is not None:
+            direction = metadata.get("direction", "forward")
+            sequence = await trace_event_sequence(
+                self._storage,
+                seed_id,
+                direction,
+                max_steps=10,  # type: ignore[arg-type]
+            )
+            if not sequence.events:
+                return None
+
+            answer = format_event_sequence(sequence)
+            return self._build_temporal_result(
+                answer=answer,
+                confidence=min(1.0, 0.3 + 0.1 * len(sequence.events)),
+                depth=depth,
+                neuron_ids=[e.neuron_id for e in sequence.events],
+                method=SynthesisMethod.TEMPORAL_SEQUENCE,
+                start_time=start_time,
+                intent=stimulus.intent.value,
+            )
+
+        return None
+
+    async def _find_seed_neuron(self, stimulus: Stimulus) -> str | None:
+        """Find the best seed neuron for temporal reasoning.
+
+        Searches entities first (highest specificity), then keywords.
+        Returns the first matching neuron ID, or None.
+        """
+        # Try entities first
+        for entity in stimulus.entities:
+            neurons = await self._storage.find_neurons(content_contains=entity.text, limit=1)
+            if neurons:
+                return neurons[0].id
+
+        # Fall back to keywords
+        for keyword in stimulus.keywords:
+            neurons = await self._storage.find_neurons(content_contains=keyword, limit=1)
+            if neurons:
+                return neurons[0].id
+
+        return None
+
+    def _build_temporal_result(
+        self,
+        *,
+        answer: str,
+        confidence: float,
+        depth: DepthLevel,
+        neuron_ids: list[str],
+        method: SynthesisMethod,
+        start_time: float,
+        intent: str,
+        fiber_ids: list[str] | None = None,
+    ) -> RetrievalResult:
+        """Build a RetrievalResult for temporal reasoning responses."""
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        return RetrievalResult(
+            answer=answer,
+            confidence=confidence,
+            depth_used=depth,
+            neurons_activated=len(neuron_ids),
+            fibers_matched=fiber_ids or [],
+            subgraph=Subgraph(neuron_ids=neuron_ids, synapse_ids=[], anchor_ids=[]),
+            context=answer,
+            latency_ms=latency_ms,
+            synthesis_method=method.value,
+            metadata={
+                "query_intent": intent,
+                "temporal_reasoning": True,
+            },
+        )
 
     def _depth_to_hops(self, depth: DepthLevel) -> int:
         """Convert depth level to maximum hops."""

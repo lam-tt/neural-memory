@@ -4,11 +4,12 @@
 > Every feature passes the VISION.md 4-question test + brain test.
 > ZERO LLM dependency — pure algorithmic, regex, graph-based.
 
-**Current state**: v0.17.0 (987 tests, schema v9).
+**Current state**: v0.19.0 (1019 tests, schema v9).
 v0.14.0 shipped: relation extraction, tag origin, confirmatory boost.
 v0.15.0 shipped: associative inference, co-activation persistence, tag normalization.
 v0.16.0 shipped: emotional valence, sentiment extraction, FELT synapses, emotional decay.
 v0.17.0 shipped: brain diagnostics, purity score, nmem_health MCP tool + CLI.
+v0.19.0 shipped: temporal reasoning, causal chain traversal, event sequence tracing.
 
 ---
 
@@ -739,7 +740,7 @@ Enhance `extraction/router.py` to route:
 v0.14.0 ✅ (Relation Extraction)
   ├──→ v0.15.0 ✅ (Associative Inference)
   │       └──→ v0.18.0 (Advanced Consolidation + Workflow Detection)
-  └──→ v0.19.0 (Temporal Reasoning)
+  └──→ v0.19.0 ✅ (Temporal Reasoning)
 
 v0.16.0 ✅ (Emotional Valence)     ← shipped
 v0.17.0 ✅ (Brain Diagnostics)     ← shipped
@@ -749,7 +750,7 @@ v0.17.0 ✅ (Brain Diagnostics)     ← shipped
 **Critical path**: ~~v0.14.0 → v0.15.0~~ → v0.18.0 (v0.14-v0.17 shipped)
 
 **Parallelizable**:
-- v0.19.0 only needs v0.14.0 ✅ (can start now)
+- v0.19.0 ✅ (shipped)
 - v0.18.0 needs v0.14.0 ✅ + v0.15.0 ✅ (can start now)
 
 ---
@@ -765,7 +766,7 @@ v0.17.0 ✅ (Brain Diagnostics)     ← shipped
 | G3 | Emotional synapses (`FELT`/`EVOKES`) never created | Types exist, unused | **v0.16.0** ✅ |
 | G4 | No brain health metrics or diagnostics | Flying blind | **v0.17.0** ✅ |
 | G5 | No enrichment or dream consolidation | Only PRUNE/MERGE/SUMMARIZE/MATURE/INFER | **v0.18.0** |
-| G6 | "Why?" and "When?" queries can't trace chains | Router detects intent, no traversal | **v0.19.0** |
+| G6 | "Why?" and "When?" queries can't trace chains | Router detects intent, no traversal | **v0.19.0** ✅ |
 | G7 | No brain versioning or partial transplant | Export/import only (all-or-nothing) | **v1.0.0** |
 | G8 | No habit/workflow detection from repeated actions | Frequency tracked but sequences ignored | **v0.18.0** |
 
@@ -826,17 +827,17 @@ Ranked by impact × feasibility:
 | 2 | **v0.15.0** ✅ | High | Medium | Shipped. Associative inference, co-activation, tag normalization. |
 | 3 | **v0.17.0** ✅ | High | High | Shipped. Brain diagnostics, purity score, nmem_health MCP + CLI. |
 | 4 | **v0.16.0** ✅ | Medium | High | Shipped. Emotional valence, sentiment extraction, FELT synapses, emotional decay. |
-| 5 | **v0.19.0** | High | Medium | Fills VISION.md Pillar 2 (Temporal & Causal). Needs v0.14.0 first. |
+| 5 | **v0.19.0** ✅ | High | Medium | Shipped. Temporal reasoning, causal/event traversal, pipeline integration. |
 | 6 | **v0.18.0** | High | Medium | DREAM + ENRICH + Workflow Detection. Largest scope but high differentiator (habit learning). Needs v0.14.0 ✅ + v0.15.0 ✅. |
 | 7 | **v1.0.0** | Critical | Low | Largest scope. Marketplace foundations. Needs everything else stable. |
 
 ### Recommended execution order
 
 ```
-v0.14.0 ✅ → v0.15.0 ✅ → v0.16.0 ✅ → v0.17.0 ✅ → v0.19.0 → v0.18.0 → v1.0.0
+v0.14.0 ✅ → v0.15.0 ✅ → v0.16.0 ✅ → v0.17.0 ✅ → v0.19.0 ✅ → v0.18.0 → v1.0.0
 ```
 
-v0.17.0 and v0.19.0 can be developed in parallel — all dependencies met.
+v0.18.0 is the only remaining pre-v1.0 version — all dependencies met.
 
 ---
 
@@ -853,9 +854,9 @@ v0.17.0 and v0.19.0 can be developed in parallel — all dependencies met.
 | v1.0.0 | ~500 | ~150 | ~350 | ~2,558 |
 | **Total** | **~3,550** | **~1,145** | **~2,050** | **~2,558** |
 
-Starting from 987 tests (v0.17.0) → targeting ~2,558 tests at v1.0.0.
+Starting from 1019 tests (v0.19.0) → targeting ~2,558 tests at v1.0.0.
 
 ---
 
 *See [VISION.md](VISION.md) for the north star guiding all decisions.*
-*Last updated: 2026-02-08 (v0.17.0 shipped: brain diagnostics)*
+*Last updated: 2026-02-08 (v0.19.0 shipped: temporal reasoning)*

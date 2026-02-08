@@ -28,6 +28,7 @@ from neural_memory.engine.retrieval_types import ScoreBreakdown
 
 if TYPE_CHECKING:
     from neural_memory.core.fiber import Fiber
+    from neural_memory.engine.causal_traversal import CausalChain, EventSequence
     from neural_memory.storage.base import NeuralStorage
 
 
@@ -37,6 +38,8 @@ class SynthesisMethod(StrEnum):
     SINGLE = "single"  # Top neuron content
     FIBER_SUMMARY = "fiber_summary"  # Fiber summary text
     MULTI_NEURON = "multi_neuron"  # Multiple neurons combined
+    CAUSAL_CHAIN = "causal_chain"  # Causal traversal chain
+    TEMPORAL_SEQUENCE = "temporal_sequence"  # Temporal range or event sequence
     NONE = "none"  # No answer found
 
 
@@ -270,3 +273,78 @@ async def _multi_neuron_reconstruct(
         contributing_neuron_ids=contributing_ids,
         score_breakdown=breakdown,
     )
+
+
+# ---------------------------------------------------------------------------
+# Temporal reasoning formatters (v0.19.0)
+# ---------------------------------------------------------------------------
+
+
+def format_causal_chain(chain: CausalChain) -> str:
+    """Format a causal chain as human-readable text.
+
+    For "causes" direction: "A because B because C"
+    For "effects" direction: "A leads to B leads to C"
+
+    Args:
+        chain: The causal chain to format
+
+    Returns:
+        Formatted string, or empty string if chain has no steps
+    """
+    if not chain.steps:
+        return ""
+
+    connector = " because " if chain.direction == "causes" else " leads to "
+    return connector.join(step.content for step in chain.steps)
+
+
+def format_event_sequence(sequence: EventSequence) -> str:
+    """Format an event sequence as chronological text.
+
+    Output: "First, A; then B; then C"
+    Timestamps included when available.
+
+    Args:
+        sequence: The event sequence to format
+
+    Returns:
+        Formatted string, or empty string if sequence has no events
+    """
+    if not sequence.events:
+        return ""
+
+    parts: list[str] = []
+    for i, event in enumerate(sequence.events):
+        prefix = "First, " if i == 0 else "then "
+        time_suffix = ""
+        if event.timestamp:
+            time_suffix = f" ({event.timestamp.strftime('%Y-%m-%d %H:%M')})"
+        parts.append(f"{prefix}{event.content}{time_suffix}")
+
+    return "; ".join(parts)
+
+
+def format_temporal_range(fibers: list[Fiber]) -> str:
+    """Format temporally-ranged fibers as a chronological summary.
+
+    Output: one line per fiber with timestamp and summary.
+
+    Args:
+        fibers: Fibers sorted chronologically by time_start
+
+    Returns:
+        Formatted string, or empty string if no fibers
+    """
+    if not fibers:
+        return ""
+
+    parts: list[str] = []
+    for fiber in fibers:
+        time_label = ""
+        if fiber.time_start:
+            time_label = f"[{fiber.time_start.strftime('%Y-%m-%d %H:%M')}] "
+        summary = fiber.summary or f"Memory (fiber {fiber.id[:8]})"
+        parts.append(f"- {time_label}{summary}")
+
+    return "\n".join(parts)

@@ -5,6 +5,37 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-02-08
+
+### Added
+
+- **Temporal Reasoning** — Causal chain traversal, temporal range queries, and event sequence tracing
+  - `CausalStep`, `CausalChain` frozen dataclasses for causal traversal results
+  - `EventStep`, `EventSequence` frozen dataclasses for temporal event sequences
+  - `trace_causal_chain()` — BFS traversal along CAUSED_BY/LEADS_TO synapses with cycle detection
+  - `query_temporal_range()` — Retrieve fibers within a time window, sorted chronologically
+  - `trace_event_sequence()` — BFS traversal along BEFORE/AFTER synapses with fiber timestamp enrichment
+  - Chain confidence via product of step weights (natural decay for long chains)
+- **Synthesis Methods** — `CAUSAL_CHAIN` and `TEMPORAL_SEQUENCE` added to `SynthesisMethod` enum
+  - `format_causal_chain()` — "A because B because C" or "A leads to B leads to C"
+  - `format_event_sequence()` — "First, A; then B; then C" with optional timestamps
+  - `format_temporal_range()` — Chronological fiber summary list
+- **Pipeline Integration** — Temporal reasoning fast-path in `ReflexPipeline.query()`
+  - "Why?" queries → causal chain traversal → `CAUSAL_CHAIN` synthesis
+  - "When?" queries with time hints → temporal range query → `TEMPORAL_SEQUENCE` synthesis
+  - "What happened after X?" → event sequence tracing → `TEMPORAL_SEQUENCE` synthesis
+  - Graceful fallback to standard activation pipeline when traversal finds no results
+- **Router Enhancement** — Traversal metadata in `RouteDecision`
+  - Causal queries annotated with `traversal: "causal"` and direction
+  - Temporal queries classified as `temporal_range` or `event_sequence`
+  - Event sequence patterns detected for English and Vietnamese queries
+
+### Changed
+
+- `SynthesisMethod` enum now includes `CAUSAL_CHAIN` and `TEMPORAL_SEQUENCE`
+- `QueryRouter.route()` now populates `metadata` with traversal hints
+- Tests: 1019 passed (up from 987)
+
 ## [0.17.0] - 2026-02-08
 
 ### Added
@@ -311,6 +342,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.19.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.19.0
+[0.17.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.17.0
 [0.16.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.16.0
 [0.15.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.15.0
 [0.7.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.7.0
