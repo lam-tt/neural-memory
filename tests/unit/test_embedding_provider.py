@@ -9,7 +9,6 @@ import pytest
 from neural_memory.engine.embedding.config import EmbeddingConfig
 from neural_memory.engine.embedding.provider import EmbeddingProvider
 
-
 # ── Mock provider for testing ────────────────────────────────────
 
 
