@@ -118,12 +118,14 @@ class TestScoreBreakdown:
             intersection_boost=0.15,
             freshness_boost=0.08,
             frequency_boost=0.05,
+            emotional_resonance=0.0,
             raw_total=1.0,
         )
         assert breakdown.base_activation == 0.72
         assert breakdown.intersection_boost == 0.15
         assert breakdown.freshness_boost == 0.08
         assert breakdown.frequency_boost == 0.05
+        assert breakdown.emotional_resonance == 0.0
         assert breakdown.raw_total == 1.0
 
     def test_score_breakdown_is_frozen(self) -> None:
@@ -133,6 +135,7 @@ class TestScoreBreakdown:
             intersection_boost=0.1,
             freshness_boost=0.05,
             frequency_boost=0.03,
+            emotional_resonance=0.0,
             raw_total=0.68,
         )
         with pytest.raises(AttributeError):
@@ -140,13 +143,14 @@ class TestScoreBreakdown:
 
     def test_components_sum_to_raw_total(self) -> None:
         """raw_total should equal sum of components."""
-        components = (0.6, 0.1, 0.08, 0.04)
+        components = (0.6, 0.1, 0.08, 0.04, 0.0)
         total = sum(components)
         breakdown = ScoreBreakdown(
             base_activation=components[0],
             intersection_boost=components[1],
             freshness_boost=components[2],
             frequency_boost=components[3],
+            emotional_resonance=components[4],
             raw_total=total,
         )
         assert abs(breakdown.raw_total - sum(components)) < 1e-10

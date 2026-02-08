@@ -14,6 +14,7 @@ from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.extraction.entities import EntityExtractor, EntityType
 from neural_memory.extraction.keywords import extract_keywords, extract_weighted_keywords
 from neural_memory.extraction.relations import RelationExtractor
+from neural_memory.extraction.sentiment import SentimentExtractor, Valence
 from neural_memory.extraction.temporal import TemporalExtractor
 from neural_memory.utils.simhash import is_near_duplicate, simhash
 from neural_memory.utils.tag_normalizer import TagNormalizer
@@ -78,6 +79,7 @@ class MemoryEncoder:
         self._temporal = temporal_extractor or TemporalExtractor()
         self._entity = entity_extractor or EntityExtractor()
         self._relation = relation_extractor or RelationExtractor()
+        self._sentiment = SentimentExtractor()
         self._tag_normalizer = TagNormalizer()
 
     async def encode(
@@ -204,6 +206,16 @@ class MemoryEncoder:
                 )
                 await self._storage.add_synapse(synapse)
                 synapses_created.append(synapse)
+
+        # 6a. Extract sentiment and create emotional synapses
+        emotion_synapses, emotion_neurons = await self._extract_emotion_synapses(
+            content=content,
+            anchor_neuron=anchor_neuron,
+            language=language,
+            metadata=effective_metadata,
+        )
+        synapses_created.extend(emotion_synapses)
+        neurons_created.extend(emotion_neurons)
 
         # 6b. Extract relation-based synapses (causal, comparative, sequential)
         relation_synapses = await self._extract_relation_synapses(
@@ -476,6 +488,76 @@ class MemoryEncoder:
                         logger.debug("Divergent tag synapse already exists, skipping")
 
         return new_synapses
+
+    async def _extract_emotion_synapses(
+        self,
+        content: str,
+        anchor_neuron: Neuron,
+        language: str = "auto",
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[list[Synapse], list[Neuron]]:
+        """Extract sentiment and create FELT synapses to emotion STATE neurons.
+
+        Args:
+            content: Original content text
+            anchor_neuron: The anchor neuron for this memory
+            language: Language hint
+            metadata: Mutable metadata dict to annotate with valence
+
+        Returns:
+            Tuple of (created synapses, created emotion neurons)
+        """
+        synapses: list[Synapse] = []
+        neurons: list[Neuron] = []
+
+        result = self._sentiment.extract(content, language=language)
+        if result.valence == Valence.NEUTRAL or not result.emotion_tags:
+            return synapses, neurons
+
+        # Store valence info in fiber metadata
+        if metadata is not None:
+            metadata["_valence"] = result.valence.value
+            metadata["_intensity"] = result.intensity
+
+        weight_scale = self._config.emotional_weight_scale
+
+        for emotion_tag in result.emotion_tags:
+            # Find or create shared STATE neuron for this emotion
+            existing = await self._storage.find_neurons(
+                type=NeuronType.STATE,
+                content_exact=emotion_tag,
+                limit=1,
+            )
+
+            if existing:
+                emotion_neuron = existing[0]
+            else:
+                emotion_neuron = Neuron.create(
+                    type=NeuronType.STATE,
+                    content=emotion_tag,
+                    metadata={"emotion_category": True},
+                )
+                await self._storage.add_neuron(emotion_neuron)
+                neurons.append(emotion_neuron)
+
+            synapse = Synapse.create(
+                source_id=anchor_neuron.id,
+                target_id=emotion_neuron.id,
+                type=SynapseType.FELT,
+                weight=result.intensity * weight_scale,
+                metadata={
+                    "_valence": result.valence.value,
+                    "_intensity": result.intensity,
+                    "_emotion": emotion_tag,
+                },
+            )
+            try:
+                await self._storage.add_synapse(synapse)
+                synapses.append(synapse)
+            except ValueError:
+                logger.debug("Emotion synapse already exists, skipping")
+
+        return synapses, neurons
 
     async def _extract_time_neurons(
         self,

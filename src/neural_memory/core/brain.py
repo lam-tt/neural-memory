@@ -46,6 +46,8 @@ class BrainConfig:
     co_activation_threshold: int = 3
     co_activation_window_days: int = 7
     max_inferences_per_run: int = 50
+    emotional_decay_factor: float = 0.5
+    emotional_weight_scale: float = 0.8
 
     def with_updates(self, **kwargs: Any) -> BrainConfig:
         """Create a new config with updated values."""
@@ -95,6 +97,12 @@ class BrainConfig:
             ),
             max_inferences_per_run=kwargs.get(
                 "max_inferences_per_run", self.max_inferences_per_run
+            ),
+            emotional_decay_factor=kwargs.get(
+                "emotional_decay_factor", self.emotional_decay_factor
+            ),
+            emotional_weight_scale=kwargs.get(
+                "emotional_weight_scale", self.emotional_weight_scale
             ),
         )
 

@@ -56,6 +56,7 @@ class ScoreBreakdown:
     intersection_boost: float
     freshness_boost: float
     frequency_boost: float
+    emotional_resonance: float
     raw_total: float
 
 

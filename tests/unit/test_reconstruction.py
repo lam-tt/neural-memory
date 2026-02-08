@@ -79,6 +79,7 @@ def _make_mock_storage(
     storage.get_neuron = AsyncMock(side_effect=get_neuron)
     storage.get_neuron_state = AsyncMock(side_effect=get_neuron_state)
     storage.get_neurons_batch = AsyncMock(side_effect=get_neurons_batch)
+    storage.get_synapses = AsyncMock(return_value=[])
 
     return storage
 

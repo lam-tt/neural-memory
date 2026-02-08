@@ -5,6 +5,35 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-02-08
+
+### Added
+
+- **Emotional Valence** — Lexicon-based sentiment extraction with FELT synapses
+  - `SentimentExtractor` — Pure-logic, zero-LLM sentiment analysis (EN + VI)
+  - `Valence` enum (POSITIVE/NEGATIVE/NEUTRAL) and `SentimentResult` dataclass
+  - Curated lexicons: ~80 positive + ~80 negative English words, ~30+30 Vietnamese
+  - Negation handling with 2-token window ("not good" → negative)
+  - Intensifier detection ("very", "extremely", "rất", "cực") → 1.5x intensity boost
+  - 7 emotion tag categories: frustration, satisfaction, confusion, excitement, anxiety, relief, disappointment
+  - `FELT` synapses created from anchor → emotion STATE neurons during encoding
+  - Shared emotion neurons reused across fibers (find-or-create pattern)
+  - Valence and intensity stored in synapse and fiber metadata
+- **Emotional Resonance Scoring** — `emotional_resonance` component in `ScoreBreakdown`
+  - Memories with FELT synapses get up to +0.1 retrieval score boost
+  - Intensity-proportional: higher emotion → stronger retrieval signal
+- **Emotional Decay Modulation** — FELT/EVOKES synapses decay slower
+  - High-intensity emotions: decay^0.5 (much slower, emotional persistence)
+  - Low-intensity emotions: decay^0.8 (slightly slower than normal)
+  - Models biological trauma persistence and reward reinforcement
+- **BrainConfig extension** — `emotional_decay_factor`, `emotional_weight_scale`
+
+### Changed
+
+- `ScoreBreakdown` now includes `emotional_resonance` field (0.0-0.1 range)
+- Encoder pipeline now includes step 6a (sentiment extraction) between entity co-occurrence and relation extraction
+- Tests: 950 passed (up from 908)
+
 ## [0.15.0] - 2026-02-08
 
 ### Added
@@ -264,6 +293,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.16.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.16.0
 [0.15.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.15.0
 [0.7.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.7.0
 [0.6.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.6.0

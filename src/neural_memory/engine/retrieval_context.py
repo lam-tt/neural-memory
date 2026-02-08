@@ -93,6 +93,7 @@ async def reconstitute_answer(
         intersection_boost=intersection_boost,
         freshness_boost=freshness_boost,
         frequency_boost=frequency_boost,
+        emotional_resonance=0.0,
         raw_total=raw_total,
     )
 

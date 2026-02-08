@@ -22,6 +22,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from neural_memory.core.neuron import NeuronType
+from neural_memory.core.synapse import SynapseType
 from neural_memory.engine.activation import ActivationResult
 from neural_memory.engine.retrieval_types import ScoreBreakdown
 
@@ -193,12 +194,23 @@ async def _compute_score_breakdown(
         if top_state.access_frequency > 0:
             frequency_boost = min(0.1, 0.03 * math.log1p(top_state.access_frequency))
 
-    raw_total = base_confidence + intersection_boost + freshness_boost + frequency_boost
+    # Emotional resonance: check for FELT synapses on the top neuron
+    emotional_resonance = 0.0
+    felt_synapses = await storage.get_synapses(source_id=top_id, type=SynapseType.FELT)
+    if felt_synapses:
+        best_intensity = max(s.metadata.get("_intensity", 0.5) for s in felt_synapses)
+        emotional_resonance = min(0.1, 0.05 * best_intensity)
+
+    raw_total = (
+        base_confidence + intersection_boost + freshness_boost
+        + frequency_boost + emotional_resonance
+    )
     return ScoreBreakdown(
         base_activation=base_confidence,
         intersection_boost=intersection_boost,
         freshness_boost=freshness_boost,
         frequency_boost=frequency_boost,
+        emotional_resonance=emotional_resonance,
         raw_total=raw_total,
     )
 
