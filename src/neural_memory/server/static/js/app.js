@@ -1,7 +1,12 @@
 /**
  * NeuralMemory Dashboard — Core Alpine.js application
- * Orchestrates tabs, stats, health, brain management, i18n.
+ * Orchestrates tabs, stats, health, brain management, i18n, toasts.
  */
+
+/** Global toast dispatch — usable from any module */
+function nmToast(message, type = 'success') {
+  document.dispatchEvent(new CustomEvent('nm-toast', { detail: { message, type } }));
+}
 
 function dashboardApp() {
   return {
@@ -9,6 +14,7 @@ function dashboardApp() {
     version: '',
     locale: 'en',
     activeTab: 'overview',
+    integrationTab: 'oauth',
     activeBrain: null,
     brains: [],
     stats: { total_brains: 0, total_neurons: 0, total_synapses: 0, total_fibers: 0 },
@@ -17,18 +23,31 @@ function dashboardApp() {
     healthWarnings: [],
     healthRecommendations: [],
     selectedNode: null,
+    graphSearch: '',
+    graphFilter: '',
+    graphEmpty: false,
+    toasts: [],
+    loading: { stats: true, health: true, graph: false },
     _radarChart: null,
     _graphLoaded: false,
+    _healthData: null,
 
-    // Tab definitions
+    // Tab definitions (5 tabs — user mental model)
     tabs: [
       { id: 'overview', label: 'overview', icon: 'layout-dashboard' },
       { id: 'graph', label: 'neural_graph', icon: 'share-2' },
-      { id: 'oauth', label: 'oauth_providers', icon: 'key' },
-      { id: 'openclaw', label: 'openclaw_config', icon: 'settings' },
-      { id: 'channels', label: 'channels', icon: 'message-circle' },
+      { id: 'integrations', label: 'integrations', icon: 'puzzle' },
       { id: 'health', label: 'brain_health', icon: 'heart-pulse' },
       { id: 'settings', label: 'settings', icon: 'sliders-horizontal' },
+    ],
+
+    // Integration sub-tabs
+    integrationTabs: [
+      { id: 'oauth', label: 'oauth_providers', icon: 'key' },
+      { id: 'apikeys', label: 'api_keys', icon: 'lock' },
+      { id: 'functions', label: 'functions', icon: 'puzzle' },
+      { id: 'channels', label: 'channels', icon: 'message-circle' },
+      { id: 'security', label: 'security', icon: 'shield' },
     ],
 
     // Initialize
@@ -36,7 +55,12 @@ function dashboardApp() {
       await NM_I18N.init();
       this.locale = NM_I18N.locale;
 
-      // Fetch version from API
+      // Listen for toast events from other modules
+      document.addEventListener('nm-toast', (e) => {
+        this.toast(e.detail.message, e.detail.type);
+      });
+
+      // Fetch version
       try {
         const resp = await fetch('/');
         if (resp.ok) {
@@ -45,39 +69,60 @@ function dashboardApp() {
         }
       } catch {}
 
-      await this.loadStats();
-      await this.loadHealth();
+      await Promise.all([this.loadStats(), this.loadHealth()]);
 
-      // Watch tab changes for lazy loading
+      // Watch tab changes
       this.$watch('activeTab', (tab) => this.onTabChange(tab));
+      this.$watch('integrationTab', (tab) => this.onIntegrationTabChange(tab));
 
       // Init Lucide icons
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
-    // Tab change handler
+    // ── Toast system ───────────────────────────────────
+
+    toast(message, type = 'success') {
+      const id = Date.now() + Math.random();
+      this.toasts = [...this.toasts, { id, message, type }];
+      setTimeout(() => {
+        this.toasts = this.toasts.filter(t => t.id !== id);
+      }, 4000);
+    },
+
+    toastIcon(type) {
+      const map = { success: 'check-circle', error: 'alert-circle', info: 'info', warning: 'alert-triangle' };
+      return map[type] || 'info';
+    },
+
+    toastColor(type) {
+      const map = {
+        success: 'border-nm-cta text-nm-cta',
+        error: 'border-nm-danger text-nm-danger',
+        warning: 'border-nm-warning text-nm-warning',
+        info: 'border-nm-info text-nm-info',
+      };
+      return map[type] || 'border-nm-border text-nm-muted';
+    },
+
+    // ── Tab change handlers ────────────────────────────
+
     async onTabChange(tab) {
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
 
       if (tab === 'graph' && !this._graphLoaded) {
         this._graphLoaded = true;
+        this.loading = { ...this.loading, graph: true };
         await this.$nextTick();
         const cy = await NM_GRAPH.init('cy-graph');
+        this.loading = { ...this.loading, graph: false };
+        this.graphEmpty = NM_GRAPH.isEmpty();
         if (cy) {
           NM_GRAPH.onNodeClick((node) => { this.selectedNode = node; });
         }
       }
 
-      if (tab === 'oauth') {
-        await NM_OAUTH.init();
-      }
-
-      if (tab === 'openclaw') {
-        await NM_OPENCLAW.init();
-      }
-
-      if (tab === 'channels') {
-        await NM_OPENCLAW.init();
+      if (tab === 'integrations') {
+        await this.onIntegrationTabChange(this.integrationTab);
       }
 
       if (tab === 'health') {
@@ -85,27 +130,41 @@ function dashboardApp() {
       }
     },
 
-    // i18n helper
+    async onIntegrationTabChange(tab) {
+      await NM_OPENCLAW.init();
+      this.$nextTick(() => {
+        if (tab === 'oauth') NM_OAUTH.init();
+        if (tab === 'apikeys') NM_OPENCLAW.renderApiKeys();
+        if (tab === 'functions') NM_OPENCLAW.renderFunctions();
+        if (tab === 'channels') NM_OPENCLAW.renderChannels();
+        if (tab === 'security') NM_OPENCLAW.renderSecurity();
+        if (window.lucide) lucide.createIcons();
+      });
+    },
+
+    // ── i18n ───────────────────────────────────────────
+
     t(key) {
       return NM_I18N.t(key);
     },
 
     toggleLocale() {
-      const next = this.locale === 'en' ? 'vi' : 'en';
-      this.setLocale(next);
+      this.setLocale(this.locale === 'en' ? 'vi' : 'en');
     },
 
     async setLocale(locale) {
       await NM_I18N.setLocale(locale);
       this.locale = locale;
-      // Force re-render of dynamic modules
-      if (this.activeTab === 'oauth') NM_OAUTH.render();
-      if (this.activeTab === 'openclaw') NM_OPENCLAW.renderConfig();
-      if (this.activeTab === 'channels') NM_OPENCLAW.renderChannels();
+      // Re-render dynamic modules
+      if (this.activeTab === 'integrations') {
+        await this.onIntegrationTabChange(this.integrationTab);
+      }
     },
 
-    // Data loading
+    // ── Data loading ───────────────────────────────────
+
     async loadStats() {
+      this.loading = { ...this.loading, stats: true };
       try {
         const resp = await fetch('/api/dashboard/stats');
         if (resp.ok) {
@@ -116,10 +175,14 @@ function dashboardApp() {
           this.healthGrade = data.health_grade || 'F';
           this.purityScore = data.purity_score || 0;
         }
-      } catch {}
+      } catch {
+        this.toast(NM_I18N.t('connection_failed'), 'error');
+      }
+      this.loading = { ...this.loading, stats: false };
     },
 
     async loadHealth() {
+      this.loading = { ...this.loading, health: true };
       try {
         const resp = await fetch('/api/dashboard/health');
         if (resp.ok) {
@@ -130,10 +193,14 @@ function dashboardApp() {
           this.healthRecommendations = data.recommendations || [];
           this._healthData = data;
         }
-      } catch {}
+      } catch {
+        // Health data optional — don't show error
+      }
+      this.loading = { ...this.loading, health: false };
     },
 
-    // Brain management
+    // ── Brain management ───────────────────────────────
+
     async switchBrain(name) {
       try {
         const resp = await fetch('/api/dashboard/brains/switch', {
@@ -143,10 +210,12 @@ function dashboardApp() {
         });
         if (resp.ok) {
           this.activeBrain = name;
-          await this.loadStats();
-          await this.loadHealth();
+          await Promise.all([this.loadStats(), this.loadHealth()]);
+          this.toast(`Switched to ${name}`, 'success');
         }
-      } catch {}
+      } catch {
+        this.toast(NM_I18N.t('error_occurred'), 'error');
+      }
     },
 
     async exportBrain() {
@@ -162,9 +231,10 @@ function dashboardApp() {
           a.download = `${this.activeBrain}-brain-export.json`;
           a.click();
           URL.revokeObjectURL(url);
+          this.toast(NM_I18N.t('export_success'), 'success');
         }
       } catch (err) {
-        alert('Export failed: ' + err.message);
+        this.toast(NM_I18N.t('error_occurred') + ': ' + err.message, 'error');
       }
     },
 
@@ -181,26 +251,61 @@ function dashboardApp() {
           body: JSON.stringify(snapshot),
         });
         if (resp.ok) {
-          await this.loadStats();
-          await this.loadHealth();
-          alert(NM_I18N.t('import_success'));
+          await Promise.all([this.loadStats(), this.loadHealth()]);
+          this.toast(NM_I18N.t('import_success'), 'success');
         }
       } catch (err) {
-        alert('Import failed: ' + err.message);
+        this.toast(NM_I18N.t('error_occurred') + ': ' + err.message, 'error');
       }
-      // Reset file input
       event.target.value = '';
     },
 
-    // Graph
+    // ── Quick Actions ──────────────────────────────────
+
+    async runHealthCheck() {
+      await this.loadHealth();
+      this.activeTab = 'health';
+      this.$nextTick(() => this.renderRadar());
+      this.toast(NM_I18N.t('run_health_check') + ' done', 'success');
+    },
+
+    viewWarnings() {
+      this.activeTab = 'health';
+    },
+
+    // ── Graph toolbar ──────────────────────────────────
+
+    graphZoomIn() { NM_GRAPH.zoomIn(); },
+    graphZoomOut() { NM_GRAPH.zoomOut(); },
+    graphFit() { NM_GRAPH.fit(); },
+
+    searchGraph() {
+      if (!this.graphSearch) {
+        NM_GRAPH.clearSearch();
+        return;
+      }
+      NM_GRAPH.search(this.graphSearch);
+    },
+
+    filterGraph() {
+      NM_GRAPH.filterByType(this.graphFilter || '');
+    },
+
     async reloadGraph() {
+      this.loading = { ...this.loading, graph: true };
+      this.selectedNode = null;
+      this.graphSearch = '';
+      this.graphFilter = '';
       const cy = await NM_GRAPH.reload();
+      this.loading = { ...this.loading, graph: false };
+      this.graphEmpty = NM_GRAPH.isEmpty();
       if (cy) {
         NM_GRAPH.onNodeClick((node) => { this.selectedNode = node; });
       }
     },
 
-    // Health radar chart
+    // ── Health radar chart ─────────────────────────────
+
     renderRadar() {
       const canvas = document.getElementById('health-radar');
       if (!canvas || !this._healthData) return;
@@ -269,7 +374,8 @@ function dashboardApp() {
       });
     },
 
-    // Utility
+    // ── Utility ────────────────────────────────────────
+
     gradeColor(grade) {
       const map = {
         A: 'text-nm-cta',

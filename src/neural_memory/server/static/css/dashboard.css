@@ -40,11 +40,6 @@ nav {
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* Card hover glow */
-.card-glow:hover {
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.08);
-}
-
 /* Fade-in animation */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -67,10 +62,129 @@ section[x-show] {
 
 /* Radar chart container */
 #health-radar {
-  max-height: 350px;
+  max-height: 400px;
 }
 
-/* Responsive sidebar collapse on small screens */
+/* ── Toast notifications ─────────────────────────────── */
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(20px); }
+}
+
+.toast-enter {
+  animation: toastIn 200ms ease-out;
+}
+
+/* ── Loading skeleton ────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+.skeleton-card {
+  height: 120px;
+}
+
+.skeleton-line {
+  height: 16px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line-short {
+  height: 16px;
+  width: 60%;
+}
+
+/* ── Loading spinner ─────────────────────────────────── */
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #334155;
+  border-top-color: #22C55E;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.spinner-lg {
+  width: 40px;
+  height: 40px;
+  border-width: 3px;
+}
+
+/* ── Pulse for active indicators ─────────────────────── */
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Only pulse small indicator dots */
+.pulse-dot {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+/* ── Empty state ─────────────────────────────────────── */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: #94A3B8;
+}
+
+.empty-state i {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+/* ── Graph toolbar ───────────────────────────────────── */
+
+.graph-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 0.5rem;
+  background: #1E293B;
+  border: 1px solid #475569;
+  color: #94A3B8;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.graph-toolbar-btn:hover {
+  background: #334155;
+  color: #F8FAFC;
+  border-color: #22C55E;
+}
+
+/* ── Responsive: Mobile ──────────────────────────────── */
+
 @media (max-width: 768px) {
   aside {
     position: fixed;
@@ -100,8 +214,14 @@ section[x-show] {
     border-left: none !important;
     border-bottom: 2px solid transparent;
     border-radius: 0;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.75rem;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
   }
 
   aside nav button[class*="border-nm-cta"] {
@@ -116,27 +236,17 @@ section[x-show] {
 
   main {
     margin-left: 0 !important;
-    padding-bottom: 4rem;
+    padding-bottom: 5rem;
+  }
+
+  /* Graph toolbar stacks on mobile */
+  .graph-toolbar {
+    flex-wrap: wrap;
   }
 }
 
-/* Pulse animation for active indicator */
-@keyframes pulse-green {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
+/* ── Reduced motion ──────────────────────────────────── */
 
-.bg-nm-cta {
-  animation: pulse-green 2s ease-in-out infinite;
-}
-
-/* Prevent pulse on buttons and non-indicator elements */
-button.bg-nm-cta,
-span.bg-nm-cta:not(.w-2):not(.w-3) {
-  animation: none;
-}
-
-/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

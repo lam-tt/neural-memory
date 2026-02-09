@@ -465,9 +465,9 @@ class TestTemporalNeighborSynapses:
 
 
 class TestVersionBump:
-    """Verify the package version is 1.0.2."""
+    """Verify the package version is current."""
 
-    def test_version_is_1_0_1(self) -> None:
+    def test_version_is_current(self) -> None:
         import neural_memory
 
-        assert neural_memory.__version__ == "1.0.2"
+        assert neural_memory.__version__ == "1.2.0"

@@ -37,14 +37,26 @@ const NM_OAUTH = {
       }
     } catch {
       this.providers = [];
+      nmToast(NM_I18N.t('connection_failed'), 'error');
     }
   },
 
   render() {
-    const container = document.getElementById('oauth-providers');
+    const container = document.getElementById('int-oauth');
     if (!container) return;
 
-    container.innerHTML = this.providers.map(p => `
+    if (this.providers.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <i data-lucide="key"></i>
+          <p class="text-nm-muted">No OAuth providers available.</p>
+        </div>`;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">` +
+      this.providers.map(p => `
       <div class="bg-nm-primary border border-nm-border rounded-xl p-5 hover:border-nm-border transition-colors duration-200"
            style="border-left: 3px solid ${this.COLORS[p.id] || '#475569'}">
         <div class="flex items-center justify-between mb-4">
@@ -57,21 +69,22 @@ const NM_OAUTH = {
               <div class="text-xs text-nm-muted">${this.escapeHtml(p.description || '')}</div>
             </div>
           </div>
-          <span class="w-3 h-3 rounded-full ${p.authenticated ? 'bg-nm-cta' : 'bg-nm-secondary'}"></span>
+          <span class="w-3 h-3 rounded-full ${p.authenticated ? 'bg-nm-cta pulse-dot' : 'bg-nm-secondary'}"></span>
         </div>
         <div class="flex items-center gap-2">
           ${p.authenticated
             ? `<span class="text-xs text-nm-cta font-code bg-nm-cta/10 px-2 py-1 rounded">${NM_I18N.t('connected')}</span>
                <button onclick="NM_OAUTH.revokeProvider('${p.id}')"
+                       aria-label="Revoke ${this.escapeHtml(p.name)}"
                        class="text-xs text-nm-danger hover:text-nm-danger/80 font-code px-2 py-1 cursor-pointer">${NM_I18N.t('revoke')}</button>`
             : `<button onclick="NM_OAUTH.connectProvider('${p.id}')"
+                       aria-label="Connect ${this.escapeHtml(p.name)}"
                        class="bg-nm-secondary hover:bg-nm-border text-sm font-code px-4 py-1.5 rounded-lg transition-colors duration-200 cursor-pointer">${NM_I18N.t('connect')}</button>`
           }
         </div>
       </div>
-    `).join('');
+    `).join('') + `</div>`;
 
-    // Re-init Lucide icons for dynamic content
     if (window.lucide) lucide.createIcons();
   },
 
@@ -85,25 +98,22 @@ const NM_OAUTH = {
 
       if (!resp.ok) {
         const err = await resp.json();
-        alert(err.detail || 'Failed to initiate OAuth');
+        nmToast(err.detail || 'Failed to initiate OAuth', 'error');
         return;
       }
 
       const data = await resp.json();
       if (data.auth_url) {
-        // Open OAuth in popup
         const popup = window.open(data.auth_url, 'oauth', 'width=600,height=700');
-        // Poll for completion
         this._pollAuth(providerId, popup);
       }
     } catch (err) {
-      alert('OAuth error: ' + err.message);
+      nmToast('OAuth error: ' + err.message, 'error');
     }
   },
 
   _pollAuth(providerId, popup) {
     const interval = setInterval(async () => {
-      // Check if popup was closed
       if (popup && popup.closed) {
         clearInterval(interval);
         await this.loadProviders();
@@ -120,6 +130,7 @@ const NM_OAUTH = {
             if (popup) popup.close();
             await this.loadProviders();
             this.render();
+            nmToast(`${providerId} connected!`, 'success');
           }
         }
       } catch {
@@ -127,13 +138,10 @@ const NM_OAUTH = {
       }
     }, 2000);
 
-    // Stop polling after 10 minutes
     setTimeout(() => clearInterval(interval), 600000);
   },
 
   async revokeProvider(providerId) {
-    // Note: revocation depends on CLIProxyAPI support
-    // For now just refresh status
     await this.loadProviders();
     this.render();
   },

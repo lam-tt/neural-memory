@@ -1,10 +1,11 @@
 /**
  * NeuralMemory Dashboard — Cytoscape.js graph module
- * Neural graph visualization with COSE layout.
+ * Neural graph visualization with COSE layout, search, filter, zoom controls.
  */
 
 const NM_GRAPH = {
   _cy: null,
+  _allElements: [],
 
   TYPE_COLORS: {
     concept: '#e94560',
@@ -23,6 +24,9 @@ const NM_GRAPH = {
     if (!data) return null;
 
     const elements = this.buildElements(data);
+    this._allElements = elements;
+
+    if (elements.length === 0) return null;
 
     this._cy = cytoscape({
       container: document.getElementById(containerId),
@@ -78,6 +82,26 @@ const NM_GRAPH = {
             'target-arrow-color': '#22C55E',
             'opacity': 1,
           }
+        },
+        {
+          selector: '.dimmed',
+          style: {
+            'opacity': 0.12,
+          }
+        },
+        {
+          selector: '.highlighted',
+          style: {
+            'border-width': 3,
+            'border-color': '#22C55E',
+            'opacity': 1,
+          }
+        },
+        {
+          selector: '.filtered-out',
+          style: {
+            'display': 'none',
+          }
         }
       ],
       layout: {
@@ -125,20 +149,23 @@ const NM_GRAPH = {
       };
     });
 
-    const edges = (data.synapses || []).map(s => {
-      const weight = Math.min(6, Math.max(1, (s.weight || 0.5) * 3));
-      const arrowShape = s.direction === 'bidirectional' ? 'none' : 'triangle';
-      return {
-        data: {
-          id: s.id,
-          source: s.source_id,
-          target: s.target_id,
-          weight: weight,
-          arrowShape: arrowShape,
-          type: s.type,
-        }
-      };
-    });
+    const nodeIds = new Set(nodes.map(n => n.data.id));
+    const edges = (data.synapses || [])
+      .filter(s => nodeIds.has(s.source_id) && nodeIds.has(s.target_id))
+      .map(s => {
+        const weight = Math.min(6, Math.max(1, (s.weight || 0.5) * 3));
+        const arrowShape = s.direction === 'bidirectional' ? 'none' : 'triangle';
+        return {
+          data: {
+            id: s.id,
+            source: s.source_id,
+            target: s.target_id,
+            weight: weight,
+            arrowShape: arrowShape,
+            type: s.type,
+          }
+        };
+      });
 
     return [...nodes, ...edges];
   },
@@ -167,5 +194,99 @@ const NM_GRAPH = {
         metadata: node.data('metadata'),
       });
     });
-  }
+  },
+
+  // ── Toolbar: Zoom ───────────────────────────────────
+
+  zoomIn() {
+    if (!this._cy) return;
+    this._cy.zoom({
+      level: this._cy.zoom() * 1.3,
+      renderedPosition: { x: this._cy.width() / 2, y: this._cy.height() / 2 },
+    });
+  },
+
+  zoomOut() {
+    if (!this._cy) return;
+    this._cy.zoom({
+      level: this._cy.zoom() / 1.3,
+      renderedPosition: { x: this._cy.width() / 2, y: this._cy.height() / 2 },
+    });
+  },
+
+  fit() {
+    if (!this._cy) return;
+    this._cy.fit(undefined, 30);
+  },
+
+  // ── Toolbar: Search ─────────────────────────────────
+
+  search(query) {
+    if (!this._cy) return 0;
+    this._cy.elements().removeClass('highlighted dimmed');
+
+    if (!query || !query.trim()) return 0;
+
+    const q = query.toLowerCase().trim();
+    const matching = this._cy.nodes().filter(n => {
+      const content = (n.data('content') || '').toLowerCase();
+      const type = (n.data('type') || '').toLowerCase();
+      const label = (n.data('label') || '').toLowerCase();
+      return content.includes(q) || type.includes(q) || label.includes(q);
+    });
+
+    if (matching.length > 0) {
+      this._cy.elements().addClass('dimmed');
+      matching.removeClass('dimmed').addClass('highlighted');
+      matching.connectedEdges().removeClass('dimmed');
+      this._cy.fit(matching, 50);
+    }
+
+    return matching.length;
+  },
+
+  clearSearch() {
+    if (!this._cy) return;
+    this._cy.elements().removeClass('highlighted dimmed');
+  },
+
+  // ── Toolbar: Filter by type ─────────────────────────
+
+  filterByType(type) {
+    if (!this._cy) return;
+    this._cy.elements().removeClass('filtered-out');
+
+    if (!type) return;
+
+    this._cy.nodes().forEach(n => {
+      if (n.data('type') !== type) {
+        n.addClass('filtered-out');
+        n.connectedEdges().addClass('filtered-out');
+      }
+    });
+  },
+
+  // ── Utilities ───────────────────────────────────────
+
+  getTypes() {
+    if (!this._cy) return [];
+    const types = new Set();
+    this._cy.nodes().forEach(n => {
+      const t = n.data('type');
+      if (t) types.add(t);
+    });
+    return Array.from(types).sort();
+  },
+
+  isEmpty() {
+    return !this._cy || this._cy.nodes().length === 0;
+  },
+
+  nodeCount() {
+    return this._cy ? this._cy.nodes().length : 0;
+  },
+
+  edgeCount() {
+    return this._cy ? this._cy.edges().length : 0;
+  },
 };
