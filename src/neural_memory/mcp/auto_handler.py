@@ -143,7 +143,9 @@ class AutoHandler:
             ]
         )
         return [
-            item["content"][:50] for item, result in zip(eligible, results) if "error" not in result
+            item["content"][:50]
+            for item, result in zip(eligible, results, strict=False)
+            if "error" not in result
         ]
 
     def _run_detection(self, text: str) -> list[dict[str, Any]]:
