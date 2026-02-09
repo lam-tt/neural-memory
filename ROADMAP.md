@@ -4,8 +4,8 @@
 > Every feature passes the VISION.md 4-question test + brain test.
 > ZERO LLM dependency — pure algorithmic, regex, graph-based.
 
-**Current state**: v1.4.0 shipped. OpenClaw plugin, dashboard, 17 MCP tools, 1372 tests. Conflict detection + provenance tracking in progress.
-**Next milestone**: v1.5.0 — Ecosystem Expansion.
+**Current state**: v1.5.0 shipped. Conflict detection surfaced, provenance tracking, deep audit clean. 17 MCP tools, 1372 tests.
+**Next milestone**: v1.6.0 — Ecosystem Expansion.
 
 ---
 
@@ -937,7 +937,7 @@ Starting from 1105 tests (v0.20.0) → targeting ~1,455+ tests at v1.0.0.
 >
 > **Three pillars**: Dashboard + Integrations + Community
 >
-> **Current state**: v1.4.0 shipped. 1,372 tests. 17 MCP tools. OpenClaw plugin published. Conflict detection + provenance tracking done. Deep audit clean.
+> **Current state**: v1.5.0 shipped. 1,372 tests. 17 MCP tools. Conflict detection surfaced, provenance tracking, deep audit clean.
 
 ## Strategic Context
 
@@ -1295,13 +1295,59 @@ When OpenClaw plugin is active, NM dashboard's Integrations status card shows:
 
 ---
 
-## Phase 5: v1.5.0 — Ecosystem Expansion
+## Phase 5: v1.5.0 — Conflict Detection + Quality Hardening ✅
+
+> Surface silent conflict detection as user-facing tool. Harden quality via deep audit.
+
+**Status**: ✅ Shipped (2026-02-10). 1372 tests. Published to PyPI.
+
+### What shipped
+
+| Feature | Description |
+|---------|-------------|
+| **`nmem_conflicts` MCP tool** | List, resolve, and pre-check memory conflicts — surfaces previously silent detection |
+| **ConflictHandler mixin** | `list` (view active CONTRADICTS), `resolve` (keep_existing/keep_new/keep_both), `check` (pre-check content) |
+| **Recall conflict surfacing** | `has_conflicts` flag + `conflict_count` in default recall response; full details opt-in via `include_conflicts=true` |
+| **Remember conflict reporting** | `conflicts_detected` count in `nmem_remember` response when conflicts found |
+| **Stats conflict count** | `conflicts_active` in `nmem_stats` response |
+| **Provenance tracking** | `NEURALMEMORY_SOURCE` env var → `mcp:{source}` provenance with `mcp_tool` fallback |
+| **Purity score penalty** | Unresolved CONTRADICTS reduce health score (max -10 points), `HIGH_CONFLICT_COUNT` warning |
+| **Pre-dispute activation** | `_pre_dispute_activation` saved before anti-Hebbian update, restored on `keep_existing` resolve |
+| **`_conflict_resolved` guard** | Prevents re-flagging after manual resolution |
+
+### Deep audit fixes (included in v1.5.0)
+
+| Category | Fixes |
+|----------|-------|
+| **Performance** | 3× `get_all_synapses()` → filtered `get_synapses(type=CONTRADICTS)`, diagnostics double fiber fetch eliminated |
+| **Logic** | `_resolve_keep_new` missing `_disputed=False`, recall field name alignment |
+| **Security** | Error messages no longer leak exceptions, tag validation (max 50/100), `NEURALMEMORY_SOURCE` truncated to 256 |
+| **Quality** | UUID regex case-insensitive, deprecated `datetime.utcnow()` replaced, ruff B905 lint fix |
+| **Tests** | 9 new audit-driven tests for edge cases (deleted neurons, missing synapses, invalid inputs, error sanitization) |
+
+### Files
+
+| Action | File |
+|--------|------|
+| NEW | `mcp/conflict_handler.py` — ConflictHandler mixin (list/resolve/check) |
+| NEW | `tests/unit/test_conflict_handler.py` — 20 tests |
+| MOD | `mcp/server.py` — Conflict surfacing in recall/remember/stats, provenance enrichment |
+| MOD | `mcp/tool_schemas.py` — `nmem_conflicts` schema + `include_conflicts` on recall |
+| MOD | `engine/conflict_detection.py` — `_conflict_resolved` guard, `_pre_dispute_activation` save |
+| MOD | `engine/encoder.py` — `conflicts_detected` in `EncodingResult` |
+| MOD | `engine/retrieval.py` — `disputed_ids` in retrieval metadata |
+| MOD | `engine/diagnostics.py` — Conflict penalty + warning, single fiber fetch |
+| MOD | `mcp/auto_handler.py` — ruff B905 lint fix |
+
+---
+
+## Phase 6: v1.6.0 — Ecosystem Expansion
 
 > Marketplace, storage backends, more languages.
 
-**Target**: 1-2 months after v1.4.0
+**Target**: 1-2 months after v1.5.0
 
-### 5.1 Brain Marketplace (Preview)
+### 6.1 Brain Marketplace (Preview)
 
 NM dashboard gains a "Marketplace" tab (6th tab — the exception where NM IS the hub):
 - Public brain gallery
@@ -1310,7 +1356,7 @@ NM dashboard gains a "Marketplace" tab (6th tab — the exception where NM IS th
 - Search by tags, language, grade
 - Brain transplant from marketplace → local brain
 
-### 5.2 Neo4j Storage Backend
+### 6.2 Neo4j Storage Backend
 
 For users with large-scale graph requirements:
 - `Neo4jStorage` implementing `BaseStorage` ABC
@@ -1319,7 +1365,7 @@ For users with large-scale graph requirements:
 - Optional — SQLite remains default
 - Dashboard graph tab auto-detects Neo4j and uses native traversal
 
-### 5.3 Multi-Language Expansion
+### 6.3 Multi-Language Expansion
 
 Beyond EN/VI:
 - Japanese (large AI dev community)
@@ -1330,7 +1376,7 @@ Beyond EN/VI:
 
 ---
 
-## Phase 6: v2.0.0 — Platform
+## Phase 7: v2.0.0 — Platform
 
 > NeuralMemory becomes the universal memory layer for AI agents.
 
@@ -1368,13 +1414,13 @@ Any AI Agent (OpenClaw, Claude Code, Cursor, THOR, Nanobot, custom)
 v1.1.0 ✅ (Community Foundations)
   ├──→ v1.2.0 ✅ (Dashboard — specialist tool + status-only integrations)
   │       └──→ v1.3.0 ✅ (Deep Integration Status + activity logs)
-  │               └──→ v1.5.0 (Ecosystem — Marketplace, Neo4j, i18n)
   └──→ v1.4.0 ✅ (OpenClaw Memory Plugin — NM inside the hub)
-              └──→ v1.5.0 (Ecosystem Expansion)
-                        └──→ v2.0.0 (Platform — protocol, federation, real-time)
+              └──→ v1.5.0 ✅ (Conflict Detection + Quality Hardening)
+                        └──→ v1.6.0 (Ecosystem — Marketplace, Neo4j, i18n)
+                                  └──→ v2.0.0 (Platform — protocol, federation, real-time)
 ```
 
-**Critical path**: v1.1.0 ✅ → v1.2.0 ✅ → v1.4.0 ✅ → v1.3.0 ✅ → v1.5.0
+**Critical path**: v1.1.0 ✅ → v1.2.0 ✅ → v1.3.0 ✅ → v1.4.0 ✅ → v1.5.0 ✅ → v1.6.0
 
 **Next**: v1.5.0 — Ecosystem Expansion (Marketplace, Neo4j, multi-language)
 
