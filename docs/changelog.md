@@ -5,6 +5,17 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-02-09
+
+### Fixed
+
+- **Empty recall for broad queries** — `format_context()` now truncates long fiber content to fit within token budget instead of skipping entirely. Queries that hit long anchors (e.g., architecture summaries) no longer return empty "## Relevant Memories" headers.
+- **Diversity metric normalization** — Shannon entropy now normalized against 8 expected synapse types (was 20 total defined types). Realistic baseline for typical brain usage.
+- **Temporal synapse diversity** — `_link_temporal_neighbors()` now creates BEFORE/AFTER synapses based on temporal ordering instead of always RELATED_TO.
+- **Consolidation prune crash** — Fixed `_prune()` using `Fiber(..., tags=fiber.tags)` which would TypeError since `tags` is a computed `@property`. Now uses `dataclasses.replace()`.
+- **Tag drift** — Ran one-time normalization sweep on existing fibers via `TagNormalizer.normalize_set()`.
+- **Diversity warning threshold** — Warning triggers at `types_used < 3` (was `< 5`), reducing false positives.
+
 ## [1.0.0] - 2026-02-09
 
 ### Added
@@ -410,6 +421,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.0.2]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v1.0.2
 [1.0.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v1.0.0
 [0.20.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.20.0
 [0.19.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.19.0

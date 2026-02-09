@@ -1,10 +1,10 @@
-"""Tests for v1.0.1 health and correctness fixes.
+"""Tests for v1.0.2 health and correctness fixes.
 
 Covers:
 1. Context truncation (retrieval_context.py) — long fibers truncated instead of skipped
 2. Diversity metric (diagnostics.py) — normalized against 8 expected types, threshold 3
 3. Temporal neighbor synapses (encoder.py) — BEFORE/AFTER instead of RELATED_TO
-4. Version bump — __version__ == "1.0.1"
+4. Version bump — __version__ == "1.0.2"
 """
 
 from __future__ import annotations
@@ -465,9 +465,9 @@ class TestTemporalNeighborSynapses:
 
 
 class TestVersionBump:
-    """Verify the package version is 1.0.1."""
+    """Verify the package version is 1.0.2."""
 
     def test_version_is_1_0_1(self) -> None:
         import neural_memory
 
-        assert neural_memory.__version__ == "1.0.1"
+        assert neural_memory.__version__ == "1.0.2"
