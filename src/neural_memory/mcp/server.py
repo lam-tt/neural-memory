@@ -722,11 +722,20 @@ async def handle_message(server: MCPServer, message: dict[str, Any]) -> dict[str
         tool_args = params.get("arguments", {})
 
         try:
-            result = await server.call_tool(tool_name, tool_args)
+            result = await asyncio.wait_for(
+                server.call_tool(tool_name, tool_args),
+                timeout=30.0,
+            )
             return {
                 "jsonrpc": "2.0",
                 "id": msg_id,
                 "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
+            }
+        except TimeoutError:
+            return {
+                "jsonrpc": "2.0",
+                "id": msg_id,
+                "error": {"code": -32000, "message": f"Tool '{tool_name}' timed out after 30s"},
             }
         except Exception as e:
             return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32000, "message": str(e)}}

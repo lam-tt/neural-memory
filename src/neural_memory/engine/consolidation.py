@@ -312,14 +312,33 @@ class ConsolidationEngine:
         report: ConsolidationReport,
         dry_run: bool,
     ) -> None:
-        """Merge overlapping fibers using Jaccard similarity."""
+        """Merge overlapping fibers using inverted index for O(n*m) performance.
+
+        Instead of O(n²) pairwise comparison, builds a neuron→fiber inverted
+        index to find only fibers that actually share neurons.
+        """
         fibers = await self._storage.get_fibers(limit=10000)
         if len(fibers) < 2:
             return
 
-        # Build adjacency using Jaccard similarity
         fiber_list = list(fibers)
         n = len(fiber_list)
+
+        # Build inverted index: neuron_id → set of fiber indices
+        neuron_to_fibers: dict[str, set[int]] = {}
+        for idx, fiber in enumerate(fiber_list):
+            if len(fiber.neuron_ids) > self._config.merge_max_fiber_size:
+                continue
+            for nid in fiber.neuron_ids:
+                neuron_to_fibers.setdefault(nid, set()).add(idx)
+
+        # Find candidate pairs (fibers sharing at least one neuron)
+        candidate_pairs: set[tuple[int, int]] = set()
+        for indices in neuron_to_fibers.values():
+            indices_list = sorted(indices)
+            for i_pos in range(len(indices_list)):
+                for j_pos in range(i_pos + 1, len(indices_list)):
+                    candidate_pairs.add((indices_list[i_pos], indices_list[j_pos]))
 
         # Union-Find
         parent: dict[int, int] = {i: i for i in range(n)}
@@ -335,32 +354,26 @@ class ConsolidationEngine:
             if ra != rb:
                 parent[ra] = rb
 
-        # Pairwise Jaccard on neuron_ids
-        for i in range(n):
-            if len(fiber_list[i].neuron_ids) > self._config.merge_max_fiber_size:
-                continue
-            for j in range(i + 1, n):
-                if len(fiber_list[j].neuron_ids) > self._config.merge_max_fiber_size:
-                    continue
+        # Only compute Jaccard for actual candidate pairs
+        for i, j in candidate_pairs:
+            set_a = fiber_list[i].neuron_ids
+            set_b = fiber_list[j].neuron_ids
+            intersection = len(set_a & set_b)
+            union_size = len(set_a | set_b)
 
-                set_a = fiber_list[i].neuron_ids
-                set_b = fiber_list[j].neuron_ids
-                intersection = len(set_a & set_b)
-                union_size = len(set_a | set_b)
-
-                if union_size > 0:
-                    jaccard = intersection / union_size
-                    # Lower threshold for temporally-close fibers (same session)
-                    time_diff = abs(
-                        (fiber_list[i].created_at - fiber_list[j].created_at).total_seconds()
-                    )
-                    effective_threshold = (
-                        self._config.merge_overlap_threshold * 0.6
-                        if time_diff < 3600
-                        else self._config.merge_overlap_threshold
-                    )
-                    if jaccard >= effective_threshold:
-                        union(i, j)
+            if union_size > 0:
+                jaccard = intersection / union_size
+                # Lower threshold for temporally-close fibers
+                time_diff = abs(
+                    (fiber_list[i].created_at - fiber_list[j].created_at).total_seconds()
+                )
+                effective_threshold = (
+                    self._config.merge_overlap_threshold * 0.6
+                    if time_diff < 3600
+                    else self._config.merge_overlap_threshold
+                )
+                if jaccard >= effective_threshold:
+                    union(i, j)
 
         # Group fibers by root
         groups: dict[int, list[int]] = {}
@@ -394,6 +407,12 @@ class ConsolidationEngine:
                     best_anchor = fiber.anchor_neuron_id
 
             merged_fiber_id = str(uuid4())
+            # Merge auto_tags and agent_tags separately
+            merged_auto_tags: set[str] = set()
+            merged_agent_tags: set[str] = set()
+            for fiber in member_fibers:
+                merged_auto_tags |= fiber.auto_tags
+                merged_agent_tags |= fiber.agent_tags
             merged_fiber = Fiber(
                 id=merged_fiber_id,
                 neuron_ids=merged_neuron_ids,
@@ -402,7 +421,8 @@ class ConsolidationEngine:
                 pathway=[best_anchor],
                 salience=max_salience,
                 frequency=best_frequency,
-                tags=merged_tags,
+                auto_tags=merged_auto_tags,
+                agent_tags=merged_agent_tags,
                 summary=f"Merged from {len(member_fibers)} fibers",
                 metadata={"merged_from": [f.id for f in member_fibers]},
                 created_at=min(f.created_at for f in member_fibers),
@@ -420,11 +440,9 @@ class ConsolidationEngine:
             )
 
             if not dry_run:
-                # Delete originals
                 for fiber in member_fibers:
                     await self._storage.delete_fiber(fiber.id)
                     report.fibers_removed += 1
-                # Add merged
                 await self._storage.add_fiber(merged_fiber)
 
     async def _summarize(
@@ -432,17 +450,30 @@ class ConsolidationEngine:
         report: ConsolidationReport,
         dry_run: bool,
     ) -> None:
-        """Create concept neurons for tag-based clusters."""
+        """Create concept neurons for tag-based clusters using inverted index."""
         fibers = await self._storage.get_fibers(limit=10000)
         if len(fibers) < self._config.summarize_min_cluster_size:
             return
 
-        # Group fibers by tags using overlap threshold
         fiber_list = [f for f in fibers if f.tags]
         if len(fiber_list) < self._config.summarize_min_cluster_size:
             return
 
         n = len(fiber_list)
+
+        # Build inverted index: tag → set of fiber indices
+        tag_to_fibers: dict[str, set[int]] = {}
+        for idx, fiber in enumerate(fiber_list):
+            for tag in fiber.tags:
+                tag_to_fibers.setdefault(tag, set()).add(idx)
+
+        # Find candidate pairs (fibers sharing at least one tag)
+        candidate_pairs: set[tuple[int, int]] = set()
+        for indices in tag_to_fibers.values():
+            indices_list = sorted(indices)
+            for i_pos in range(len(indices_list)):
+                for j_pos in range(i_pos + 1, len(indices_list)):
+                    candidate_pairs.add((indices_list[i_pos], indices_list[j_pos]))
 
         # Union-Find for tag clustering
         parent: dict[int, int] = {i: i for i in range(n)}
@@ -458,17 +489,16 @@ class ConsolidationEngine:
             if ra != rb:
                 parent[ra] = rb
 
-        for i in range(n):
-            for j in range(i + 1, n):
-                tags_a = fiber_list[i].tags
-                tags_b = fiber_list[j].tags
-                intersection = len(tags_a & tags_b)
-                union_size = len(tags_a | tags_b)
-                if (
-                    union_size > 0
-                    and intersection / union_size >= self._config.summarize_tag_overlap_threshold
-                ):
-                    union(i, j)
+        for i, j in candidate_pairs:
+            tags_a = fiber_list[i].tags
+            tags_b = fiber_list[j].tags
+            intersection = len(tags_a & tags_b)
+            union_size = len(tags_a | tags_b)
+            if (
+                union_size > 0
+                and intersection / union_size >= self._config.summarize_tag_overlap_threshold
+            ):
+                union(i, j)
 
         groups: dict[int, list[int]] = {}
         for i in range(n):
@@ -481,7 +511,6 @@ class ConsolidationEngine:
 
             cluster_fibers = [fiber_list[i] for i in members]
 
-            # Build summary content from fiber summaries
             summaries = [f.summary for f in cluster_fibers if f.summary]
             all_tags: set[str] = set()
             for f in cluster_fibers:
@@ -499,7 +528,6 @@ class ConsolidationEngine:
                 report.summaries_created += 1
                 continue
 
-            # Create a CONCEPT neuron
             concept_neuron = Neuron.create(
                 type=NeuronType.CONCEPT,
                 content=concept_content,
@@ -511,7 +539,6 @@ class ConsolidationEngine:
             )
             await self._storage.add_neuron(concept_neuron)
 
-            # Link concept to anchor neurons via RELATED_TO synapses
             anchor_ids: set[str] = set()
             for fiber in cluster_fibers:
                 anchor_ids.add(fiber.anchor_neuron_id)
@@ -527,7 +554,6 @@ class ConsolidationEngine:
                 await self._storage.add_synapse(synapse)
                 synapse_ids.add(synapse.id)
 
-            # Create summary fiber
             summary_fiber = Fiber.create(
                 neuron_ids={concept_neuron.id} | anchor_ids,
                 synapse_ids=synapse_ids,

@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from neural_memory.core.brain import BrainConfig
+    from neural_memory.engine.embedding.provider import EmbeddingProvider
     from neural_memory.storage.base import NeuralStorage
 
 
@@ -75,6 +76,7 @@ class ReflexPipeline:
         config: BrainConfig,
         parser: QueryParser | None = None,
         use_reflex: bool = True,
+        embedding_provider: EmbeddingProvider | None = None,
     ) -> None:
         """
         Initialize the retrieval pipeline.
@@ -84,11 +86,13 @@ class ReflexPipeline:
             config: Brain configuration
             parser: Custom query parser (creates default if None)
             use_reflex: If True, use ReflexActivation; else use SpreadingActivation
+            embedding_provider: Optional embedding provider for semantic fallback
         """
         self._storage = storage
         self._config = config
         self._parser = parser or QueryParser()
         self._use_reflex = use_reflex
+        self._embedding_provider = embedding_provider
         self._activator = SpreadingActivation(storage, config)
         self._reflex_activator = ReflexActivation(storage, config)
         self._reinforcer = ReinforcementManager(
@@ -538,15 +542,14 @@ class ReflexPipeline:
     ) -> None:
         """Defer Hebbian strengthening writes to the write queue.
 
-        Reads existing synapses to determine update vs create, but
-        defers the actual writes to flush time.
-
-        When activation levels are available, passes them to the formal
-        Hebbian learning rule for principled weight updates.
+        Uses batch synapse lookups to reduce per-pair queries.
         """
         threshold = self._config.hebbian_threshold
         delta = self._config.hebbian_delta
         initial_weight = self._config.hebbian_initial_weight
+
+        # Collect all neuron pairs that need synapse lookup
+        pairs_to_check: list[tuple[str, str, float | None, float | None]] = []
 
         for co in co_activations:
             if co.binding_strength < threshold:
@@ -569,74 +572,66 @@ class ReflexPipeline:
                         if activations and b in activations
                         else None
                     )
-                    await self._defer_reinforce_or_create(
-                        a,
-                        b,
-                        delta,
-                        initial_weight,
-                        pre_act,
-                        post_act,
+                    pairs_to_check.append((a, b, pre_act, post_act))
+
+            # Persist co-activation event
+            source_anchor = co.source_anchors[0] if co.source_anchors else None
+            for i in range(len(neuron_ids)):
+                for j in range(i + 1, len(neuron_ids)):
+                    self._write_queue.defer_co_activation(
+                        neuron_ids[i], neuron_ids[j], co.binding_strength, source_anchor
                     )
 
-                    # Persist co-activation event for associative inference
-                    source_anchor = co.source_anchors[0] if co.source_anchors else None
-                    self._write_queue.defer_co_activation(a, b, co.binding_strength, source_anchor)
-
-    async def _defer_reinforce_or_create(
-        self,
-        neuron_a: str,
-        neuron_b: str,
-        delta: float,
-        initial_weight: float,
-        pre_activation: float | None = None,
-        post_activation: float | None = None,
-    ) -> None:
-        """Check synapse existence (read) and defer the write."""
-        # Check A->B
-        forward = await self._storage.get_synapses(source_id=neuron_a, target_id=neuron_b)
-        if forward:
-            reinforced = forward[0].reinforce(
-                delta,
-                pre_activation=pre_activation,
-                post_activation=post_activation,
-            )
-            self._write_queue.defer_synapse_update(reinforced)
+        if not pairs_to_check:
             return
 
-        # Check B->A
-        reverse = await self._storage.get_synapses(source_id=neuron_b, target_id=neuron_a)
-        if reverse:
-            reinforced = reverse[0].reinforce(
-                delta,
-                pre_activation=post_activation,
-                post_activation=pre_activation,
-            )
-            self._write_queue.defer_synapse_update(reinforced)
-            return
+        # Batch fetch: get all synapses for involved neurons in one query
+        all_neuron_ids = list({nid for pair in pairs_to_check for nid in pair[:2]})
+        outgoing = await self._storage.get_synapses_for_neurons(all_neuron_ids, direction="out")
 
-        # No existing synapse — defer creation
-        synapse = Synapse.create(
-            source_id=neuron_a,
-            target_id=neuron_b,
-            type=SynapseType.RELATED_TO,
-            weight=initial_weight,
-        )
-        self._write_queue.defer_synapse_create(synapse)
+        # Build lookup: (source, target) -> Synapse
+        existing_map: dict[tuple[str, str], Synapse] = {}
+        for _nid, synapses in outgoing.items():
+            for syn in synapses:
+                existing_map[(syn.source_id, syn.target_id)] = syn
+
+        # Process pairs using cached lookups
+        for a, b, pre_act, post_act in pairs_to_check:
+            forward = existing_map.get((a, b))
+            reverse = existing_map.get((b, a))
+
+            if forward:
+                reinforced = forward.reinforce(
+                    delta,
+                    pre_activation=pre_act,
+                    post_activation=post_act,
+                )
+                self._write_queue.defer_synapse_update(reinforced)
+            elif reverse:
+                reinforced = reverse.reinforce(
+                    delta,
+                    pre_activation=post_act,
+                    post_activation=pre_act,
+                )
+                self._write_queue.defer_synapse_update(reinforced)
+            else:
+                synapse = Synapse.create(
+                    source_id=a,
+                    target_id=b,
+                    type=SynapseType.RELATED_TO,
+                    weight=initial_weight,
+                )
+                self._write_queue.defer_synapse_create(synapse)
 
     def _apply_lateral_inhibition(
         self,
         activations: dict[str, ActivationResult],
     ) -> dict[str, ActivationResult]:
-        """Apply lateral inhibition: top-K neurons survive, rest are suppressed.
+        """Apply cluster-aware lateral inhibition.
 
-        This is the competition phase — highly activated neurons inhibit
-        weaker competitors, sharpening the activation landscape.
-
-        Args:
-            activations: Current activation results
-
-        Returns:
-            New dict with suppressed activations applied
+        Instead of global top-K, group neurons by source_anchor and
+        allow top winners per cluster, preserving diversity across
+        different query aspects.
         """
         k = self._config.lateral_inhibition_k
         factor = self._config.lateral_inhibition_factor
@@ -645,18 +640,43 @@ class ReflexPipeline:
         if len(activations) <= k:
             return activations
 
-        # Sort by activation level descending
-        sorted_items = sorted(
-            activations.items(),
-            key=lambda x: x[1].activation_level,
-            reverse=True,
-        )
+        # Group by source_anchor (cluster)
+        clusters: dict[str | None, list[tuple[str, ActivationResult]]] = {}
+        for neuron_id, activation in activations.items():
+            anchor = activation.source_anchor
+            clusters.setdefault(anchor, []).append((neuron_id, activation))
 
-        # Top-K survive unchanged
-        winner_ids = {item[0] for item in sorted_items[:k]}
+        # Sort each cluster by activation level
+        for anchor in clusters:
+            clusters[anchor].sort(key=lambda x: x[1].activation_level, reverse=True)
+
+        # Distribute K across clusters proportionally, minimum 1 per cluster
+        num_clusters = len(clusters)
+        if num_clusters == 0:
+            return activations
+
+        per_cluster = max(1, k // num_clusters)
+        winner_ids: set[str] = set()
+
+        for items in clusters.values():
+            for nid, _act in items[:per_cluster]:
+                winner_ids.add(nid)
+
+        # If we still have budget, fill from global top
+        if len(winner_ids) < k:
+            all_sorted = sorted(
+                activations.items(),
+                key=lambda x: x[1].activation_level,
+                reverse=True,
+            )
+            for nid, _act in all_sorted:
+                if nid not in winner_ids:
+                    winner_ids.add(nid)
+                if len(winner_ids) >= k:
+                    break
 
         result: dict[str, ActivationResult] = {}
-        for neuron_id, activation in sorted_items:
+        for neuron_id, activation in activations.items():
             if neuron_id in winner_ids:
                 result[neuron_id] = activation
             else:
@@ -719,6 +739,75 @@ class ReflexPipeline:
 
         return result
 
+    def _expand_query_terms(self, keywords: list[str]) -> list[str]:
+        """Expand query keywords with basic stemming and synonyms.
+
+        Adds common morphological variants so that 'auth' matches
+        'authentication', 'authorize', etc.
+        """
+        expanded: list[str] = list(keywords)
+        seen = {k.lower() for k in keywords}
+
+        # Common suffix expansions
+        _suffixes = ("tion", "ment", "ing", "ed", "er", "ity", "ness", "ize", "ise", "ate")
+        _prefixes = ("un", "re", "pre", "de", "dis")
+
+        for kw in keywords:
+            kw_lower = kw.lower()
+            # If keyword looks like a stem (short), try common expansions
+            if 3 <= len(kw_lower) <= 6:
+                for suffix in _suffixes:
+                    candidate = kw_lower + suffix
+                    if candidate not in seen:
+                        expanded.append(candidate)
+                        seen.add(candidate)
+                        break  # Only add first plausible expansion
+
+            # If keyword is long, try extracting stem
+            for suffix in _suffixes:
+                if kw_lower.endswith(suffix) and len(kw_lower) - len(suffix) >= 3:
+                    stem = kw_lower[: -len(suffix)]
+                    if stem not in seen:
+                        expanded.append(stem)
+                        seen.add(stem)
+                    break
+
+        return expanded
+
+    async def _find_embedding_anchors(self, query: str, top_k: int = 10) -> list[str]:
+        """Find anchor neurons via embedding similarity.
+
+        Embeds the query, then finds neurons whose stored embeddings
+        (in metadata['_embedding']) are above the similarity threshold.
+        """
+        if self._embedding_provider is None:
+            return []
+
+        try:
+            query_vec = await self._embedding_provider.embed(query)
+        except Exception:
+            logger.debug("Embedding query failed (non-critical)", exc_info=True)
+            return []
+
+        # Get all anchor neurons (with embeddings) - limit search scope
+        candidates = await self._storage.find_neurons(limit=500)
+
+        scored: list[tuple[str, float]] = []
+        for neuron in candidates:
+            stored_embedding = neuron.metadata.get("_embedding")
+            if not stored_embedding or not isinstance(stored_embedding, list):
+                continue
+            try:
+                sim = await self._embedding_provider.similarity(query_vec, stored_embedding)
+                if sim >= 0.7:  # threshold
+                    scored.append((neuron.id, sim))
+            except Exception:
+                continue
+
+        # Sort by similarity descending, return top-K IDs
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [nid for nid, _ in scored[:top_k]]
+
     async def _find_anchors_time_first(self, stimulus: Stimulus) -> list[list[str]]:
         """
         Find anchor neurons with time as primary signal.
@@ -749,9 +838,12 @@ class ReflexPipeline:
             self._storage.find_neurons(content_contains=entity.text, limit=3)
             for entity in stimulus.entities
         ]
+
+        # Expand keywords for better recall
+        expanded_keywords = self._expand_query_terms(list(stimulus.keywords[:5]))
         keyword_tasks = [
             self._storage.find_neurons(content_contains=keyword, limit=2)
-            for keyword in stimulus.keywords[:5]
+            for keyword in expanded_keywords[:8]  # cap at 8 to limit queries
         ]
 
         all_tasks = entity_tasks + keyword_tasks
@@ -770,6 +862,12 @@ class ReflexPipeline:
                 anchor_sets.append(entity_anchors)
             if keyword_anchors:
                 anchor_sets.append(keyword_anchors)
+
+        # 4. EMBEDDING FALLBACK - when no substring anchors found
+        if not anchor_sets and self._embedding_provider is not None:
+            embedding_anchors = await self._find_embedding_anchors(stimulus.raw_query)
+            if embedding_anchors:
+                anchor_sets.append(embedding_anchors)
 
         return anchor_sets
 

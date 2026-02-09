@@ -262,9 +262,18 @@ class MemoryEncoder:
         linked = await self._link_temporal_neighbors(anchor_neuron, timestamp)
         neurons_linked.extend(linked)
 
-        # 9. Create fiber
+        # 9. Create fiber with meaningful pathway
         neuron_ids = {n.id for n in all_neurons}
         synapse_ids = {s.id for s in synapses_created}
+
+        # Build pathway: time → entities → concepts → anchor
+        # This represents the activation order during encoding
+        pathway = self._build_pathway(
+            time_neurons=time_neurons,
+            entity_neurons=entity_neurons,
+            concept_neurons=concept_neurons,
+            anchor_neuron=anchor_neuron,
+        )
 
         fiber = Fiber.create(
             neuron_ids=neuron_ids,
@@ -275,6 +284,7 @@ class MemoryEncoder:
             auto_tags=auto_tags,
             agent_tags=agent_tags,
             metadata=effective_metadata,
+            pathway=pathway,
         )
 
         # Calculate coherence (simple: edges / possible edges)
@@ -302,6 +312,47 @@ class MemoryEncoder:
             neurons_linked=neurons_linked,
             synapses_created=synapses_created,
         )
+
+    def _build_pathway(
+        self,
+        time_neurons: list[Neuron],
+        entity_neurons: list[Neuron],
+        concept_neurons: list[Neuron],
+        anchor_neuron: Neuron,
+    ) -> list[str]:
+        """Build a meaningful activation pathway for the fiber.
+
+        The pathway represents the order neurons would activate during
+        retrieval: time context → specific entities → abstract concepts → anchor.
+        This enables the reflex activation engine to traverse fibers
+        in a semantically meaningful order.
+        """
+        pathway: list[str] = []
+        seen: set[str] = set()
+
+        # Time neurons first (temporal context activates first)
+        for n in time_neurons[:2]:
+            if n.id not in seen:
+                pathway.append(n.id)
+                seen.add(n.id)
+
+        # Entity neurons next (specific references)
+        for n in entity_neurons[:3]:
+            if n.id not in seen:
+                pathway.append(n.id)
+                seen.add(n.id)
+
+        # Top concept neurons (abstract associations)
+        for n in concept_neurons[:2]:
+            if n.id not in seen:
+                pathway.append(n.id)
+                seen.add(n.id)
+
+        # Anchor neuron last (destination)
+        if anchor_neuron.id not in seen:
+            pathway.append(anchor_neuron.id)
+
+        return pathway
 
     def _generate_auto_tags(
         self,

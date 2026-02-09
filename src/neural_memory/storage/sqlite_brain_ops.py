@@ -148,17 +148,22 @@ class SQLiteBrainMixin:
         self.set_brain(brain_id)
 
         try:
+            # Wrap all imports in a single transaction for performance
+            conn = self._ensure_conn()
             await self._import_neurons(snapshot.neurons)
             await self._import_synapses(snapshot.synapses)
             await self._import_fibers(snapshot.fibers)
             await self._import_projects(snapshot.metadata.get("projects", []))
             await self._import_typed_memories(snapshot.metadata.get("typed_memories", []))
+            await conn.commit()
         finally:
             self._current_brain_id = old_brain_id
 
         return brain_id
 
     async def _import_neurons(self, neurons_data: list[dict]) -> None:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
         for n_data in neurons_data:
             neuron = Neuron(
                 id=n_data["id"],
@@ -167,9 +172,32 @@ class SQLiteBrainMixin:
                 metadata=n_data.get("metadata", {}),
                 created_at=datetime.fromisoformat(n_data["created_at"]),
             )
-            await self.add_neuron(neuron)
+            # Insert neuron directly (skip per-statement commit)
+            await conn.execute(
+                """INSERT INTO neurons (id, brain_id, type, content, metadata, content_hash, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    neuron.id,
+                    brain_id,
+                    neuron.type.value,
+                    neuron.content,
+                    json.dumps(neuron.metadata),
+                    neuron.content_hash,
+                    neuron.created_at.isoformat(),
+                ),
+            )
+            # Insert neuron state
+            await conn.execute(
+                """INSERT INTO neuron_states
+                   (neuron_id, brain_id, firing_threshold, refractory_period_ms,
+                    homeostatic_target, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (neuron.id, brain_id, 0.3, 500.0, 0.5, datetime.utcnow().isoformat()),
+            )
 
     async def _import_synapses(self, synapses_data: list[dict]) -> None:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
         for s_data in synapses_data:
             synapse = Synapse(
                 id=s_data["id"],
@@ -182,11 +210,31 @@ class SQLiteBrainMixin:
                 reinforced_count=s_data.get("reinforced_count", 0),
                 created_at=datetime.fromisoformat(s_data["created_at"]),
             )
-            await self.add_synapse(synapse)
+            # Insert directly (skip per-statement commit and neuron existence check)
+            await conn.execute(
+                """INSERT INTO synapses
+                   (id, brain_id, source_id, target_id, type, weight, direction,
+                    metadata, reinforced_count, last_activated, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    synapse.id,
+                    brain_id,
+                    synapse.source_id,
+                    synapse.target_id,
+                    synapse.type.value,
+                    synapse.weight,
+                    synapse.direction.value,
+                    json.dumps(synapse.metadata),
+                    synapse.reinforced_count,
+                    synapse.last_activated.isoformat() if synapse.last_activated else None,
+                    synapse.created_at.isoformat(),
+                ),
+            )
 
     async def _import_fibers(self, fibers_data: list[dict]) -> None:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
         for f_data in fibers_data:
-            # Tag origin: read auto_tags/agent_tags, fallback to legacy tags
             auto_tags = set(f_data.get("auto_tags", []))
             agent_tags = set(f_data.get("agent_tags", []))
             if not auto_tags and not agent_tags:
@@ -214,7 +262,43 @@ class SQLiteBrainMixin:
                 metadata=f_data.get("metadata", {}),
                 created_at=datetime.fromisoformat(f_data["created_at"]),
             )
-            await self.add_fiber(fiber)
+            # Insert directly without per-fiber commit
+            all_tags = sorted(fiber.auto_tags | fiber.agent_tags)
+            await conn.execute(
+                """INSERT INTO fibers
+                   (id, brain_id, neuron_ids, synapse_ids, anchor_neuron_id,
+                    pathway, conductivity, last_conducted, time_start, time_end,
+                    coherence, salience, frequency, summary, tags,
+                    auto_tags, agent_tags, metadata, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    fiber.id,
+                    brain_id,
+                    json.dumps(sorted(fiber.neuron_ids)),
+                    json.dumps(sorted(fiber.synapse_ids)),
+                    fiber.anchor_neuron_id,
+                    json.dumps(list(fiber.pathway)),
+                    fiber.conductivity,
+                    fiber.last_conducted.isoformat() if fiber.last_conducted else None,
+                    fiber.time_start.isoformat() if fiber.time_start else None,
+                    fiber.time_end.isoformat() if fiber.time_end else None,
+                    fiber.coherence,
+                    fiber.salience,
+                    fiber.frequency,
+                    fiber.summary,
+                    json.dumps(all_tags),
+                    json.dumps(sorted(fiber.auto_tags)),
+                    json.dumps(sorted(fiber.agent_tags)),
+                    json.dumps(fiber.metadata),
+                    fiber.created_at.isoformat(),
+                ),
+            )
+            # Insert fiber_neurons junction rows
+            for neuron_id in fiber.neuron_ids:
+                await conn.execute(
+                    "INSERT OR IGNORE INTO fiber_neurons (brain_id, fiber_id, neuron_id) VALUES (?, ?, ?)",
+                    (brain_id, fiber.id, neuron_id),
+                )
 
     async def _import_projects(self, projects_data: list[dict]) -> None:
         for p_data in projects_data:

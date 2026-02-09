@@ -11,17 +11,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Schema version for migrations
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
-# ── Migrations ──────────────────────────────────────────────────────
+# â”€â”€ Migrations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Each entry maps (from_version -> to_version) with a list of SQL statements.
 # Migrations run sequentially in initialize() when db version < SCHEMA_VERSION.
 
-# FTS5 setup statements — must be executed via individual execute() calls,
+# FTS5 setup statements â€” must be executed via individual execute() calls,
 # NOT executescript(), because trigger bodies contain semicolons inside
 # BEGIN...END blocks that executescript() would incorrectly split on.
 FTS_SETUP_STATEMENTS: list[str] = [
-    # FTS5 virtual table (external content → neurons table).
+    # FTS5 virtual table (external content â†’ neurons table).
     # Only index 'content' for searching; 'brain_id' is UNINDEXED (filter only).
     # We join on rowid to retrieve the full neuron row, so no neuron_id column needed.
     """CREATE VIRTUAL TABLE IF NOT EXISTS neurons_fts USING fts5(
@@ -66,7 +66,7 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
         ),
     ],
     (3, 4): [
-        # Junction table for fast fiber↔neuron lookups (replaces LIKE on JSON)
+        # Junction table for fast fiberâ†”neuron lookups (replaces LIKE on JSON)
         """CREATE TABLE IF NOT EXISTS fiber_neurons (
             brain_id TEXT NOT NULL,
             fiber_id TEXT NOT NULL,
@@ -98,7 +98,7 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
         "ALTER TABLE neuron_states ADD COLUMN homeostatic_target REAL DEFAULT 0.5",
     ],
     (6, 7): [
-        # Memory maturation lifecycle: STM → Working → Episodic → Semantic
+        # Memory maturation lifecycle: STM â†’ Working â†’ Episodic â†’ Semantic
         """CREATE TABLE IF NOT EXISTS memory_maturations (
             fiber_id TEXT NOT NULL,
             brain_id TEXT NOT NULL,
@@ -115,7 +115,7 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
         # Tag origin tracking: separate auto-generated tags from agent-provided tags
         "ALTER TABLE fibers ADD COLUMN auto_tags TEXT DEFAULT '[]'",
         "ALTER TABLE fibers ADD COLUMN agent_tags TEXT DEFAULT '[]'",
-        # Backfill: existing tags → agent_tags (conservative — can't determine origin retroactively)
+        # Backfill: existing tags â†’ agent_tags (conservative â€” can't determine origin retroactively)
         "UPDATE fibers SET agent_tags = tags WHERE tags != '[]'",
     ],
     (8, 9): [
@@ -135,7 +135,7 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
         "CREATE INDEX IF NOT EXISTS idx_co_activation_created ON co_activation_events(brain_id, created_at)",
     ],
     (9, 10): [
-        # Action event log — hippocampal buffer for habit learning
+        # Action event log â€” hippocampal buffer for habit learning
         """CREATE TABLE IF NOT EXISTS action_events (
             id TEXT NOT NULL,
             brain_id TEXT NOT NULL,
@@ -153,7 +153,7 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
         "CREATE INDEX IF NOT EXISTS idx_action_events_created ON action_events(brain_id, created_at)",
     ],
     (10, 11): [
-        # Brain versioning — point-in-time snapshots
+        # Brain versioning â€” point-in-time snapshots
         """CREATE TABLE IF NOT EXISTS brain_versions (
             id TEXT NOT NULL,
             brain_id TEXT NOT NULL,
@@ -172,6 +172,12 @@ MIGRATIONS: dict[tuple[int, int], list[str]] = {
         )""",
         "CREATE INDEX IF NOT EXISTS idx_brain_versions_number ON brain_versions(brain_id, version_number DESC)",
         "CREATE INDEX IF NOT EXISTS idx_brain_versions_created ON brain_versions(brain_id, created_at DESC)",
+    ],
+    (11, 12): [
+        # Composite index for synapse pair lookups (source_id + target_id)
+        "CREATE INDEX IF NOT EXISTS idx_synapses_pair ON synapses(brain_id, source_id, target_id)",
+        # Composite index for fiber tag searches
+        "CREATE INDEX IF NOT EXISTS idx_fibers_tags ON fibers(brain_id, tags)",
     ],
 }
 
@@ -198,7 +204,7 @@ async def run_migrations(conn: aiosqlite.Connection, current_version: int) -> in
         next_version = version + 1
         key = (version, next_version)
 
-        # FTS tables must exist before the v2→v3 backfill INSERT runs
+        # FTS tables must exist before the v2â†’v3 backfill INSERT runs
         if key == (2, 3):
             await ensure_fts_tables(conn)
 
@@ -217,7 +223,7 @@ async def run_migrations(conn: aiosqlite.Connection, current_version: int) -> in
                 ):
                     logger.debug("Migration already applied: %s", e)
                 else:
-                    logger.warning("Migration statement failed: %s — %s", sql[:80], e)
+                    logger.warning("Migration statement failed: %s â€” %s", sql[:80], e)
 
         version = next_version
 
@@ -300,6 +306,7 @@ CREATE TABLE IF NOT EXISTS synapses (
 );
 CREATE INDEX IF NOT EXISTS idx_synapses_source ON synapses(brain_id, source_id);
 CREATE INDEX IF NOT EXISTS idx_synapses_target ON synapses(brain_id, target_id);
+CREATE INDEX IF NOT EXISTS idx_synapses_pair ON synapses(brain_id, source_id, target_id);
 
 -- Fibers table
 CREATE TABLE IF NOT EXISTS fibers (

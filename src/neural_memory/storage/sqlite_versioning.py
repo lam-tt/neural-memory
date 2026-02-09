@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import zlib
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -25,8 +27,12 @@ class SQLiteVersioningMixin:
         version: BrainVersion,
         snapshot_json: str,
     ) -> None:
-        """Persist a brain version with its snapshot data."""
+        """Persist a brain version with its compressed snapshot data."""
         conn = self._ensure_conn()
+        # Compress snapshot for storage efficiency
+        compressed = base64.b64encode(zlib.compress(snapshot_json.encode("utf-8"), level=6)).decode(
+            "ascii"
+        )
         await conn.execute(
             """INSERT INTO brain_versions
                (id, brain_id, version_name, version_number, description,
@@ -43,7 +49,7 @@ class SQLiteVersioningMixin:
                 version.synapse_count,
                 version.fiber_count,
                 version.snapshot_hash,
-                snapshot_json,
+                compressed,
                 version.created_at.isoformat(),
                 json.dumps(version.metadata),
             ),
@@ -67,7 +73,10 @@ class SQLiteVersioningMixin:
             return None
 
         version = _row_to_version(row)
-        return version, row["snapshot_data"]
+        raw_data = row["snapshot_data"]
+        # Decompress: try zlib first, fall back to raw JSON for legacy data
+        snapshot_json = _decompress_snapshot(raw_data)
+        return version, snapshot_json
 
     async def list_versions(
         self,
@@ -109,6 +118,16 @@ class SQLiteVersioningMixin:
         )
         await conn.commit()
         return cursor.rowcount > 0
+
+
+def _decompress_snapshot(raw_data: str) -> str:
+    """Decompress snapshot data, with fallback for uncompressed legacy data."""
+    try:
+        compressed_bytes = base64.b64decode(raw_data)
+        return zlib.decompress(compressed_bytes).decode("utf-8")
+    except Exception:
+        # Legacy uncompressed data - return as-is
+        return raw_data
 
 
 def _row_to_version(row: aiosqlite.Row) -> BrainVersion:
