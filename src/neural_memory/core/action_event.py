@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import uuid4
 
+from neural_memory.utils.timeutils import utcnow
+
 
 @dataclass(frozen=True)
 class ActionEvent:
@@ -34,4 +36,4 @@ class ActionEvent:
     action_context: str = ""
     tags: tuple[str, ...] = ()
     fiber_id: str | None = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)

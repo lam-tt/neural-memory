@@ -12,6 +12,7 @@ from neural_memory.core.memory_types import MemoryType, TypedMemory
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.project import MemoryScope, Project
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 
 class TestProjectModel:
@@ -69,7 +70,7 @@ class TestProjectModel:
 
     def test_is_active_future_start(self) -> None:
         """Test that future projects are not active."""
-        future_start = datetime.utcnow() + timedelta(days=7)
+        future_start = utcnow() + timedelta(days=7)
         project = Project.create(
             name="Future",
             start_date=future_start,
@@ -79,8 +80,8 @@ class TestProjectModel:
 
     def test_is_active_ended(self) -> None:
         """Test that ended projects are not active."""
-        past_end = datetime.utcnow() - timedelta(days=1)
-        past_start = datetime.utcnow() - timedelta(days=10)
+        past_end = utcnow() - timedelta(days=1)
+        past_start = utcnow() - timedelta(days=10)
 
         project = Project(
             id="test-id",
@@ -115,7 +116,7 @@ class TestProjectModel:
     def test_with_end_date(self) -> None:
         """Test creating a copy with new end date."""
         project = Project.create(name="Test")
-        new_end = datetime.utcnow() + timedelta(days=30)
+        new_end = utcnow() + timedelta(days=30)
 
         updated = project.with_end_date(new_end)
 
@@ -220,7 +221,7 @@ class TestMemoryScope:
         """Test matching by time window."""
         scope = MemoryScope.recent(days=7)
 
-        now = datetime.utcnow()
+        now = utcnow()
         recent = now - timedelta(days=3)
         old = now - timedelta(days=10)
 
@@ -238,7 +239,7 @@ class TestMemoryScope:
         """Test relevance boost for recency."""
         scope = MemoryScope.recent(days=7)
 
-        now = datetime.utcnow()
+        now = utcnow()
         recent = now - timedelta(days=1)
         older = now - timedelta(days=6)
 
@@ -340,8 +341,8 @@ class TestProjectStorage:
         ended = Project(
             id="ended-id",
             name="Ended",
-            start_date=datetime.utcnow() - timedelta(days=10),
-            end_date=datetime.utcnow() - timedelta(days=1),
+            start_date=utcnow() - timedelta(days=10),
+            end_date=utcnow() - timedelta(days=1),
         )
         await storage.add_project(active)
         await storage.add_project(ended)

@@ -13,6 +13,7 @@ from neural_memory.integration.models import (
     SourceCapability,
     SourceSystemType,
 )
+from neural_memory.utils.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class LlamaIndexAdapter:
             metadata = getattr(node, "metadata", {}) or {}
             embedding = getattr(node, "embedding", None)
 
-            created_at = datetime.utcnow()
+            created_at = utcnow()
             if "created_at" in metadata:
                 try:
                     created_at = datetime.fromisoformat(str(metadata["created_at"]))

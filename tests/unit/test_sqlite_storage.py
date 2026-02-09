@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tempfile
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -16,6 +16,7 @@ from neural_memory.core.project import Project
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.storage.sqlite_neurons import _build_fts_prefix_query
 from neural_memory.storage.sqlite_store import SQLiteStorage
+from neural_memory.utils.timeutils import utcnow
 
 
 @pytest.fixture
@@ -347,7 +348,7 @@ class TestSQLiteTypedMemories:
         typed_mem = TypedMemory(
             fiber_id=fiber.id,
             memory_type=MemoryType.TODO,
-            expires_at=datetime.utcnow() - timedelta(days=1),
+            expires_at=utcnow() - timedelta(days=1),
         )
         await storage.add_typed_memory(typed_mem)
 
@@ -369,7 +370,7 @@ class TestSQLiteTypedMemories:
         typed_mem = TypedMemory(
             fiber_id=fiber.id,
             memory_type=MemoryType.TODO,
-            expires_at=datetime.utcnow() - timedelta(days=1),
+            expires_at=utcnow() - timedelta(days=1),
         )
         await storage.add_typed_memory(typed_mem)
 
@@ -420,8 +421,8 @@ class TestSQLiteProjects:
         ended = Project(
             id="ended-id",
             name="Ended",
-            start_date=datetime.utcnow() - timedelta(days=10),
-            end_date=datetime.utcnow() - timedelta(days=1),
+            start_date=utcnow() - timedelta(days=10),
+            end_date=utcnow() - timedelta(days=1),
         )
 
         await storage.add_project(active)

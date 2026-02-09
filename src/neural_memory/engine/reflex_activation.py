@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from neural_memory.engine.activation import ActivationResult
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     from neural_memory.core.brain import BrainConfig
@@ -91,7 +92,7 @@ class ReflexActivation:
             Dict mapping neuron_id to ActivationResult
         """
         if reference_time is None:
-            reference_time = datetime.utcnow()
+            reference_time = utcnow()
 
         results: dict[str, ActivationResult] = {}
 
@@ -301,7 +302,7 @@ class ReflexActivation:
             Tuple of (combined activations, co-activations)
         """
         if reference_time is None:
-            reference_time = datetime.utcnow()
+            reference_time = utcnow()
 
         # Activate from each anchor set in parallel
         tasks = [

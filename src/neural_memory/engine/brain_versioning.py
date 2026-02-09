@@ -14,6 +14,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
+from neural_memory.utils.timeutils import utcnow
+
 if TYPE_CHECKING:
     from neural_memory.core.brain import BrainSnapshot
     from neural_memory.storage.base import NeuralStorage
@@ -250,7 +252,7 @@ class VersioningEngine:
             synapse_count=len(snapshot.synapses),
             fiber_count=len(snapshot.fibers),
             snapshot_hash=snapshot_hash,
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
         )
 
         await self._storage.save_version(brain_id, version, snapshot_json)
@@ -359,7 +361,7 @@ class VersioningEngine:
             synapse_count=len(snapshot.synapses),
             fiber_count=len(snapshot.fibers),
             snapshot_hash=snapshot_hash,
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
             metadata={"rollback_from": version_id},
         )
 

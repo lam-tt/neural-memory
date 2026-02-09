@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 
+from neural_memory.utils.timeutils import utcnow
+
 
 class MemoryStage(StrEnum):
     """Memory maturation stages in order of consolidation."""
@@ -61,7 +63,7 @@ class MaturationRecord:
     fiber_id: str
     brain_id: str
     stage: MemoryStage = MemoryStage.SHORT_TERM
-    stage_entered_at: datetime = field(default_factory=datetime.utcnow)
+    stage_entered_at: datetime = field(default_factory=utcnow)
     rehearsal_count: int = 0
     reinforcement_timestamps: list[str] = field(default_factory=list)
 
@@ -74,7 +76,7 @@ class MaturationRecord:
         Returns:
             New MaturationRecord with updated rehearsal data
         """
-        now = now or datetime.utcnow()
+        now = now or utcnow()
         return MaturationRecord(
             fiber_id=self.fiber_id,
             brain_id=self.brain_id,
@@ -101,7 +103,7 @@ class MaturationRecord:
         Returns:
             New MaturationRecord in the new stage
         """
-        now = now or datetime.utcnow()
+        now = now or utcnow()
         return MaturationRecord(
             fiber_id=self.fiber_id,
             brain_id=self.brain_id,
@@ -150,9 +152,7 @@ class MaturationRecord:
 
         stage_entered_raw = data.get("stage_entered_at", "")
         stage_entered = (
-            datetime.fromisoformat(str(stage_entered_raw))
-            if stage_entered_raw
-            else datetime.utcnow()
+            datetime.fromisoformat(str(stage_entered_raw)) if stage_entered_raw else utcnow()
         )
 
         return cls(
@@ -183,7 +183,7 @@ def compute_stage_transition(
     Returns:
         New MaturationRecord (possibly in a new stage)
     """
-    now = now or datetime.utcnow()
+    now = now or utcnow()
     time_in_stage = now - record.stage_entered_at
 
     if record.stage == MemoryStage.SHORT_TERM:

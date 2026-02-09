@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -10,6 +10,7 @@ import pytest_asyncio
 from neural_memory.core.action_event import ActionEvent
 from neural_memory.core.brain import Brain
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 
 @pytest_asyncio.fixture
@@ -92,9 +93,9 @@ async def test_filter_by_since(store: InMemoryStorage) -> None:
 
     # Age the first event
     brain_id = store._get_brain_id()
-    store._action_events[brain_id][0]["created_at"] = datetime.utcnow() - timedelta(days=5)
+    store._action_events[brain_id][0]["created_at"] = utcnow() - timedelta(days=5)
 
-    cutoff = datetime.utcnow() - timedelta(days=1)
+    cutoff = utcnow() - timedelta(days=1)
     events = await store.get_action_sequences(since=cutoff)
     assert len(events) == 1
     assert events[0].action_type == "new-action"
@@ -125,11 +126,11 @@ async def test_prune_removes_old_keeps_recent(store: InMemoryStorage) -> None:
 
     # Age the first two events
     brain_id = store._get_brain_id()
-    old_time = datetime.utcnow() - timedelta(days=10)
+    old_time = utcnow() - timedelta(days=10)
     store._action_events[brain_id][0]["created_at"] = old_time
     store._action_events[brain_id][1]["created_at"] = old_time
 
-    cutoff = datetime.utcnow() - timedelta(days=1)
+    cutoff = utcnow() - timedelta(days=1)
     pruned = await store.prune_action_events(older_than=cutoff)
     assert pruned == 2
 

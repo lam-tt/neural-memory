@@ -126,15 +126,11 @@ async def get_activity(
     since: str | None = Query(default=None),
 ) -> ActivityResponse:
     """Get daily integration metrics and recent activity log."""
-    today_midnight = datetime.now(UTC).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    today_midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
     try:
         # All events today for metrics
-        today_events = await storage.get_action_sequences(
-            since=today_midnight, limit=1000
-        )
+        today_events = await storage.get_action_sequences(since=today_midnight, limit=1000)
     except Exception:
         logger.debug("Failed to fetch today's action events", exc_info=True)
         today_events = []
@@ -150,9 +146,7 @@ async def get_activity(
             pass
 
     try:
-        log_events = await storage.get_action_sequences(
-            since=since_dt, limit=limit
-        )
+        log_events = await storage.get_action_sequences(since=since_dt, limit=limit)
         # Reverse to get newest first
         log_events = list(reversed(log_events))
     except Exception:

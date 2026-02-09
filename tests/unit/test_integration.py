@@ -27,6 +27,7 @@ from neural_memory.integration.models import (
 )
 from neural_memory.integration.sync_engine import SyncEngine
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 # ---------------------------------------------------------------------------
 # Mock adapter for testing
@@ -252,7 +253,7 @@ class TestSyncState:
 
     def test_with_update_immutability(self) -> None:
         state = SyncState(source_system="test", source_collection="default")
-        now = datetime.utcnow()
+        now = utcnow()
         updated = state.with_update(last_sync_at=now, records_imported=10)
         # Original unchanged
         assert state.records_imported == 0
@@ -861,7 +862,7 @@ class TestAWFAdapter:
 
         adapter = AWFAdapter(brain_dir=brain_dir)
         with pytest.raises(NotImplementedError):
-            await adapter.fetch_since(since=datetime.utcnow())
+            await adapter.fetch_since(since=utcnow())
 
     def test_properties(self, brain_dir: Any) -> None:
         """Test adapter properties."""
@@ -980,7 +981,7 @@ class TestCogneeAdapter:
 
         adapter = CogneeAdapter(api_key="test-key")
         with pytest.raises(NotImplementedError):
-            await adapter.fetch_since(since=datetime.utcnow())
+            await adapter.fetch_since(since=utcnow())
 
     @pytest.mark.asyncio()
     async def test_health_check(self) -> None:
@@ -1318,7 +1319,7 @@ class TestLlamaIndexAdapter:
 
         adapter = LlamaIndexAdapter(persist_dir="/fake/path")
         with pytest.raises(NotImplementedError):
-            await adapter.fetch_since(since=datetime.utcnow())
+            await adapter.fetch_since(since=utcnow())
 
     @pytest.mark.asyncio()
     async def test_health_check(self) -> None:

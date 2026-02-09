@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import pytest
 
 from neural_memory.core.fiber import Fiber
+from neural_memory.utils.timeutils import utcnow
 
 
 class TestFiber:
@@ -137,7 +136,7 @@ class TestFiberConduct:
         """Test conduct updates last_conducted timestamp."""
         assert fiber.last_conducted is None
 
-        now = datetime.utcnow()
+        now = utcnow()
         conducted = fiber.conduct(conducted_at=now)
 
         assert conducted.last_conducted == now

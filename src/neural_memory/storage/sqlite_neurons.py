@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from neural_memory.core.neuron import Neuron, NeuronState, NeuronType
 from neural_memory.storage.sqlite_row_mappers import row_to_neuron, row_to_neuron_state
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -84,7 +85,7 @@ class SQLiteNeuronMixin:
                    (neuron_id, brain_id, firing_threshold, refractory_period_ms,
                     homeostatic_target, created_at)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (neuron.id, brain_id, 0.3, 500.0, 0.5, datetime.utcnow().isoformat()),
+                (neuron.id, brain_id, 0.3, 500.0, 0.5, utcnow().isoformat()),
             )
 
             await conn.commit()

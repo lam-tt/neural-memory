@@ -14,6 +14,8 @@ from typing import Any
 
 import aiohttp
 
+from neural_memory.utils.timeutils import utcnow
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +46,7 @@ class SyncEvent:
             brain_id=data["brain_id"],
             timestamp=datetime.fromisoformat(data["timestamp"])
             if data.get("timestamp")
-            else datetime.utcnow(),
+            else utcnow(),
             data=data.get("data", {}),
             source_client_id=data.get("source_client_id"),
         )
@@ -300,7 +302,7 @@ class SyncClient:
         event = {
             "type": event_type,
             "brain_id": brain_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow().isoformat(),
             "data": data or {},
         }
 

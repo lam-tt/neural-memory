@@ -20,13 +20,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.learning_rule import LearningConfig, anti_hebbian_update
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     from neural_memory.storage.base import NeuralStorage
@@ -341,7 +341,7 @@ async def resolve_conflicts(
         is_superseded = update.new_weight < supersede_threshold
         updated_neuron = existing_neuron.with_metadata(
             _disputed=True,
-            _disputed_at=datetime.utcnow().isoformat(),
+            _disputed_at=utcnow().isoformat(),
             _disputed_by=new_neuron_id,
             _superseded=is_superseded,
         )
@@ -356,7 +356,7 @@ async def resolve_conflicts(
             metadata={
                 "conflict_type": conflict.type.value,
                 "subject": conflict.subject,
-                "detected_at": datetime.utcnow().isoformat(),
+                "detected_at": utcnow().isoformat(),
             },
         )
 

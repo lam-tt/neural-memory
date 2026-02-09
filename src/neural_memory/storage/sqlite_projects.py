@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from neural_memory.core.project import Project
 from neural_memory.storage.sqlite_row_mappers import row_to_project
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -87,7 +87,7 @@ class SQLiteProjectMixin:
         params: list[Any] = [brain_id]
 
         if active_only:
-            now = datetime.utcnow().isoformat()
+            now = utcnow().isoformat()
             query += " AND start_date <= ? AND (end_date IS NULL OR end_date > ?)"
             params.extend([now, now])
 

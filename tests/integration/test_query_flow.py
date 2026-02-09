@@ -13,6 +13,7 @@ from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 
 class TestQueryFlow:
@@ -238,7 +239,7 @@ class TestHybridFallback:
             fiber_id="f1",
         )
         fiber = fiber.conduct(
-            conducted_at=datetime.utcnow() - timedelta(hours=1),
+            conducted_at=utcnow() - timedelta(hours=1),
             reinforce=False,
         )
         await storage.add_fiber(fiber)
@@ -293,7 +294,7 @@ class TestHybridFallback:
         )
         hybrid_activations, intersections, co_acts = await pipeline._reflex_query(
             anchor_sets=[["nA"]],
-            reference_time=datetime.utcnow(),
+            reference_time=utcnow(),
         )
         hybrid_ids = set(hybrid_activations.keys())
 
@@ -320,7 +321,7 @@ class TestHybridFallback:
         )
         activations, _, _ = await pipeline._reflex_query(
             anchor_sets=[["nA"]],
-            reference_time=datetime.utcnow(),
+            reference_time=utcnow(),
         )
 
         # nB is in fiber pathway (reflex primary)
@@ -350,7 +351,7 @@ class TestHybridFallback:
         # nD is not in any fiber -- should fall back to pure classic
         activations, intersections, co_acts = await pipeline._reflex_query(
             anchor_sets=[["nD"]],
-            reference_time=datetime.utcnow(),
+            reference_time=utcnow(),
         )
 
         # Should find nD and its neighbor nE via classic activation

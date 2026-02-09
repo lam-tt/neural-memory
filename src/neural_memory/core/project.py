@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
+from neural_memory.utils.timeutils import utcnow
+
 
 @dataclass(frozen=True)
 class Project:
@@ -23,12 +25,12 @@ class Project:
     id: str
     name: str
     description: str = ""
-    start_date: datetime = field(default_factory=datetime.utcnow)
+    start_date: datetime = field(default_factory=utcnow)
     end_date: datetime | None = None  # None = ongoing
     tags: frozenset[str] = field(default_factory=frozenset)
     priority: float = 1.0  # Higher = more important
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
 
     @classmethod
     def create(
@@ -57,7 +59,7 @@ class Project:
         Returns:
             New Project instance
         """
-        now = datetime.utcnow()
+        now = utcnow()
         start = start_date or now
 
         # Calculate end_date from duration if provided
@@ -80,7 +82,7 @@ class Project:
     @property
     def is_active(self) -> bool:
         """Check if project is currently active."""
-        now = datetime.utcnow()
+        now = utcnow()
         if now < self.start_date:
             return False
         if self.end_date is not None and now > self.end_date:
@@ -97,7 +99,7 @@ class Project:
         """Get days remaining until project end, or None if ongoing."""
         if self.end_date is None:
             return None
-        delta = self.end_date - datetime.utcnow()
+        delta = self.end_date - utcnow()
         return max(0, delta.days)
 
     @property
@@ -221,7 +223,7 @@ class MemoryScope:
 
         # Time window filter
         if self.time_window_days is not None and created_at is not None:
-            cutoff = datetime.utcnow() - timedelta(days=self.time_window_days)
+            cutoff = utcnow() - timedelta(days=self.time_window_days)
             if created_at < cutoff:
                 return False
 
@@ -245,7 +247,7 @@ class MemoryScope:
 
         # Recency boost (exponential decay within window)
         if self.time_window_days is not None and created_at is not None:
-            days_ago = (datetime.utcnow() - created_at).days
+            days_ago = (utcnow() - created_at).days
             if days_ago <= self.time_window_days:
                 # Linear decay: 1.5 at day 0, 1.0 at window edge
                 recency_factor = 1.0 + 0.5 * (1 - days_ago / self.time_window_days)

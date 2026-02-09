@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from neural_memory.core.memory_types import (
     DEFAULT_EXPIRY_DAYS,
@@ -13,6 +13,7 @@ from neural_memory.core.memory_types import (
     TypedMemory,
     suggest_memory_type,
 )
+from neural_memory.utils.timeutils import utcnow
 
 
 class TestMemoryType:
@@ -165,7 +166,7 @@ class TestTypedMemory:
         mem = TypedMemory(
             fiber_id="fiber-123",
             memory_type=MemoryType.CONTEXT,
-            expires_at=datetime.utcnow() - timedelta(days=1),
+            expires_at=utcnow() - timedelta(days=1),
         )
         assert mem.is_expired is True
 
@@ -174,7 +175,7 @@ class TestTypedMemory:
         mem = TypedMemory(
             fiber_id="fiber-123",
             memory_type=MemoryType.CONTEXT,
-            expires_at=datetime.utcnow() + timedelta(days=7),
+            expires_at=utcnow() + timedelta(days=7),
         )
         assert mem.is_expired is False
 

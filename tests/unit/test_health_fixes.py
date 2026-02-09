@@ -25,6 +25,7 @@ from neural_memory.engine.diagnostics import DiagnosticsEngine
 from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval_context import _TOKEN_RATIO, _estimate_tokens, format_context
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ def _make_fiber(
     time_end: datetime | None = None,
 ) -> Fiber:
     """Create a minimal fiber around an anchor neuron."""
-    ts = time_start or datetime.utcnow()
+    ts = time_start or utcnow()
     te = time_end or ts
     return Fiber.create(
         neuron_ids={anchor.id},
@@ -344,7 +345,7 @@ class TestTemporalNeighborSynapses:
         (meaning: current happened AFTER older).
         """
         encoder, store = encoder_and_storage
-        now = datetime.utcnow()
+        now = utcnow()
 
         # Create an older fiber (1 hour before 'now')
         older_anchor = _make_neuron("older memory content", neuron_id="n-older")
@@ -387,7 +388,7 @@ class TestTemporalNeighborSynapses:
         (meaning: current happened BEFORE newer).
         """
         encoder, store = encoder_and_storage
-        now = datetime.utcnow()
+        now = utcnow()
 
         # Create a newer fiber (1 hour after 'now')
         newer_anchor = _make_neuron("newer memory content", neuron_id="n-newer")
@@ -429,7 +430,7 @@ class TestTemporalNeighborSynapses:
         the synapse type should be RELATED_TO.
         """
         encoder, store = encoder_and_storage
-        now = datetime.utcnow()
+        now = utcnow()
 
         # Create a fiber with the exact same timestamp
         same_anchor = _make_neuron("same-time memory content", neuron_id="n-same")

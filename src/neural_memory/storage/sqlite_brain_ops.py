@@ -19,6 +19,7 @@ from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.project import Project
 from neural_memory.core.synapse import Direction, Synapse, SynapseType
 from neural_memory.storage.sqlite_row_mappers import row_to_brain
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -104,7 +105,7 @@ class SQLiteBrainMixin:
         return BrainSnapshot(
             brain_id=brain_id,
             brain_name=brain.name,
-            exported_at=datetime.utcnow(),
+            exported_at=utcnow(),
             version="0.1.0",
             neurons=neurons,
             synapses=synapses,
@@ -192,7 +193,7 @@ class SQLiteBrainMixin:
                    (neuron_id, brain_id, firing_threshold, refractory_period_ms,
                     homeostatic_target, created_at)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (neuron.id, brain_id, 0.3, 500.0, 0.5, datetime.utcnow().isoformat()),
+                (neuron.id, brain_id, 0.3, 500.0, 0.5, utcnow().isoformat()),
             )
 
     async def _import_synapses(self, synapses_data: list[dict]) -> None:

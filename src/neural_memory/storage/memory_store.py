@@ -19,6 +19,7 @@ from neural_memory.engine.brain_versioning import BrainVersion
 from neural_memory.storage.base import NeuralStorage
 from neural_memory.storage.memory_brain_ops import InMemoryBrainMixin
 from neural_memory.storage.memory_collections import InMemoryCollectionsMixin
+from neural_memory.utils.timeutils import utcnow
 
 
 class InMemoryStorage(InMemoryCollectionsMixin, InMemoryBrainMixin, NeuralStorage):
@@ -491,7 +492,7 @@ class InMemoryStorage(InMemoryCollectionsMixin, InMemoryBrainMixin, NeuralStorag
                 "neuron_b": b,
                 "binding_strength": binding_strength,
                 "source_anchor": source_anchor,
-                "created_at": datetime.utcnow(),
+                "created_at": utcnow(),
             }
         )
         return event_id
@@ -549,7 +550,7 @@ class InMemoryStorage(InMemoryCollectionsMixin, InMemoryBrainMixin, NeuralStorag
                 "action_context": action_context,
                 "tags": tuple(tags),
                 "fiber_id": fiber_id,
-                "created_at": datetime.utcnow(),
+                "created_at": utcnow(),
             }
         )
         return event_id

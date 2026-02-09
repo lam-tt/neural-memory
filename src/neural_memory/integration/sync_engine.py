@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from neural_memory.integration.mapper import RecordMapper
@@ -16,6 +15,7 @@ from neural_memory.integration.models import (
     SourceCapability,
     SyncState,
 )
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     from neural_memory.core.brain import BrainConfig
@@ -159,7 +159,7 @@ class SyncEngine:
         duration = time.monotonic() - start_time
 
         updated_state = sync_state.with_update(
-            last_sync_at=datetime.utcnow(),
+            last_sync_at=utcnow(),
             records_imported=sync_state.records_imported + imported_count,
             last_record_id=records[-1].id if records else sync_state.last_record_id,
         )

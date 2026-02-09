@@ -12,6 +12,7 @@ from neural_memory.integration.models import (
     SourceCapability,
     SourceSystemType,
 )
+from neural_memory.utils.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,7 @@ class ChromaDBAdapter:
             metadata = metadatas[i] if i < len(metadatas) and metadatas[i] else {}
             embedding = embeddings[i] if embeddings and i < len(embeddings) else None
 
-            created_at = datetime.utcnow()
+            created_at = utcnow()
             if "created_at" in metadata:
                 try:
                     created_at = datetime.fromisoformat(str(metadata["created_at"]))

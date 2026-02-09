@@ -9,6 +9,8 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
+from neural_memory.utils.timeutils import utcnow
+
 
 class SynapseType(StrEnum):
     """Types of synaptic connections between neurons."""
@@ -106,7 +108,7 @@ class Synapse:
     metadata: dict[str, Any] = field(default_factory=dict)
     reinforced_count: int = 0
     last_activated: datetime | None = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
 
     @classmethod
     def create(
@@ -148,7 +150,7 @@ class Synapse:
             weight=max(0.0, min(1.0, weight)),
             direction=direction,
             metadata=metadata or {},
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
         )
 
     def reinforce(
@@ -174,7 +176,7 @@ class Synapse:
         Returns:
             New Synapse with increased weight (capped at 1.0)
         """
-        now = now or datetime.utcnow()
+        now = now or utcnow()
 
         if pre_activation is not None and post_activation is not None:
             from neural_memory.engine.learning_rule import LearningConfig, hebbian_update
@@ -243,7 +245,7 @@ class Synapse:
             New Synapse with time-decayed weight (floor at 30% of original)
         """
         if reference_time is None:
-            reference_time = datetime.utcnow()
+            reference_time = utcnow()
 
         if self.last_activated:
             hours_since = (reference_time - self.last_activated).total_seconds() / 3600

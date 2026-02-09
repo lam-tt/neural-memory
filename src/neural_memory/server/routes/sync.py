@@ -12,6 +12,8 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from neural_memory.utils.timeutils import utcnow
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sync", tags=["sync"])
@@ -57,7 +59,7 @@ class SyncEvent:
 
     type: SyncEventType
     brain_id: str
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=utcnow)
     data: dict[str, Any] = field(default_factory=dict)
     source_client_id: str | None = None
 
@@ -83,7 +85,7 @@ class SyncEvent:
             brain_id=data["brain_id"],
             timestamp=datetime.fromisoformat(data["timestamp"])
             if data.get("timestamp")
-            else datetime.utcnow(),
+            else utcnow(),
             data=data.get("data", {}),
             source_client_id=data.get("source_client_id"),
         )
@@ -96,7 +98,7 @@ class ConnectedClient:
     client_id: str
     websocket: WebSocket
     brain_ids: set[str] = field(default_factory=set)
-    connected_at: datetime = field(default_factory=datetime.utcnow)
+    connected_at: datetime = field(default_factory=utcnow)
 
     async def send_event(self, event: SyncEvent) -> bool:
         """Send event to client. Returns False if connection closed."""

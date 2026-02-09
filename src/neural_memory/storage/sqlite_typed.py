@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from neural_memory.core.memory_types import MemoryType, Priority, TypedMemory
 from neural_memory.storage.sqlite_row_mappers import provenance_to_dict, row_to_typed_memory
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -90,7 +90,7 @@ class SQLiteTypedMemoryMixin:
 
         if not include_expired:
             query += " AND (expires_at IS NULL OR expires_at > ?)"
-            params.append(datetime.utcnow().isoformat())
+            params.append(utcnow().isoformat())
 
         if project_id is not None:
             query += " AND project_id = ?"
@@ -155,7 +155,7 @@ class SQLiteTypedMemoryMixin:
         async with conn.execute(
             """SELECT * FROM typed_memories
                WHERE brain_id = ? AND expires_at IS NOT NULL AND expires_at <= ?""",
-            (brain_id, datetime.utcnow().isoformat()),
+            (brain_id, utcnow().isoformat()),
         ) as cursor:
             rows = await cursor.fetchall()
             return [row_to_typed_memory(row) for row in rows]

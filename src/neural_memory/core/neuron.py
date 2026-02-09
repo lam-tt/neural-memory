@@ -9,6 +9,8 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
+from neural_memory.utils.timeutils import utcnow
+
 
 class NeuronType(StrEnum):
     """Types of neurons in the memory system."""
@@ -44,7 +46,7 @@ class Neuron:
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
     content_hash: int = 0
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
 
     @classmethod
     def create(
@@ -74,7 +76,7 @@ class Neuron:
             content=content,
             metadata=metadata or {},
             content_hash=content_hash,
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
         )
 
     def with_metadata(self, **kwargs: Any) -> Neuron:
@@ -119,7 +121,7 @@ class NeuronState:
     access_frequency: int = 0
     last_activated: datetime | None = None
     decay_rate: float = 0.1
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
     firing_threshold: float = 0.3
     refractory_until: datetime | None = None
     refractory_period_ms: float = 500.0
@@ -146,7 +148,7 @@ class NeuronState:
         Returns:
             New NeuronState with updated activation
         """
-        now = now or datetime.utcnow()
+        now = now or utcnow()
 
         # Refractory check: neuron cannot fire during cooldown
         if self.refractory_until is not None and now < self.refractory_until:
@@ -217,4 +219,4 @@ class NeuronState:
         """Check if neuron is in refractory cooldown period."""
         if self.refractory_until is None:
             return False
-        return datetime.utcnow() < self.refractory_until
+        return utcnow() < self.refractory_until

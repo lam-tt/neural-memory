@@ -16,6 +16,7 @@ from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.brain_versioning import BrainVersion
 from neural_memory.storage.sqlite_store import SQLiteStorage
 from neural_memory.storage.sqlite_versioning import _row_to_version
+from neural_memory.utils.timeutils import utcnow
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ def _make_version(
         synapse_count=synapse_count,
         fiber_count=fiber_count,
         snapshot_hash=snapshot_hash,
-        created_at=datetime.utcnow(),
+        created_at=utcnow(),
         metadata=metadata or {},
     )
 
@@ -280,7 +281,7 @@ class TestRowToVersion:
             "fiber_count": 2,
             "snapshot_hash": "hash123",
             "snapshot_data": "{}",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": utcnow().isoformat(),
             "metadata": metadata_raw,
         }
 

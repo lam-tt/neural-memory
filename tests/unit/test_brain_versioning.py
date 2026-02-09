@@ -18,6 +18,7 @@ from neural_memory.engine.brain_versioning import (
     _snapshot_to_json,
 )
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -419,7 +420,6 @@ class TestVersionDiff:
 
     def test_brain_version_frozen(self) -> None:
         """BrainVersion should be immutable."""
-        from datetime import datetime
 
         version = BrainVersion(
             id="v1",
@@ -431,7 +431,7 @@ class TestVersionDiff:
             synapse_count=0,
             fiber_count=0,
             snapshot_hash="abc",
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
         )
         with pytest.raises(AttributeError):
             version.version_name = "changed"  # type: ignore[misc]

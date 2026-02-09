@@ -21,7 +21,7 @@ Người dùng đã làm việc 45 giờ liên tục với OpenClaw agent. Agent
 
 ## OpenClaw Memory: Mạnh Mẽ Nhưng Mong Manh
 
-OpenClaw (172k stars, 60k Discord members, 3,500+ skills) là open-source AI agent phổ biến nhất thế giới. Nhưng hệ thống bộ nhớ của nó có 1 thiết kế gây tranh cãi:
+OpenClaw (178k stars, 60k Discord members, 3,500+ skills) là open-source AI agent phổ biến nhất thế giới. Nhưng hệ thống bộ nhớ của nó có 1 thiết kế gây tranh cãi:
 
 **Bộ nhớ = Markdown files.**
 
@@ -59,7 +59,7 @@ Kết quả? Cộng đồng OpenClaw tràn ngập workarounds: [8 cách ngăn ag
 > *"OpenClaw has amazing hands for a brain that doesn't yet exist."*
 > — [Ben Goertzel](https://bengoertzel.substack.com/p/openclaw-amazing-hands-for-a-brain)
 
-[Neural Memory](https://github.com/nhadaututtheky/neural-memory) (v1.0.2) là hệ thống bộ nhớ dựa trên **neural graph** — không dùng embedding, không dùng vector search, không cần LLM. Thay vào đó, nó mô phỏng cách não người hoạt động:
+[Neural Memory](https://github.com/nhadaututtheky/neural-memory) (v1.3.0) là hệ thống bộ nhớ dựa trên **neural graph** — không dùng embedding, không dùng vector search, không cần LLM. Thay vào đó, nó mô phỏng cách não người hoạt động:
 
 - **Neurons** = đơn vị thông tin (facts, decisions, errors, concepts)
 - **Synapses** = liên kết giữa các neurons (có trọng số, tự tăng/giảm)
@@ -83,7 +83,7 @@ Query: "Tại sao chọn Redis?"
 → Trả về: chuỗi nhân quả hoàn chỉnh, không phải keyword snippets
 ```
 
-### 10 tính năng thay đổi cuộc chơi
+### 12 tính năng thay đổi cuộc chơi
 
 #### 1. Bộ nhớ sống ngoài context window
 
@@ -223,7 +223,32 @@ Session 3: recall → edit → ...
 
 Spreading activation qua strong BEFORE synapses = suggestion engine tự nhiên. Không cần workflow config.
 
-#### 10. Zero cost — không embedding, không API, không GPU
+#### 10. Dashboard + Integration Status
+
+v1.2.0 thêm dashboard tại `http://localhost:8000/dashboard` với 5 tab:
+
+- **Overview** — stats, quick actions, brain list, health summary
+- **Neural Graph** — Cytoscape.js explorer với search/filter/zoom
+- **Integrations** — Live metrics (memories/recalls today), activity log, setup wizards
+- **Health** — Radar chart, warnings, recommendations
+- **Settings** — Language (EN/VI), brain export/import
+
+v1.3.0 mở rộng Integrations tab: activity log realtime, setup wizards cho Claude Code/Cursor/OpenClaw, import source detection cho ChromaDB/Mem0/Cognee.
+
+#### 11. OpenClaw Plugin (v1.4.0)
+
+Cài đặt native plugin thay vì SKILL:
+
+```bash
+npm install -g @neuralmemory/openclaw-plugin
+```
+
+Plugin tự động:
+- Inject memory context trước mỗi agent session
+- Auto-capture decisions, errors sau mỗi session
+- 6 tools registered trực tiếp vào OpenClaw
+
+#### 12. Zero cost — không embedding, không API, không GPU
 
 | | OpenClaw Memory | Neural Memory |
 |-|----------------|---------------|
@@ -233,20 +258,28 @@ Spreading activation qua strong BEFORE synapses = suggestion engine tự nhiên.
 | Offline? | Chỉ với local GGUF | 100% offline |
 | RAM cho model? | 2-8GB cho GGUF | 0 |
 
-Neural Memory là **pure algorithmic** — 1,340 unit tests, Python thuần, SQLite storage, 16 MCP tools. Không phụ thuộc bất kỳ AI service nào.
+Neural Memory là **pure algorithmic** — 1,352 tests, Python thuần, SQLite storage, 16 MCP tools. Không phụ thuộc bất kỳ AI service nào.
 
 ---
 
-## Tích hợp: 5 phút, 3 bước
+## Tích hợp: 2 cách, 5 phút
 
-### Bước 1: Cài đặt
+### Cách 1: OpenClaw Plugin (khuyên dùng)
+
+```bash
+pip install neural-memory
+nmem init
+npm install -g @neuralmemory/openclaw-plugin
+```
+
+Plugin tự động register 6 tools, inject context trước session, auto-capture sau session. Zero config.
+
+### Cách 2: MCP Skill (manual)
 
 ```bash
 pip install neural-memory
 nmem init
 ```
-
-### Bước 2: Thêm skill vào OpenClaw
 
 Tạo file `.openclaw/skills/neural-memory/SKILL.md`:
 
@@ -262,45 +295,26 @@ mcp:
 # Neural Memory Skill
 
 Persistent memory system using neural graph + spreading activation.
-Replaces flat file memory with associative recall.
-
-## Tools available (16 MCP tools)
-
-### Core Memory
-- nmem_remember: Save memories (decisions, facts, errors, preferences)
-- nmem_recall: Query with spreading activation (depth 0-3)
-- nmem_context: Load recent memories
-- nmem_todo: Quick TODO with auto-expiry
-
-### Intelligence
-- nmem_auto: Auto-capture from conversations
-- nmem_temporal: Causal chain + event sequence queries
-- nmem_habits: Workflow suggestions from learned patterns
-
-### Management
-- nmem_stats: Brain statistics
-- nmem_health: Brain diagnostics with purity score + grade
-- nmem_version: Brain versioning (save, rollback, diff)
-- nmem_transplant: Partial brain merge by topic/tags
-- nmem_consolidate: Run consolidation strategies
-- nmem_update: Self-update NeuralMemory
+16 MCP tools: nmem_remember, nmem_recall, nmem_context, nmem_todo,
+nmem_auto, nmem_temporal, nmem_habits, nmem_stats, nmem_health,
+nmem_version, nmem_transplant, nmem_consolidate, nmem_update, ...
 ```
 
-### Bước 3: Thêm rules
+### Claude Code / Cursor
 
-Thêm vào `.openclaw/rules/memory.md`:
+Thêm vào MCP config (`~/.claude/claude_desktop_config.json` hoặc Cursor settings):
 
-```markdown
-# Memory Rules
-
-1. Đầu session: gọi nmem_recap() để nạp context
-2. Trước khi hỏi user: gọi nmem_recall() kiểm tra đã biết chưa
-3. Sau mỗi quyết định: gọi nmem_remember(type="decision", priority=7)
-4. Sau mỗi bug fix: gọi nmem_remember(type="error", priority=7)
-5. Cuối session: gọi nmem_session(action="end")
+```json
+{
+  "mcpServers": {
+    "neural-memory": {
+      "command": "nmem-mcp"
+    }
+  }
+}
 ```
 
-**Done.** OpenClaw agent giờ có neural memory.
+**Done.** Agent giờ có neural memory — bất kể bạn dùng OpenClaw, Claude Code, hay Cursor.
 
 ---
 
@@ -325,7 +339,7 @@ Thêm vào `.openclaw/rules/memory.md`:
 | **Offline** | Partial (cần GGUF) | Không | 100% |
 | **Cross-agent** | Không | Cloud sync | Portable SQLite brains |
 | **Compaction-safe** | Không (vấn đề chính) | Có | Có |
-| **Tests** | N/A | N/A | 1,340 tests |
+| **Tests** | N/A | N/A | 1,352 tests |
 | **MCP tools** | N/A | N/A | 16 tools |
 | **Open source** | Có | Có (core) | Có (MIT) |
 
@@ -435,7 +449,9 @@ Neural Memory mang đến:
 - **Habit learning** — phát hiện workflow patterns, gợi ý next action
 - **Brain diagnostics** — purity score, grade A-F, actionable recommendations
 - **Zero cost** — không embedding, không API, không GPU
-- **Production-grade** — 1,340 tests, 16 MCP tools, MIT license, v1.0.2
+- **Dashboard** — neural graph explorer, integration status, health radar
+- **OpenClaw plugin** — native integration, auto-context, auto-capture
+- **Production-grade** — 1,352 tests, 16 MCP tools, MIT license, v1.3.0
 
 Cài đặt mất 5 phút. Cải thiện kéo dài mãi mãi.
 
@@ -448,8 +464,10 @@ OpenClaw đã có đôi tay tuyệt vời. Giờ hãy cho nó một bộ não.
 
 ---
 
-*[Neural Memory](https://github.com/nhadaututtheky/neural-memory) — Reflex-based memory system for AI agents. Retrieval through activation, not search. v1.0.2, 1,340 tests, 16 MCP tools.*
+*[Neural Memory](https://github.com/nhadaututtheky/neural-memory) — Reflex-based memory system for AI agents. Retrieval through activation, not search. v1.3.0, 1,352 tests, 16 MCP tools.*
 
-*[OpenClaw](https://github.com/openclaw/openclaw) — Open-source autonomous AI agent.*
+*[OpenClaw Plugin](https://www.npmjs.com/package/@neuralmemory/openclaw-plugin) — Native OpenClaw integration. `npm install -g @neuralmemory/openclaw-plugin`*
 
 *[ClawHub Skill](https://clawhub.ai/skills/neural-memory) — Install NeuralMemory as an OpenClaw skill in one click.*
+
+*[Dashboard](http://localhost:8000/dashboard) — Neural graph explorer, integration status, health diagnostics. `nmem serve`*

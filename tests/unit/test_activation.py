@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 
@@ -13,6 +13,7 @@ from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.activation import ActivationResult, SpreadingActivation
 from neural_memory.engine.reflex_activation import CoActivation, ReflexActivation
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 
 class TestSpreadingActivation:
@@ -241,7 +242,7 @@ class TestReflexActivation:
             fiber_id="fiber1",
         )
         # Set conductivity and last_conducted
-        fiber = fiber.conduct(conducted_at=datetime.utcnow() - timedelta(hours=1))
+        fiber = fiber.conduct(conducted_at=utcnow() - timedelta(hours=1))
         await storage.add_fiber(fiber)
 
         return storage
@@ -301,7 +302,7 @@ class TestReflexActivation:
 
         # Get fiber and set it as recently conducted
         fibers = await storage_with_fibers.find_fibers()
-        recent_fiber = fibers[0].conduct(conducted_at=datetime.utcnow())
+        recent_fiber = fibers[0].conduct(conducted_at=utcnow())
         await storage_with_fibers.update_fiber(recent_fiber)
 
         recent_fibers = await storage_with_fibers.find_fibers()
@@ -310,11 +311,11 @@ class TestReflexActivation:
         recent_results = await reflex.activate_trail(
             anchor_neurons=["time1"],
             fibers=recent_fibers,
-            reference_time=datetime.utcnow(),
+            reference_time=utcnow(),
         )
 
         # Set fiber as old
-        old_fiber = fibers[0].conduct(conducted_at=datetime.utcnow() - timedelta(days=5))
+        old_fiber = fibers[0].conduct(conducted_at=utcnow() - timedelta(days=5))
         await storage_with_fibers.update_fiber(old_fiber)
         old_fibers = await storage_with_fibers.find_fibers()
 
@@ -322,7 +323,7 @@ class TestReflexActivation:
         old_results = await reflex.activate_trail(
             anchor_neurons=["time1"],
             fibers=old_fibers,
-            reference_time=datetime.utcnow(),
+            reference_time=utcnow(),
         )
 
         # Recent fiber should result in higher activation

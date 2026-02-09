@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 
@@ -15,6 +15,7 @@ from neural_memory.core.memory_types import (
 )
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 
 @pytest.fixture
@@ -160,7 +161,7 @@ class TestTypedMemoryStorage:
         typed_mem = TypedMemory(
             fiber_id=fiber.id,
             memory_type=MemoryType.CONTEXT,
-            expires_at=datetime.utcnow() - timedelta(days=1),
+            expires_at=utcnow() - timedelta(days=1),
         )
         await storage.add_typed_memory(typed_mem)
 
@@ -231,7 +232,7 @@ class TestTypedMemoryStorage:
         typed_mem = TypedMemory(
             fiber_id=fiber.id,
             memory_type=MemoryType.TODO,
-            expires_at=datetime.utcnow() - timedelta(days=1),
+            expires_at=utcnow() - timedelta(days=1),
         )
         await storage.add_typed_memory(typed_mem)
 

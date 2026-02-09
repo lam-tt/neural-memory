@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+from neural_memory.utils.timeutils import utcnow
+
 
 @dataclass(frozen=True)
 class BrainConfig:
@@ -174,8 +176,8 @@ class Brain:
     synapse_count: int = 0
     fiber_count: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
+    updated_at: datetime = field(default_factory=utcnow)
 
     @classmethod
     def create(
@@ -208,8 +210,8 @@ class Brain:
             owner_id=owner_id,
             is_public=is_public,
             metadata=metadata or {},
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=utcnow(),
+            updated_at=utcnow(),
         )
 
     def share_with(self, user_id: str) -> Brain:
@@ -237,7 +239,7 @@ class Brain:
             fiber_count=self.fiber_count,
             metadata=self.metadata,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=utcnow(),
         )
 
     def unshare_with(self, user_id: str) -> Brain:
@@ -262,7 +264,7 @@ class Brain:
             fiber_count=self.fiber_count,
             metadata=self.metadata,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=utcnow(),
         )
 
     def make_public(self) -> Brain:
@@ -279,7 +281,7 @@ class Brain:
             fiber_count=self.fiber_count,
             metadata=self.metadata,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=utcnow(),
         )
 
     def make_private(self) -> Brain:
@@ -296,7 +298,7 @@ class Brain:
             fiber_count=self.fiber_count,
             metadata=self.metadata,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=utcnow(),
         )
 
     def with_config(self, config: BrainConfig) -> Brain:
@@ -313,7 +315,7 @@ class Brain:
             fiber_count=self.fiber_count,
             metadata=self.metadata,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=utcnow(),
         )
 
     def with_stats(
@@ -335,7 +337,7 @@ class Brain:
             fiber_count=fiber_count if fiber_count is not None else self.fiber_count,
             metadata=self.metadata,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=utcnow(),
         )
 
     def can_access(self, user_id: str | None) -> bool:

@@ -7,6 +7,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from neural_memory.core.action_event import ActionEvent
+from neural_memory.utils.timeutils import utcnow
 
 
 class SQLiteActionLogMixin:
@@ -53,7 +54,7 @@ class SQLiteActionLogMixin:
                 action_context,
                 json.dumps(list(tags)),
                 fiber_id,
-                datetime.utcnow().isoformat(),
+                utcnow().isoformat(),
             ),
         )
         await conn.commit()

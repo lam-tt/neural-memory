@@ -13,6 +13,7 @@ from neural_memory.integration.models import (
     SourceCapability,
     SourceSystemType,
 )
+from neural_memory.utils.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class Mem0Adapter:
 
             metadata = mem.get("metadata", {}) or {}
 
-            created_at = datetime.utcnow()
+            created_at = utcnow()
             if "created_at" in mem:
                 try:
                     created_at = datetime.fromisoformat(

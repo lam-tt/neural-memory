@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import uuid4
 
+from neural_memory.utils.timeutils import utcnow
+
 
 class SQLiteCoActivationMixin:
     """Co-activation event persistence for SQLiteStorage.
@@ -39,7 +41,7 @@ class SQLiteCoActivationMixin:
                 b,
                 binding_strength,
                 source_anchor,
-                datetime.utcnow().isoformat(),
+                utcnow().isoformat(),
             ),
         )
         await conn.commit()

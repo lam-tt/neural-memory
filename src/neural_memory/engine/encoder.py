@@ -18,6 +18,7 @@ from neural_memory.extraction.sentiment import SentimentExtractor, Valence
 from neural_memory.extraction.temporal import TemporalExtractor
 from neural_memory.utils.simhash import is_near_duplicate, simhash
 from neural_memory.utils.tag_normalizer import TagNormalizer
+from neural_memory.utils.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class MemoryEncoder:
             EncodingResult with created structures
         """
         if timestamp is None:
-            timestamp = datetime.utcnow()
+            timestamp = utcnow()
 
         neurons_created: list[Neuron] = []
         neurons_linked: list[str] = []

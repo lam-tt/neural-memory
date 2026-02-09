@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -13,6 +13,7 @@ from neural_memory.server.routes.integration_status import (
     _extract_source,
 )
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 
 @pytest_asyncio.fixture
@@ -151,7 +152,7 @@ async def test_since_filter_excludes_old(store: InMemoryStorage) -> None:
     await store.record_action("remember", action_context="now")
 
     # Query with since = far in the future excludes all (naive to match storage)
-    future = datetime.utcnow() + timedelta(hours=1)
+    future = utcnow() + timedelta(hours=1)
     events = await store.get_action_sequences(since=future)
     assert len(events) == 0
 

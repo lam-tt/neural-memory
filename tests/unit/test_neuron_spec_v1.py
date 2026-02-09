@@ -10,6 +10,7 @@ from neural_memory.core.brain import BrainConfig
 from neural_memory.core.neuron import NeuronState
 from neural_memory.engine.activation import ActivationResult
 from neural_memory.engine.retrieval import ReflexPipeline
+from neural_memory.utils.timeutils import utcnow
 
 
 class TestSigmoidActivation:
@@ -125,12 +126,12 @@ class TestRefractoryPeriod:
         assert not state.in_refractory
 
         # Set refractory in the future
-        future = datetime.utcnow() + timedelta(seconds=10)
+        future = utcnow() + timedelta(seconds=10)
         state_with_ref = NeuronState(neuron_id="test-1", refractory_until=future)
         assert state_with_ref.in_refractory
 
         # Set refractory in the past
-        past = datetime.utcnow() - timedelta(seconds=10)
+        past = utcnow() - timedelta(seconds=10)
         state_expired = NeuronState(neuron_id="test-1", refractory_until=past)
         assert not state_expired.in_refractory
 

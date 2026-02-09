@@ -13,6 +13,7 @@ from neural_memory.integration.models import (
     SourceCapability,
     SourceSystemType,
 )
+from neural_memory.utils.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ class GraphitiAdapter:
             if not summary:
                 continue
 
-            created_at = datetime.utcnow()
+            created_at = utcnow()
             raw_created = getattr(node, "created_at", None)
             if raw_created:
                 try:
@@ -137,7 +138,7 @@ class GraphitiAdapter:
             if not content:
                 continue
 
-            created_at = datetime.utcnow()
+            created_at = utcnow()
             raw_created = getattr(episode, "created_at", None)
             if raw_created:
                 try:
@@ -241,7 +242,7 @@ class GraphitiAdapter:
             if not summary:
                 continue
 
-            created_at = datetime.utcnow()
+            created_at = utcnow()
             raw_created = getattr(node, "created_at", None)
             if raw_created:
                 try:
@@ -273,7 +274,7 @@ class GraphitiAdapter:
             if not content:
                 continue
 
-            created_at = datetime.utcnow()
+            created_at = utcnow()
             raw_created = getattr(episode, "created_at", None)
             if raw_created:
                 try:

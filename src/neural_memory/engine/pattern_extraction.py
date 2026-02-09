@@ -12,13 +12,13 @@ experiences (specific events) generalize into concepts (abstract knowledge).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.memory_stages import MaturationRecord, MemoryStage
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     from neural_memory.core.fiber import Fiber
@@ -197,9 +197,9 @@ def _extract_from_cluster(fibers: list[Fiber]) -> ExtractedPattern | None:
         metadata={
             "source_fiber_count": len(fibers),
             "common_tags": sorted(common_tags),
-            "extracted_at": datetime.utcnow().isoformat(),
+            "extracted_at": utcnow().isoformat(),
         },
-        created_at=datetime.utcnow(),
+        created_at=utcnow(),
     )
 
     # Create IS_A synapses from common entities to concept

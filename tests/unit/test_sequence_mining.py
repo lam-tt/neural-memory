@@ -19,6 +19,7 @@ from neural_memory.engine.sequence_mining import (
     mine_sequential_pairs,
 )
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -310,7 +311,7 @@ class TestLearnHabits:
             await store.record_action("remember", session_id=sid)
 
         config = BrainConfig(habit_min_frequency=2, sequential_window_seconds=60.0)
-        now = datetime.utcnow()
+        now = utcnow()
 
         learned, report = await learn_habits(store, config, now)
 
@@ -338,7 +339,7 @@ class TestLearnHabits:
         await store.record_action("recall", session_id="s0")
 
         config = BrainConfig(habit_min_frequency=2, sequential_window_seconds=60.0)
-        now = datetime.utcnow()
+        now = utcnow()
 
         learned, report = await learn_habits(store, config, now)
 
@@ -354,7 +355,7 @@ class TestLearnHabits:
             await store.record_action("edit", session_id=sid)
 
         config = BrainConfig(habit_min_frequency=2, sequential_window_seconds=60.0)
-        now = datetime.utcnow()
+        now = utcnow()
 
         await learn_habits(store, config, now)
 
@@ -373,7 +374,7 @@ class TestLearnHabits:
             await store.record_action("context", session_id=sid)
 
         config = BrainConfig(habit_min_frequency=2, sequential_window_seconds=60.0)
-        now = datetime.utcnow()
+        now = utcnow()
 
         learned, report = await learn_habits(store, config, now)
 
@@ -400,7 +401,7 @@ class TestLearnHabits:
         await store.record_action("remember", session_id="s0")
 
         config = BrainConfig(habit_min_frequency=2, sequential_window_seconds=60.0)
-        now = datetime.utcnow()
+        now = utcnow()
 
         learned, report = await learn_habits(store, config, now)
 
@@ -415,7 +416,7 @@ class TestLearnHabits:
             await store.record_action("remember", session_id=sid)
 
         config = BrainConfig(habit_min_frequency=2, sequential_window_seconds=60.0)
-        now = datetime.utcnow()
+        now = utcnow()
 
         _learned, report = await learn_habits(store, config, now)
 

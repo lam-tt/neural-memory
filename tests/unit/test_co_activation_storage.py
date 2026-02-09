@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
 
 from neural_memory.core.brain import Brain
 from neural_memory.storage.memory_store import InMemoryStorage
+from neural_memory.utils.timeutils import utcnow
 
 
 @pytest_asyncio.fixture
@@ -64,12 +65,12 @@ async def test_since_filter(store: InMemoryStorage) -> None:
 
     # Manually age the event
     brain_id = store._get_brain_id()
-    store._co_activations[brain_id][0]["created_at"] = datetime.utcnow() - timedelta(days=10)
+    store._co_activations[brain_id][0]["created_at"] = utcnow() - timedelta(days=10)
 
     # Record a recent event
     await store.record_co_activation("n1", "n2", 0.9)
 
-    counts = await store.get_co_activation_counts(since=datetime.utcnow() - timedelta(days=1))
+    counts = await store.get_co_activation_counts(since=utcnow() - timedelta(days=1))
     assert len(counts) == 1
     assert counts[0][2] == 1  # Only 1 recent event
 
@@ -84,12 +85,12 @@ async def test_prune_co_activations(store: InMemoryStorage) -> None:
     # Age all events
     brain_id = store._get_brain_id()
     for event in store._co_activations[brain_id]:
-        event["created_at"] = datetime.utcnow() - timedelta(days=10)
+        event["created_at"] = utcnow() - timedelta(days=10)
 
     # Record a recent event
     await store.record_co_activation("n5", "n6", 0.9)
 
-    pruned = await store.prune_co_activations(older_than=datetime.utcnow() - timedelta(days=1))
+    pruned = await store.prune_co_activations(older_than=utcnow() - timedelta(days=1))
     assert pruned == 2
 
     counts = await store.get_co_activation_counts()

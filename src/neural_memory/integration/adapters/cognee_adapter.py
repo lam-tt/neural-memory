@@ -13,6 +13,7 @@ from neural_memory.integration.models import (
     SourceCapability,
     SourceSystemType,
 )
+from neural_memory.utils.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class CogneeAdapter:
             if not content:
                 continue
 
-            created_at = datetime.utcnow()
+            created_at = utcnow()
             if created_at_raw:
                 try:
                     created_at = datetime.fromisoformat(str(created_at_raw).replace("Z", "+00:00"))

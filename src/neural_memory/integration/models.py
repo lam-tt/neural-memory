@@ -7,6 +7,8 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from neural_memory.utils.timeutils import utcnow
+
 
 class SourceSystemType(StrEnum):
     """Categories of external memory systems."""
@@ -73,7 +75,7 @@ class ExternalRecord:
     source_system: str
     source_collection: str
     content: str
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
     updated_at: datetime | None = None
     source_type: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -102,7 +104,7 @@ class ExternalRecord:
             source_system=source_system,
             source_collection=source_collection,
             content=content,
-            created_at=created_at or datetime.utcnow(),
+            created_at=created_at or utcnow(),
             updated_at=updated_at,
             source_type=source_type,
             metadata=metadata or {},

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from neural_memory.core.fiber import Fiber
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     from neural_memory.core.action_event import ActionEvent
@@ -271,7 +272,7 @@ async def strengthen_sequential_pair(
             direction=synapse.direction,
             metadata={**synapse.metadata, "sequential_count": seq_count},
             reinforced_count=synapse.reinforced_count + 1,
-            last_activated=datetime.utcnow(),
+            last_activated=utcnow(),
             created_at=synapse.created_at,
         )
         await storage.update_synapse(reinforced)

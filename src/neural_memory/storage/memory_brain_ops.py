@@ -17,6 +17,7 @@ from neural_memory.core.memory_types import (
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.project import Project
 from neural_memory.core.synapse import Direction, Synapse, SynapseType
+from neural_memory.utils.timeutils import utcnow
 
 
 class InMemoryBrainMixin:
@@ -136,7 +137,7 @@ class InMemoryBrainMixin:
         return BrainSnapshot(
             brain_id=brain_id,
             brain_name=brain.name,
-            exported_at=datetime.utcnow(),
+            exported_at=utcnow(),
             version="0.1.0",
             neurons=neurons,
             synapses=synapses,

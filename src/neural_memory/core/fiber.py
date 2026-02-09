@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+from neural_memory.utils.timeutils import utcnow
+
 
 @dataclass
 class Fiber:
@@ -57,7 +59,7 @@ class Fiber:
     auto_tags: set[str] = field(default_factory=set)
     agent_tags: set[str] = field(default_factory=set)
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
     # Lazy pathway index cache (not part of constructor/repr/compare)
     _pathway_index: dict[str, int] | None = field(
         default=None, init=False, repr=False, compare=False
@@ -132,7 +134,7 @@ class Fiber:
             auto_tags=effective_auto,
             agent_tags=effective_agent,
             metadata=metadata or {},
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
         )
 
     def access(self) -> Fiber:
@@ -221,7 +223,7 @@ class Fiber:
         return replace(
             self,
             conductivity=new_conductivity,
-            last_conducted=conducted_at or datetime.utcnow(),
+            last_conducted=conducted_at or utcnow(),
             frequency=self.frequency + 1,
         )
 

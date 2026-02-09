@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from neural_memory.core.neuron import NeuronState
 from neural_memory.core.synapse import SynapseType
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     from neural_memory.storage.base import NeuralStorage
@@ -276,7 +277,7 @@ class ReinforcementManager:
                     neuron_id=state.neuron_id,
                     activation_level=new_level,
                     access_frequency=state.access_frequency + 1,
-                    last_activated=datetime.utcnow(),
+                    last_activated=utcnow(),
                     decay_rate=state.decay_rate,
                     created_at=state.created_at,
                     firing_threshold=state.firing_threshold,

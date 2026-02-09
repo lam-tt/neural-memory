@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from neural_memory.core.synapse import SynapseType
 from neural_memory.engine.memory_stages import MemoryStage
 from neural_memory.utils.tag_normalizer import TagNormalizer
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     from neural_memory.storage.base import NeuralStorage
@@ -249,7 +250,7 @@ class DiagnosticsEngine:
         if not fibers:
             return 0.0
 
-        now = datetime.utcnow()
+        now = utcnow()
         cutoff = now - timedelta(days=7)
         fresh_count = sum(1 for f in fibers if (f.last_conducted or f.created_at) >= cutoff)
         return fresh_count / len(fibers)
@@ -435,7 +436,7 @@ class DiagnosticsEngine:
             purity_score=report.purity_score,
             marketplace_eligible=report.grade in ("A", "B"),
             badge_label=badge_labels.get(report.grade, f"{report.grade} - Unknown"),
-            computed_at=datetime.utcnow(),
+            computed_at=utcnow(),
             component_summary={
                 "connectivity": report.connectivity,
                 "diversity": report.diversity,

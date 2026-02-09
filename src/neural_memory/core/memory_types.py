@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 from enum import IntEnum, StrEnum
 from typing import Any
 
+from neural_memory.utils.timeutils import utcnow
+
 
 class MemoryType(StrEnum):
     """Types of memories based on their nature and purpose."""
@@ -90,9 +92,9 @@ class Provenance:
             source=self.source,
             confidence=Confidence.VERIFIED,
             verified=True,
-            verified_at=datetime.utcnow(),
+            verified_at=utcnow(),
             created_by=self.created_by,
-            last_confirmed=datetime.utcnow(),
+            last_confirmed=utcnow(),
         )
 
     def confirm(self) -> Provenance:
@@ -103,7 +105,7 @@ class Provenance:
             verified=self.verified,
             verified_at=self.verified_at,
             created_by=self.created_by,
-            last_confirmed=datetime.utcnow(),
+            last_confirmed=utcnow(),
         )
 
 
@@ -133,7 +135,7 @@ class TypedMemory:
     project_id: str | None = None
     tags: frozenset[str] = field(default_factory=frozenset)
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utcnow)
 
     @classmethod
     def create(
@@ -169,7 +171,7 @@ class TypedMemory:
 
         expires_at = None
         if expires_in_days is not None:
-            expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
+            expires_at = utcnow() + timedelta(days=expires_in_days)
 
         return cls(
             fiber_id=fiber_id,
@@ -180,7 +182,7 @@ class TypedMemory:
             project_id=project_id,
             tags=frozenset(tags) if tags else frozenset(),
             metadata=metadata or {},
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
         )
 
     @property
@@ -188,14 +190,14 @@ class TypedMemory:
         """Check if this memory has expired."""
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return utcnow() > self.expires_at
 
     @property
     def days_until_expiry(self) -> int | None:
         """Days until this memory expires, or None if no expiry."""
         if self.expires_at is None:
             return None
-        delta = self.expires_at - datetime.utcnow()
+        delta = self.expires_at - utcnow()
         return max(0, delta.days)
 
     def with_priority(self, priority: Priority | int) -> TypedMemory:
@@ -230,7 +232,7 @@ class TypedMemory:
 
     def extend_expiry(self, days: int) -> TypedMemory:
         """Create a new TypedMemory with extended expiry."""
-        new_expiry = datetime.utcnow() + timedelta(days=days)
+        new_expiry = utcnow() + timedelta(days=days)
         return TypedMemory(
             fiber_id=self.fiber_id,
             memory_type=self.memory_type,
