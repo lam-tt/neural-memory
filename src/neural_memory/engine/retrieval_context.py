@@ -123,18 +123,30 @@ async def format_context(
 
         for fiber in fibers[:5]:
             if fiber.summary:
-                line = f"- {fiber.summary}"
+                content = fiber.summary
             else:
                 anchor = anchor_map.get(fiber.anchor_neuron_id)
                 if anchor:
-                    line = f"- {anchor.content}"
+                    content = anchor.content
                 else:
                     continue
 
-            token_estimate += _estimate_tokens(line)
-            if token_estimate > max_tokens:
+            # Truncate long content to fit within token budget
+            remaining_budget = max_tokens - token_estimate
+            if remaining_budget <= 0:
                 break
 
+            content_tokens = _estimate_tokens(content)
+            if content_tokens > remaining_budget:
+                # Truncate to fit: estimate words from remaining budget
+                max_words = int(remaining_budget / _TOKEN_RATIO)
+                if max_words < 10:
+                    break
+                words = content.split()
+                content = " ".join(words[:max_words]) + "..."
+
+            line = f"- {content}"
+            token_estimate += _estimate_tokens(line)
             lines.append(line)
 
     # Add individual activated neurons (batch fetch)

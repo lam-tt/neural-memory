@@ -265,23 +265,11 @@ class ConsolidationEngine:
         for fiber in fibers:
             removed = fiber.synapse_ids & pruned_synapse_ids
             if removed and not dry_run:
-                updated_fiber = Fiber(
-                    id=fiber.id,
-                    neuron_ids=fiber.neuron_ids,
+                from dataclasses import replace as dc_replace
+
+                updated_fiber = dc_replace(
+                    fiber,
                     synapse_ids=fiber.synapse_ids - pruned_synapse_ids,
-                    anchor_neuron_id=fiber.anchor_neuron_id,
-                    pathway=fiber.pathway,
-                    conductivity=fiber.conductivity,
-                    last_conducted=fiber.last_conducted,
-                    time_start=fiber.time_start,
-                    time_end=fiber.time_end,
-                    coherence=fiber.coherence,
-                    salience=fiber.salience,
-                    frequency=fiber.frequency,
-                    summary=fiber.summary,
-                    tags=fiber.tags,
-                    metadata=fiber.metadata,
-                    created_at=fiber.created_at,
                 )
                 await self._storage.update_fiber(updated_fiber)
 

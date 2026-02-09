@@ -210,11 +210,17 @@ class DiagnosticsEngine:
         raw = synapse_count / neuron_count
         return 1.0 / (1.0 + math.exp(-1.5 * (raw - 3.0)))
 
+    # Synapse types realistically expected in typical usage.
+    # Spatial/semantic types only appear with specialized content.
+    _EXPECTED_SYNAPSE_TYPES = 8
+
     @staticmethod
     def _compute_diversity(synapse_stats: dict[str, Any]) -> float:
         """Compute synapse type diversity via Shannon entropy.
 
-        Normalized against log(total_types_available) so 1.0 = maximum diversity.
+        Normalized against log(expected_types) rather than all defined types,
+        since most brains won't use spatial/semantic types without specialized
+        content. Using all 20 types as baseline unfairly penalizes typical usage.
         """
         by_type = synapse_stats.get("by_type", {})
         if not by_type:
@@ -233,8 +239,8 @@ class DiagnosticsEngine:
                 p = count / total
                 entropy -= p * math.log(p)
 
-        total_types = len(SynapseType)
-        max_entropy = math.log(total_types) if total_types > 1 else 1.0
+        expected_types = DiagnosticsEngine._EXPECTED_SYNAPSE_TYPES
+        max_entropy = math.log(expected_types) if expected_types > 1 else 1.0
         return min(1.0, entropy / max_entropy)
 
     async def _compute_freshness(self) -> float:
@@ -337,13 +343,14 @@ class DiagnosticsEngine:
         # Low diversity
         by_type = synapse_stats.get("by_type", {})
         types_used = len(by_type)
-        if types_used < 5 and synapse_count > 0:
+        expected = DiagnosticsEngine._EXPECTED_SYNAPSE_TYPES
+        if types_used < 3 and synapse_count > 0:
             warnings.append(
                 DiagnosticWarning(
                     severity=WarningSeverity.WARNING,
                     code="LOW_DIVERSITY",
-                    message=f"Low synapse diversity: {types_used} of {len(SynapseType)} types used.",
-                    details={"types_used": types_used, "types_available": len(SynapseType)},
+                    message=f"Low synapse diversity: {types_used} of {expected} expected types used.",
+                    details={"types_used": types_used, "types_expected": expected},
                 )
             )
             recommendations.append(

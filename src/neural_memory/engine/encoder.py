@@ -801,7 +801,11 @@ class MemoryEncoder:
         anchor: Neuron,
         timestamp: datetime,
     ) -> list[str]:
-        """Link to temporally nearby memories."""
+        """Link to temporally nearby memories with directional synapses.
+
+        Creates BEFORE/AFTER synapses for memories within 24 hours,
+        improving synapse type diversity and enabling temporal reasoning.
+        """
         from datetime import timedelta
 
         linked: list[str] = []
@@ -819,11 +823,18 @@ class MemoryEncoder:
             if fiber.anchor_neuron_id == anchor.id:
                 continue
 
-            # Create temporal synapse
+            # Determine temporal direction: is this fiber before or after?
+            if fiber.time_start is not None and fiber.time_start < timestamp:
+                synapse_type = SynapseType.AFTER
+            elif fiber.time_start is not None and fiber.time_start > timestamp:
+                synapse_type = SynapseType.BEFORE
+            else:
+                synapse_type = SynapseType.RELATED_TO
+
             synapse = Synapse.create(
                 source_id=anchor.id,
                 target_id=fiber.anchor_neuron_id,
-                type=SynapseType.RELATED_TO,
+                type=synapse_type,
                 weight=0.3,
                 metadata={"temporal_link": True},
             )
