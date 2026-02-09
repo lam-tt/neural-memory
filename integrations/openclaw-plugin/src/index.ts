@@ -57,7 +57,7 @@ const plugin: OpenClawPluginDefinition = {
   version: "1.4.0",
   kind: "memory",
 
-  async register(api: OpenClawPluginApi): Promise<void> {
+  register(api: OpenClawPluginApi): void {
     const cfg = resolveConfig(api.pluginConfig);
 
     const mcp = new NeuralMemoryMcpClient({
