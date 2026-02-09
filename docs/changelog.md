@@ -5,6 +5,142 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Conflict Management MCP Tool (`nmem_conflicts`)** — Surface conflict detection as user-facing tool
+  - `list` action: view active CONTRADICTS synapses with neuron content previews, conflict type, confidence
+  - `resolve` action: manual resolution via `keep_existing`, `keep_new`, `keep_both` strategies
+  - `check` action: pre-check content for potential conflicts before storing
+  - `ConflictHandler` mixin class with full input validation (UUID, content length, tags)
+  - Preserves `_pre_dispute_activation` for restore on `keep_existing` resolution
+  - `_conflict_resolved` flag prevents re-flagging after manual resolution
+  - Atomic resolution via `disable_auto_save → operations → batch_save()` pattern
+- **Recall Conflict Surfacing** — `nmem_recall` now returns `has_conflicts` flag and `conflict_count` by default
+  - Opt-in `include_conflicts=true` for full conflict details (saves AI client tokens)
+- **Remember Conflict Reporting** — `nmem_remember` response includes `conflicts_detected` count when conflicts found during encoding
+- **Stats Conflict Count** — `nmem_stats` response includes `conflicts_active` (unresolved CONTRADICTS count)
+- **Provenance Source Enrichment** — `NEURALMEMORY_SOURCE` env var → `mcp:{source}` provenance with `mcp_tool` fallback
+- **Purity Score Conflict Penalty** — Unresolved CONTRADICTS synapses reduce brain health purity score (max -10 points)
+  - New diagnostic warning `HIGH_CONFLICT_COUNT` when conflicts exceed 5
+  - Recommendation to run `nmem_conflicts` for resolution
+
+### Fixed
+
+- **`_resolve_keep_new` missing `_disputed=False`** — Existing neuron now properly cleared of dispute flag on `keep_new` resolution
+- **Performance: filtered synapse queries** — `_conflicts_list`, `_conflicts_resolve`, and `_stats` now use `get_synapses(type=CONTRADICTS)` instead of `get_all_synapses()` full table scan
+- **Diagnostics double fiber fetch** — `analyze()` now fetches fibers once and passes to both `_compute_freshness` and `_generate_diagnostics`
+- **UUID validation case sensitivity** — UUID pattern now accepts uppercase hex (A-F) via `re.IGNORECASE`
+- **Error message information leak** — All conflict handler errors now return generic messages; raw exceptions logged server-side only
+- **Tag validation** — `nmem_conflicts check` and `nmem_remember` now validate tag count (max 50) and length (max 100 chars)
+- **`NEURALMEMORY_SOURCE` truncation** — Source env var truncated to 256 chars to prevent unbounded metadata
+- **Recall conflict field names** — Aligned with `nmem_conflicts list` (`existing_neuron_id`, `content` with 200-char truncation)
+- **20+ performance bottlenecks** — Storage index optimization, encoder batch operations, retrieval pipeline improvements
+- **25+ bugs across engine/storage/MCP** — Deep audit fixes including deprecated `datetime.utcnow()` replacement
+
+### Changed
+
+- `_compute_freshness` refactored from async instance method to `@staticmethod` accepting `fibers: list`
+- MCP tools expanded from 16 to 17 (`nmem_conflicts`)
+- `nmem_recall` schema gains `include_conflicts` boolean parameter
+- Tests: 1372 passed (up from 1352)
+
+---
+
+## [1.4.0] - 2026-02-09
+
+### Added
+
+- **OpenClaw Memory Plugin** — NM becomes the memory layer inside OpenClaw (178k-star ecosystem)
+  - `@neuralmemory/openclaw-plugin` npm package (TypeScript, zero runtime deps)
+  - MCP stdio client: JSON-RPC 2.0 over stdio with Content-Length framing
+  - 6 core tools registered: `nmem_remember`, `nmem_recall`, `nmem_context`, `nmem_todo`, `nmem_stats`, `nmem_health`
+  - 2 hooks: `before_agent_start` (auto-context injection), `agent_end` (auto-capture)
+  - Service registration: spawns `python -m neural_memory.mcp` as subprocess
+  - Plugin manifest with `configSchema` + `uiHints` for OpenClaw settings UI
+  - Zod parameter schemas for all tool inputs
+- **Dashboard refactor** — Integrations tab simplified to status-only with deep links (Option B architecture)
+  - Config forms removed — each service manages its own configuration
+  - OpenClaw status card shows connection state when plugin is active
+
+### Changed
+
+- Architectural decision: NM Dashboard is a specialist tool, not a hub
+- Dashboard Integrations tab now read-only status with deep links to service dashboards
+
+---
+
+## [1.3.0] - 2026-02-09
+
+### Added
+
+- **Deep Integration Status** — Richer integration monitoring in dashboard
+  - Enhanced status cards with live metrics (memories/recalls today, last call timestamp, error badges)
+  - Activity log: collapsible feed of recent tool calls with source attribution (MCP/OpenClaw/Nanobot)
+  - Setup wizards: accordion config snippets for Claude Code, Cursor, OpenClaw, generic MCP with copy-to-clipboard
+  - Import sources: detection panel for ChromaDB, Mem0, Cognee, Graphiti, LlamaIndex
+- **Source Attribution** — `NEURALMEMORY_SOURCE` env var → `session_id` prefix for integration tracking
+- **i18n expansion** — 25 new keys in EN + VI (87 total)
+
+### Changed
+
+- Version bumped to 1.3.0
+- Tests: 1352 passed (up from 1340)
+
+---
+
+## [1.2.0] - 2026-02-09
+
+### Added
+
+- **Dashboard** — Full-featured SPA at `/dashboard` (Alpine.js + Tailwind CDN, zero-build)
+  - 5 tab sections: Overview, Neural Graph, Integrations (status-only), Health, Settings
+  - Cytoscape.js neural graph: COSE force-directed layout, 8 neuron type colors, click → detail panel
+  - Graph toolbar: search nodes, filter by type, zoom in/out, fit to view, reload
+  - Chart.js radar chart for 7 health diagnostics metrics
+  - Brain management: switch brains, export/import JSON, health grade sidebar badge
+  - Toast notification system: `nmToast()` with 4 severity types, 4s auto-dismiss
+  - Loading states: skeleton shimmer for stats, spinner for graph/health, proper empty states
+  - Quick actions: Health Check, Export Brain, View Warnings on Overview tab
+- **OAuth Proxy** — Routes to CLIProxyAPI (:8317) for OAuth session management
+- **OpenClaw Config API** — CRUD from `~/.neuralmemory/openclaw.json`
+- **EN/VI Internationalization** — Auto-detect browser locale, toggle in settings (68 translation keys)
+- **Design System** — Dark mode (#0F172A), Fira Code/Sans fonts, #22C55E CTA green, Lucide icons
+- **ARIA Accessibility** — `aria-label` on icon buttons, `role="tabpanel"/"tablist"`, `aria-live="polite"` on toasts
+- **Mobile** — 44px minimum touch targets, responsive navigation
+
+### Fixed
+
+- **Issue #1**: `ModuleNotFoundError: typing_extensions` on fresh Python 3.12 — added `typing_extensions>=4.0` to dependencies
+- **Ruff lint**: Fixed F821/I001 errors in `test_nanobot_integration.py`
+
+### Changed
+
+- Version bumped to 1.2.0
+- `pyproject.toml` gains `httpx` and `typing_extensions` dependencies
+- Tests: 1340 passed (up from 1264)
+
+---
+
+## [1.1.0] - 2026-02-09
+
+### Added
+
+- **ClawHub SKILL.md** — Published `neural-memory@1.0.0` to ClawHub (OpenClaw's skill registry, 2,999+ curated skills)
+  - Instructs OpenClaw's agent to use NM via existing MCP server
+- **Nanobot Integration** — Drop-in memory layer for HKUDS/nanobot framework
+  - 4 tools adapted for Nanobot's action interface
+- **OpenClaw Blog Post** — Comparison article: NM vs Mem0, Cognee, Graphiti, claude-mem
+- **Architecture Doc** — `docs/ARCHITECTURE_V1_EXTENDED.md` for post-v1.0 architecture reference
+
+### Changed
+
+- OpenClaw PR [#12596](https://github.com/openclaw/openclaw/pull/12596) submitted — fixes `openclaw status` for third-party memory plugins (2-file fix, 5/5 tests pass)
+- Post-v1.0 roadmap added: Dashboard + OpenClaw + Community strategy
+
+---
+
 ## [1.0.2] - 2026-02-09
 
 ### Fixed

@@ -4,7 +4,7 @@
 > Every feature passes the VISION.md 4-question test + brain test.
 > ZERO LLM dependency — pure algorithmic, regex, graph-based.
 
-**Current state**: v1.3.0 shipped. Dashboard with deep integration status, activity log, setup wizards.
+**Current state**: v1.4.0 shipped. OpenClaw plugin, dashboard, 17 MCP tools, 1372 tests. Conflict detection + provenance tracking in progress.
 **Next milestone**: v1.5.0 — Ecosystem Expansion.
 
 ---
@@ -937,7 +937,7 @@ Starting from 1105 tests (v0.20.0) → targeting ~1,455+ tests at v1.0.0.
 >
 > **Three pillars**: Dashboard + Integrations + Community
 >
-> **Current state**: v1.2.0 shipped to PyPI. 1,340+ tests. 16 MCP tools. Dashboard live. Nanobot integration done. ClawHub SKILL published.
+> **Current state**: v1.4.0 shipped. 1,372 tests. 17 MCP tools. OpenClaw plugin published. Conflict detection + provenance tracking done. Deep audit clean.
 
 ## Strategic Context
 
