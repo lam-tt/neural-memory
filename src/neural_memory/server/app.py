@@ -16,7 +16,10 @@ from neural_memory.server.models import HealthResponse
 from neural_memory.server.routes import (
     brain_router,
     consolidation_router,
+    dashboard_router,
     memory_router,
+    oauth_router,
+    openclaw_router,
     sync_router,
 )
 from neural_memory.storage.base import NeuralStorage
@@ -95,6 +98,11 @@ def create_app(
     app.include_router(sync_router)
     app.include_router(consolidation_router)
 
+    # Dashboard API routes (unversioned — dashboard-specific)
+    app.include_router(dashboard_router)
+    app.include_router(oauth_router)
+    app.include_router(openclaw_router)
+
     # Health check endpoint
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     async def health_check() -> HealthResponse:
@@ -165,11 +173,17 @@ def create_app(
             "stats": stats,
         }
 
-    # UI endpoint
+    # UI endpoint (legacy vis.js graph)
     @app.get("/ui", tags=["visualization"])
     async def ui() -> FileResponse:
         """Serve the visualization UI."""
         return FileResponse(STATIC_DIR / "index.html")
+
+    # Dashboard endpoint (full SPA)
+    @app.get("/dashboard", tags=["dashboard"])
+    async def dashboard() -> FileResponse:
+        """Serve the NeuralMemory dashboard."""
+        return FileResponse(STATIC_DIR / "dashboard.html")
 
     # Mount static files (for potential future assets)
     if STATIC_DIR.exists():

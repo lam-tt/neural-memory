@@ -1,0 +1,148 @@
+/* NeuralMemory Dashboard — Custom styles */
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Selection */
+::selection {
+  background: rgba(34, 197, 94, 0.3);
+  color: #F8FAFC;
+}
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid #22C55E;
+  outline-offset: 2px;
+}
+
+/* Sidebar scroll */
+aside {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #1E293B;
+}
+
+/* Nav glass effect */
+nav {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Card hover glow */
+.card-glow:hover {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.08);
+}
+
+/* Fade-in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+section[x-show] {
+  animation: fadeIn 200ms ease-out;
+}
+
+/* Toggle switch transition */
+.peer:checked ~ div::after {
+  transform: translateX(100%);
+}
+
+/* Cytoscape container */
+#cy-graph {
+  background: #0F172A;
+}
+
+/* Radar chart container */
+#health-radar {
+  max-height: 350px;
+}
+
+/* Responsive sidebar collapse on small screens */
+@media (max-width: 768px) {
+  aside {
+    position: fixed;
+    z-index: 40;
+    width: 100%;
+    bottom: 0;
+    top: auto;
+    left: 0;
+    right: 0;
+    height: auto;
+    border-right: none;
+    border-top: 1px solid #475569;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  aside nav {
+    display: flex;
+    flex-direction: row;
+    padding: 0.5rem;
+    gap: 0.25rem;
+    overflow-x: auto;
+  }
+
+  aside nav button {
+    white-space: nowrap;
+    border-left: none !important;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  aside nav button[class*="border-nm-cta"] {
+    border-bottom-color: #22C55E;
+    border-left-color: transparent !important;
+  }
+
+  /* Hide sidebar health badge on mobile */
+  aside > div:last-child {
+    display: none;
+  }
+
+  main {
+    margin-left: 0 !important;
+    padding-bottom: 4rem;
+  }
+}
+
+/* Pulse animation for active indicator */
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.bg-nm-cta {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+/* Prevent pulse on buttons and non-indicator elements */
+button.bg-nm-cta,
+span.bg-nm-cta:not(.w-2):not(.w-3) {
+  animation: none;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

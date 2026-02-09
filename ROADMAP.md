@@ -4,8 +4,8 @@
 > Every feature passes the VISION.md 4-question test + brain test.
 > ZERO LLM dependency — pure algorithmic, regex, graph-based.
 
-**Current state**: v1.0.2 shipped (schema v11). v1.1.0 in progress.
-**Next milestone**: v1.2.0 — Dashboard Foundation (Alpine.js SPA + Cytoscape.js).
+**Current state**: v1.2.0 shipped (schema v11). Dashboard with OAuth, OpenClaw config, channels.
+**Next milestone**: v1.3.0 — Integration Dashboard + v1.4.0 — OpenClaw Plugin.
 
 ---
 
@@ -1037,151 +1037,67 @@ Updated to v1.0.2: 1,340 tests, 16 MCP tools, 10 feature sections, full comparis
 
 ---
 
-## Phase 2: v1.2.0 — Dashboard Foundation
+## Phase 2: v1.2.0 — Dashboard Foundation ✅
 
-> Replace the vis.js prototype with a production dashboard.
+> Full-featured dashboard with OAuth, OpenClaw config, channel setup, neural graph.
 
-**Target**: 2-3 weeks after v1.1.0
+**Status**: ✅ Shipped (2026-02-09). ~2,800 new lines across 15 files.
 
-### The Problem
+### What shipped
 
-Current UI is a single `index.html` with vis.js — no navigation, no filtering, no management, no analytics. The VS Code extension is richer but locked inside VS Code. Users need a standalone browser dashboard.
+| Feature | Description |
+|---------|-------------|
+| **Alpine.js + Tailwind SPA** | Zero-build dashboard at `/dashboard` (CDN-loaded, ships with pip install) |
+| **7 tab sections** | Overview, Neural Graph, OAuth Providers, OpenClaw Config, Channels, Health, Settings |
+| **Cytoscape.js graph** | COSE force-directed layout, 8 neuron type colors, node click → detail panel |
+| **OAuth proxy** | Proxy to CLIProxyAPI (Claude, Gemini, OpenAI Codex, Qwen, iFlow, AntiGravity) |
+| **OpenClaw config UI** | API key management, function toggles, security restrictions (sandbox, domains, rate limits) |
+| **Channel setup** | Telegram bot token + chat IDs, Discord bot token + guild + channels |
+| **Health radar chart** | Chart.js radar with 7 diagnostics metrics, warnings, recommendations |
+| **Brain management** | Switch brains, export/import JSON, health grade sidebar badge |
+| **EN/VI i18n** | Auto-detect browser locale, toggle in settings, full Vietnamese translation |
+| **Design system** | Dark mode (#0F172A), Fira Code/Sans fonts, #22C55E CTA green, Lucide icons |
 
 ### Architecture
 
 ```
-Browser (SPA)
-  ├── Dashboard    — Overview, stats, health grade
-  ├── Explorer     — Interactive graph (Cytoscape.js)
-  ├── Timeline     — Memory creation over time
-  ├── Search       — Query + recall with preview
-  ├── Brain Mgmt   — Create, switch, export, import, transplant
-  ├── Health       — Diagnostics, warnings, recommendations
-  ├── Integrations — MCP status, Nanobot/OpenClaw config
-  └── Settings     — Config, language (EN/VI)
-        │
-  FastAPI Backend (existing)
-  + WebSocket (real-time updates)
-  + New endpoints for dashboard data
+Browser (SPA — Alpine.js + Tailwind CDN)
+  ├── /dashboard ─── dashboard.html (entry point)
+  │     ├── Overview    — stats, health grade, brain cards
+  │     ├── Graph       — Cytoscape.js neural graph explorer
+  │     ├── OAuth       — Provider login cards via CLIProxyAPI proxy
+  │     ├── OpenClaw    — API keys, functions, security config
+  │     ├── Channels    — Telegram/Discord connection setup
+  │     ├── Health      — Radar chart, warnings, recommendations
+  │     └── Settings    — Language (EN/VI), brain export/import
+  │
+  FastAPI Backend (existing server at :8000)
+  ├── /api/dashboard/*    — Stats, brain list, health (dashboard_api.py)
+  ├── /api/oauth/*        — Proxy to CLIProxyAPI :8317 (oauth.py)
+  ├── /api/openclaw/*     — Config CRUD from ~/.neuralmemory/openclaw.json (openclaw_api.py)
+  └── /api/graph          — Existing graph endpoint
 ```
 
-### Tech Stack Decision
+### Files shipped
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **Vanilla HTML/JS + Alpine.js** | Zero build, ships with NM, lightweight | Limited component reuse |
-| **React + Vite** | Rich ecosystem, component library | Separate build, npm dependency |
-| **Vue 3 + Vite** | Lighter than React, good DX | Still separate build |
-| **Svelte** | Smallest bundle, fast | Smaller ecosystem |
-
-**Recommendation**: **Vanilla HTML/JS + Alpine.js + Tailwind CSS (CDN)**
-
-Rationale:
-- Zero build step — dashboard ships as static files inside NM package
-- No Node.js/npm dependency for users
-- `pip install neural-memory` includes dashboard automatically
-- CDN-loaded libraries (Alpine.js, Tailwind, Cytoscape.js, Chart.js)
-- Same pattern as existing `index.html` but much richer
-
-### 2.1 Dashboard Overview Page
-
-```
-┌─────────────────────────────────────────────────┐
-│  🧠 NeuralMemory Dashboard    [brain: default]  │
-├──────────┬──────────┬──────────┬────────────────┤
-│ Neurons  │ Synapses │ Fibers   │ Health: A (92) │
-│   847    │  2,341   │   156    │ ████████████░  │
-├──────────┴──────────┴──────────┴────────────────┤
-│                                                  │
-│  Memory Timeline (30 days)     Type Distribution │
-│  ▁▂▃▅▇█▇▅▃▂▁▂▃▅▇            ██ fact    42%    │
-│                                ██ decision 18%   │
-│  Recent Activity               ██ insight  15%   │
-│  • [14:23] Remembered: ...     ██ todo     12%   │
-│  • [14:20] Recalled: ...       ██ other    13%   │
-│  • [14:15] Consolidated: ...                     │
-│                                                  │
-│  Warnings                      Quick Actions     │
-│  ⚠ Tag drift: UI/Frontend     [Remember] [Recall]│
-│  ⚠ Low diversity              [Health] [Export]  │
-└──────────────────────────────────────────────────┘
-```
-
-### 2.2 Graph Explorer (Cytoscape.js upgrade)
-
-Replace vis.js with Cytoscape.js (already used in VS Code extension):
-- Force-directed + hierarchical + radial layouts
-- Filter by neuron type, date range, tags
-- Fiber pathway highlighting
-- Synapse type color coding (20 types)
-- Sub-graph navigation (click neuron → show neighborhood)
-- Export as PNG/SVG
-
-### 2.3 Brain Management UI
-
-- Brain list with health grades
-- Create / delete / switch brains
-- Export / import (JSON)
-- Version history with rollback
-- Transplant wizard (source brain → filter → target brain)
-
-### 2.4 Health Diagnostics Page
-
-- Radar chart of 7 component scores
-- Warning list with severity badges
-- Recommendation cards with action buttons
-- Historical health trend (if data available)
-
-### 2.5 Vietnamese Localization (i18n)
-
-```javascript
-// locales/vi.json
-{
-  "dashboard": "Bảng Điều Khiển",
-  "neurons": "Nơ-ron",
-  "synapses": "Khớp Thần Kinh",
-  "fibers": "Sợi Ký Ức",
-  "health": "Sức Khỏe Não",
-  "remember": "Ghi Nhớ",
-  "recall": "Hồi Tưởng",
-  "brain": "Não",
-  "settings": "Cài Đặt",
-  ...
-}
-```
-
-- Language toggle in settings (EN/VI)
-- Auto-detect from browser locale
-- All UI labels, tooltips, error messages localized
-- Vietnamese-first approach for targeting Vietnamese developer community
-
-### Files
-
-| Action | File | Description |
-|--------|------|-------------|
-| **New** | `server/static/dashboard/index.html` | Main SPA entry point |
-| **New** | `server/static/dashboard/app.js` | Alpine.js app logic |
-| **New** | `server/static/dashboard/graph.js` | Cytoscape.js explorer |
-| **New** | `server/static/dashboard/charts.js` | Chart.js analytics |
-| **New** | `server/static/dashboard/style.css` | Tailwind overrides |
-| **New** | `server/static/dashboard/locales/en.json` | English strings |
-| **New** | `server/static/dashboard/locales/vi.json` | Vietnamese strings |
-| **Modified** | `server/app.py` | Mount dashboard route, new API endpoints |
-| **New** | `server/api/dashboard.py` | Dashboard-specific endpoints |
-| **New** | `tests/e2e/test_dashboard_api.py` | Dashboard API tests |
-
-### Scope
-
-~2,500 lines (HTML/JS/CSS) + ~300 lines (Python API) + ~200 test lines
-
-### VISION.md Check
-
-| Question | Answer |
-|----------|--------|
-| Activation or Search? | Visualization of activation — graph explorer shows spreading paths |
-| Spreading activation still central? | Yes — explorer visualizes it |
-| Works without embeddings? | Yes — pure frontend rendering |
-| Brain test? | Yes — visual cortex processes spatial information |
+| Action | File |
+|--------|------|
+| NEW | `server/routes/oauth.py` — OAuth proxy to CLIProxyAPI |
+| NEW | `server/routes/dashboard_api.py` — Dashboard stats, brain list, health |
+| NEW | `server/routes/openclaw_api.py` — OpenClaw config CRUD |
+| NEW | `integrations/openclaw_config.py` — Pydantic models + JSON persistence |
+| NEW | `server/static/dashboard.html` — Main SPA (Alpine.js tabs + CDN imports) |
+| NEW | `server/static/js/app.js` — Core Alpine component |
+| NEW | `server/static/js/graph.js` — Cytoscape.js graph |
+| NEW | `server/static/js/oauth.js` — OAuth provider cards |
+| NEW | `server/static/js/openclaw.js` — OpenClaw config + channel UI |
+| NEW | `server/static/js/i18n.js` — Locale detection + translation |
+| NEW | `server/static/css/dashboard.css` — Custom styles |
+| NEW | `server/static/locales/en.json` — English strings |
+| NEW | `server/static/locales/vi.json` — Vietnamese strings |
+| MOD | `server/app.py` — Mount new routers + `/dashboard` endpoint |
+| MOD | `server/routes/__init__.py` — Export new routers |
+| MOD | `pyproject.toml` — Add httpx dependency, version → 1.2.0 |
 
 ---
 
@@ -1470,4 +1386,4 @@ Do v1.4.0 before v1.3.0 because OpenClaw plugin provides the real-world integrat
 ---
 
 *See [VISION.md](VISION.md) for the north star guiding all decisions.*
-*Last updated: 2026-02-09 (v1.1.0 nearly complete: SKILL published, blog written, #7273 PR submitted)*
+*Last updated: 2026-02-09 (v1.2.0 shipped: Dashboard with OAuth, OpenClaw config, channels, neural graph)*
