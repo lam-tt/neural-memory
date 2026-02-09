@@ -12,7 +12,6 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
@@ -26,7 +25,6 @@ from neural_memory.engine.diagnostics import DiagnosticsEngine
 from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval_context import _TOKEN_RATIO, _estimate_tokens, format_context
 from neural_memory.storage.memory_store import InMemoryStorage
-
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -117,9 +115,7 @@ class TestContextTruncation:
         assert token_est <= 110  # small overshoot from header is acceptable
 
     @pytest.mark.asyncio
-    async def test_context_fits_short_content(
-        self, storage_with_brain: InMemoryStorage
-    ) -> None:
+    async def test_context_fits_short_content(self, storage_with_brain: InMemoryStorage) -> None:
         """A fiber with 10-word anchor content and max_tokens=500
         should include the full content without truncation."""
         store = storage_with_brain
@@ -198,9 +194,7 @@ class TestContextTruncation:
         assert token_est <= 130  # small overshoot tolerance
 
     @pytest.mark.asyncio
-    async def test_context_empty_fibers(
-        self, storage_with_brain: InMemoryStorage
-    ) -> None:
+    async def test_context_empty_fibers(self, storage_with_brain: InMemoryStorage) -> None:
         """Empty fibers list produces empty context."""
         store = storage_with_brain
 
