@@ -229,17 +229,17 @@ class TestSentenceTransformerEmbedding:
         """Should call model.encode and return result."""
         import unittest.mock
 
-        import numpy as np
-
         from neural_memory.engine.embedding.sentence_transformer import (
             SentenceTransformerEmbedding,
         )
 
         provider = SentenceTransformerEmbedding(model_name="test-model")
 
-        # Create a mock model that returns a numpy array
+        # Create a mock model that returns an object with .tolist()
+        mock_result = unittest.mock.MagicMock()
+        mock_result.tolist.return_value = [0.1, 0.2, 0.3]
         mock_model = unittest.mock.MagicMock()
-        mock_model.encode.return_value = np.array([0.1, 0.2, 0.3])
+        mock_model.encode.return_value = mock_result
         mock_model.get_sentence_embedding_dimension.return_value = 3
 
         # Inject the mock model directly
@@ -255,16 +255,19 @@ class TestSentenceTransformerEmbedding:
         """Should call model.encode with a list and return list of lists."""
         import unittest.mock
 
-        import numpy as np
-
         from neural_memory.engine.embedding.sentence_transformer import (
             SentenceTransformerEmbedding,
         )
 
         provider = SentenceTransformerEmbedding()
 
+        # Mock model returning iterable of objects with .tolist() (like numpy rows)
+        row1 = unittest.mock.MagicMock()
+        row1.tolist.return_value = [0.1, 0.2]
+        row2 = unittest.mock.MagicMock()
+        row2.tolist.return_value = [0.3, 0.4]
         mock_model = unittest.mock.MagicMock()
-        mock_model.encode.return_value = np.array([[0.1, 0.2], [0.3, 0.4]])
+        mock_model.encode.return_value = [row1, row2]
         provider._model = mock_model
         provider._dimension = 2
 
