@@ -333,6 +333,11 @@ def get_tool_schemas() -> list[dict[str, Any]]:
             "inputSchema": {"type": "object", "properties": {}},
         },
         {
+            "name": "nmem_evolution",
+            "description": "Measure brain evolution dynamics: maturation progress, learning plasticity, topology coherence, and proficiency level. Shows how the brain has evolved through usage.",
+            "inputSchema": {"type": "object", "properties": {}},
+        },
+        {
             "name": "nmem_habits",
             "description": "Manage learned workflow habits. Suggest next actions, list learned habits, or clear habit data.",
             "inputSchema": {

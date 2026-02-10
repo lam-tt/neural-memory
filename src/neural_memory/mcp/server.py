@@ -132,6 +132,7 @@ class MCPServer(SessionHandler, EternalHandler, AutoHandler, IndexHandler, Confl
             "nmem_eternal": self._eternal,
             "nmem_recap": self._recap,
             "nmem_health": self._health,
+            "nmem_evolution": self._evolution,
             "nmem_habits": self._habits,
             "nmem_version": self._version,
             "nmem_transplant": self._transplant,
@@ -475,6 +476,38 @@ class MCPServer(SessionHandler, EternalHandler, AutoHandler, IndexHandler, Confl
                 for w in report.warnings
             ],
             "recommendations": list(report.recommendations),
+        }
+
+    async def _evolution(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Measure brain evolution dynamics."""
+        storage = await self.get_storage()
+        brain = await storage.get_brain(storage._current_brain_id)
+        if not brain:
+            return {"error": "No brain configured"}
+
+        from neural_memory.engine.brain_evolution import EvolutionEngine
+
+        engine = EvolutionEngine(storage)
+        evo = await engine.analyze(brain.id)
+
+        return {
+            "brain": evo.brain_name,
+            "proficiency_level": evo.proficiency_level.value,
+            "proficiency_index": evo.proficiency_index,
+            "maturity_level": evo.maturity_level,
+            "plasticity": evo.plasticity,
+            "density": evo.density,
+            "activity_score": evo.activity_score,
+            "semantic_ratio": evo.semantic_ratio,
+            "reinforcement_days": evo.reinforcement_days,
+            "topology_coherence": evo.topology_coherence,
+            "plasticity_index": evo.plasticity_index,
+            "knowledge_density": evo.knowledge_density,
+            "total_neurons": evo.total_neurons,
+            "total_synapses": evo.total_synapses,
+            "total_fibers": evo.total_fibers,
+            "fibers_at_semantic": evo.fibers_at_semantic,
+            "fibers_at_episodic": evo.fibers_at_episodic,
         }
 
     async def _suggest(self, args: dict[str, Any]) -> dict[str, Any]:
