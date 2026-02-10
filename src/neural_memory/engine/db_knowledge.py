@@ -149,12 +149,8 @@ class SchemaKnowledge:
 
 # Column name patterns → SynapseType + confidence
 _PARENT_PATTERNS = frozenset({"parent_id", "category_id", "type_id", "group_id"})
-_OWNER_PATTERNS = frozenset(
-    {"user_id", "owner_id", "author_id", "creator_id", "assignee_id"}
-)
-_LOCATION_PATTERNS = frozenset(
-    {"location_id", "address_id", "place_id", "region_id", "country_id"}
-)
+_OWNER_PATTERNS = frozenset({"user_id", "owner_id", "author_id", "creator_id", "assignee_id"})
+_LOCATION_PATTERNS = frozenset({"location_id", "address_id", "place_id", "region_id", "country_id"})
 
 
 class FKMapper:
@@ -164,9 +160,7 @@ class FKMapper:
     Default is RELATED_TO (safe) rather than CONTAINS (assertive).
     """
 
-    def map_fk_to_synapse(
-        self, fk: ForeignKeyInfo, table: TableInfo
-    ) -> tuple[SynapseType, float]:
+    def map_fk_to_synapse(self, fk: ForeignKeyInfo, table: TableInfo) -> tuple[SynapseType, float]:
         """Map a FK to (SynapseType, confidence).
 
         Returns:
@@ -193,9 +187,7 @@ class FKMapper:
 _MAX_SUMMARY_COLUMNS = 8
 _MAX_ENUM_TABLE_COLUMNS = 4
 
-_AUDIT_COLUMNS = frozenset(
-    {"id", "created_at", "updated_at", "created_on", "modified_at"}
-)
+_AUDIT_COLUMNS = frozenset({"id", "created_at", "updated_at", "created_on", "modified_at"})
 
 
 class JoinTableDetector:
@@ -230,9 +222,7 @@ class JoinTableDetector:
 class PatternDetector:
     """Detects common schema patterns with confidence scores."""
 
-    def detect_all(
-        self, table: TableInfo
-    ) -> list[tuple[SchemaPatternType, float, dict[str, Any]]]:
+    def detect_all(self, table: TableInfo) -> list[tuple[SchemaPatternType, float, dict[str, Any]]]:
         """Detect all patterns in a table.
 
         Returns:
@@ -274,10 +264,7 @@ class PatternDetector:
         """Detect audit trail pattern."""
         has_created = "created_at" in col_names or "created_on" in col_names
         has_updated = "updated_at" in col_names or "updated_on" in col_names
-        has_user = any(
-            c in col_names
-            for c in ("created_by", "updated_by", "last_modified_by")
-        )
+        has_user = any(c in col_names for c in ("created_by", "updated_by", "last_modified_by"))
 
         if has_created and has_updated and has_user:
             return (
@@ -442,9 +429,7 @@ class KnowledgeExtractor:
 
             # Join tables → CO_OCCURS relationships, not entity nodes
             if is_join:
-                relationships.extend(
-                    self._extract_join_relationships(table)
-                )
+                relationships.extend(self._extract_join_relationships(table))
                 continue
 
             # Entity knowledge (semantic description)
@@ -459,16 +444,12 @@ class KnowledgeExtractor:
             # Detect patterns
             detected = self._pattern_detector.detect_all(table)
             for pattern_type, confidence, evidence in detected:
-                pattern = self._create_pattern(
-                    pattern_type, table.name, evidence, confidence
-                )
+                pattern = self._create_pattern(pattern_type, table.name, evidence, confidence)
                 patterns.append(pattern)
 
             # FK relationships (non-join)
             for fk in table.foreign_keys:
-                synapse_type, confidence = self._fk_mapper.map_fk_to_synapse(
-                    fk, table
-                )
+                synapse_type, confidence = self._fk_mapper.map_fk_to_synapse(fk, table)
                 relationships.append(
                     KnowledgeRelationship(
                         source_table=table.name,
@@ -498,10 +479,7 @@ class KnowledgeExtractor:
         table itself as an entity).
         """
         result: list[KnowledgeRelationship] = []
-        fk_targets = [
-            (fk.referenced_table, fk.referenced_column)
-            for fk in table.foreign_keys
-        ]
+        fk_targets = [(fk.referenced_table, fk.referenced_column) for fk in table.foreign_keys]
 
         # Create CO_OCCURS between all pairs of referenced tables
         for i in range(len(fk_targets)):
@@ -518,9 +496,7 @@ class KnowledgeExtractor:
                 )
         return result
 
-    def _create_entity(
-        self, table: TableInfo, snapshot: SchemaSnapshot
-    ) -> KnowledgeEntity:
+    def _create_entity(self, table: TableInfo, snapshot: SchemaSnapshot) -> KnowledgeEntity:
         """Create semantic entity description for a table."""
         purpose = _infer_purpose(table.name)
 
@@ -542,9 +518,7 @@ class KnowledgeExtractor:
         # Build FK context for richer descriptions
         fk_context = ""
         if table.foreign_keys:
-            fk_refs = [
-                f"{fk.referenced_table}" for fk in table.foreign_keys
-            ]
+            fk_refs = [f"{fk.referenced_table}" for fk in table.foreign_keys]
             fk_context = f" Links to: {', '.join(fk_refs)}."
 
         # Use table comment if available (gold metadata)
@@ -555,8 +529,7 @@ class KnowledgeExtractor:
             )
         else:
             description = (
-                f"Database table '{table.name}' {purpose}. "
-                f"Columns: {column_summary}.{fk_context}"
+                f"Database table '{table.name}' {purpose}. Columns: {column_summary}.{fk_context}"
             )
 
         return KnowledgeEntity(
@@ -568,9 +541,7 @@ class KnowledgeExtractor:
             confidence=0.90 if table.comment else 0.75,
         )
 
-    def _create_property(
-        self, table_name: str, col: ColumnInfo
-    ) -> KnowledgeProperty:
+    def _create_property(self, table_name: str, col: ColumnInfo) -> KnowledgeProperty:
         """Create column-level property knowledge."""
         constraints: list[str] = []
         if col.primary_key:

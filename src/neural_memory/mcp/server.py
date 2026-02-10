@@ -62,7 +62,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class MCPServer(SessionHandler, EternalHandler, AutoHandler, IndexHandler, ConflictHandler, TrainHandler, DBTrainHandler):
+class MCPServer(
+    SessionHandler,
+    EternalHandler,
+    AutoHandler,
+    IndexHandler,
+    ConflictHandler,
+    TrainHandler,
+    DBTrainHandler,
+):
     """MCP server that exposes NeuralMemory tools.
 
     Uses shared SQLite storage for cross-tool memory sharing.

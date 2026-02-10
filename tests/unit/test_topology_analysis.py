@@ -142,18 +142,14 @@ class TestClusteringCoefficient:
     def test_large_graph_sampling(self) -> None:
         """Graph with >200 nodes triggers sampling path."""
         # Create 250 nodes in a chain (no triangles)
-        synapses = [
-            _mock_synapse(f"n{i}", f"n{i+1}") for i in range(250)
-        ]
+        synapses = [_mock_synapse(f"n{i}", f"n{i + 1}") for i in range(250)]
         coeff = _clustering_coefficient(synapses)
         # Chain has no triangles → coefficient 0.0
         assert coeff == 0.0
 
     def test_large_graph_deterministic(self) -> None:
         """Sampling is deterministic (same result on repeated calls)."""
-        synapses = [
-            _mock_synapse(f"n{i}", f"n{i+1}") for i in range(250)
-        ]
+        synapses = [_mock_synapse(f"n{i}", f"n{i + 1}") for i in range(250)]
         coeff1 = _clustering_coefficient(synapses)
         coeff2 = _clustering_coefficient(synapses)
         assert coeff1 == coeff2
@@ -259,9 +255,7 @@ class TestPreloadedSynapses:
             return_value={"neuron_count": 3, "synapse_count": 2, "fiber_count": 0}
         )
 
-        result = await compute_topology(
-            mock_storage, "brain-1", _preloaded_synapses=synapses
-        )
+        result = await compute_topology(mock_storage, "brain-1", _preloaded_synapses=synapses)
 
         # Should NOT have called get_all_synapses
         mock_storage.get_all_synapses.assert_not_called()

@@ -142,17 +142,16 @@ class EvolutionEngine:
         all_fibers = await self._storage.get_fibers(limit=10000)
 
         # Maturation metrics
-        semantic_ratio, reinforcement_days, fibers_semantic, fibers_episodic = (
-            await self._compute_maturation()
-        )
+        (
+            semantic_ratio,
+            reinforcement_days,
+            fibers_semantic,
+            fibers_episodic,
+        ) = await self._compute_maturation()
 
         # Topology metrics (pass pre-fetched synapses)
-        topo = await compute_topology(
-            self._storage, brain_id, _preloaded_synapses=all_synapses
-        )
-        topology_coherence = (
-            topo.clustering_coefficient * 0.5 + topo.largest_component_ratio * 0.5
-        )
+        topo = await compute_topology(self._storage, brain_id, _preloaded_synapses=all_synapses)
+        topology_coherence = topo.clustering_coefficient * 0.5 + topo.largest_component_ratio * 0.5
         knowledge_density = topo.knowledge_density
 
         # Plasticity (uses pre-fetched synapses)
@@ -212,12 +211,8 @@ class EvolutionEngine:
         if not all_maturations:
             return 0.0, 0.0, 0, 0
 
-        semantic_count = sum(
-            1 for m in all_maturations if m.stage == MemoryStage.SEMANTIC
-        )
-        episodic_count = sum(
-            1 for m in all_maturations if m.stage == MemoryStage.EPISODIC
-        )
+        semantic_count = sum(1 for m in all_maturations if m.stage == MemoryStage.SEMANTIC)
+        episodic_count = sum(1 for m in all_maturations if m.stage == MemoryStage.EPISODIC)
         semantic_ratio = semantic_count / len(all_maturations)
 
         # Average distinct reinforcement days across all fibers
@@ -230,9 +225,7 @@ class EvolutionEngine:
 # ── Pure functions ───────────────────────────────────────────────
 
 
-def _compute_plasticity(
-    all_synapses: list[object], now: datetime
-) -> float:
+def _compute_plasticity(all_synapses: list[object], now: datetime) -> float:
     """Compute plasticity index: learning activity in last 7 days.
 
     Counts distinct synapses that are either new OR reinforced in the
@@ -250,8 +243,7 @@ def _compute_plasticity(
     active_7d = sum(
         1
         for s in all_synapses
-        if s.created_at >= cutoff
-        or (s.last_activated and s.last_activated >= cutoff)
+        if s.created_at >= cutoff or (s.last_activated and s.last_activated >= cutoff)
     )
 
     return active_7d / total
@@ -271,11 +263,7 @@ def _compute_activity(
 
     cutoff = now - timedelta(days=7)
 
-    active_7d = sum(
-        1
-        for f in all_fibers
-        if f.last_conducted and f.last_conducted >= cutoff
-    )
+    active_7d = sum(1 for f in all_fibers if f.last_conducted and f.last_conducted >= cutoff)
 
     return active_7d / fiber_count
 

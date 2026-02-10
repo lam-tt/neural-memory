@@ -292,9 +292,7 @@ class DocTrainer:
 
             # Record anchor for hierarchy linking
             if chunk.heading_path:
-                chunk_anchors.append(
-                    (chunk.heading_path, result.fiber.anchor_neuron_id)
-                )
+                chunk_anchors.append((chunk.heading_path, result.fiber.anchor_neuron_id))
 
         # Build heading hierarchy + temporal topology
         hierarchy_synapses = await self._build_heading_hierarchy(
@@ -362,7 +360,9 @@ class DocTrainer:
             )
             found = False
             for n in existing:
-                if n.metadata.get("heading_path") == heading_path_str and n.metadata.get("doc_heading"):
+                if n.metadata.get("heading_path") == heading_path_str and n.metadata.get(
+                    "doc_heading"
+                ):
                     heading_neuron_ids[path] = n.id
                     found = True
                     break

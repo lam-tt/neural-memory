@@ -267,7 +267,11 @@ def _split_by_headings(lines: list[str]) -> list[dict]:
             if in_fence:
                 # Check if this closes the current fence
                 stripped = line.strip()
-                if stripped == marker_char * len(stripped) and len(stripped) >= marker_len and marker_char == fence_marker:
+                if (
+                    stripped == marker_char * len(stripped)
+                    and len(stripped) >= marker_len
+                    and marker_char == fence_marker
+                ):
                     in_fence = False
                     fence_marker = ""
             else:

@@ -97,9 +97,7 @@ def _make_snapshot() -> SchemaSnapshot:
                     ColumnInfo("title", "TEXT", False, False),
                     ColumnInfo("user_id", "INTEGER", False, False),
                 ),
-                foreign_keys=(
-                    ForeignKeyInfo("user_id", "users", "id", None, None),
-                ),
+                foreign_keys=(ForeignKeyInfo("user_id", "users", "id", None, None),),
                 indexes=(),
                 row_count_estimate=50,
             ),
@@ -197,9 +195,7 @@ class TestDBTrainerBatchPattern:
         config = _build_mock_config()
 
         with (
-            patch.object(
-                DBTrainer, "__init__", lambda self, *a, **kw: None
-            ),
+            patch.object(DBTrainer, "__init__", lambda self, *a, **kw: None),
         ):
             trainer = DBTrainer.__new__(DBTrainer)
             trainer._storage = storage
@@ -258,9 +254,7 @@ class TestDBTrainerEncoding:
         config = _build_mock_config()
 
         with (
-            patch.object(
-                DBTrainer, "__init__", lambda self, *a, **kw: None
-            ),
+            patch.object(DBTrainer, "__init__", lambda self, *a, **kw: None),
         ):
             trainer = DBTrainer.__new__(DBTrainer)
             trainer._storage = storage
@@ -299,9 +293,7 @@ class TestDBTrainerEncoding:
         config = _build_mock_config()
 
         with (
-            patch.object(
-                DBTrainer, "__init__", lambda self, *a, **kw: None
-            ),
+            patch.object(DBTrainer, "__init__", lambda self, *a, **kw: None),
         ):
             trainer = DBTrainer.__new__(DBTrainer)
             trainer._storage = storage
@@ -360,9 +352,7 @@ class TestMaxTablesGuard:
         config = _build_mock_config()
 
         with (
-            patch.object(
-                DBTrainer, "__init__", lambda self, *a, **kw: None
-            ),
+            patch.object(DBTrainer, "__init__", lambda self, *a, **kw: None),
         ):
             trainer = DBTrainer.__new__(DBTrainer)
             trainer._storage = storage
@@ -400,9 +390,7 @@ class TestDomainNeuron:
         config = _build_mock_config()
 
         with (
-            patch.object(
-                DBTrainer, "__init__", lambda self, *a, **kw: None
-            ),
+            patch.object(DBTrainer, "__init__", lambda self, *a, **kw: None),
         ):
             trainer = DBTrainer.__new__(DBTrainer)
             trainer._storage = storage
@@ -436,9 +424,7 @@ class TestDomainNeuron:
         config = _build_mock_config()
 
         with (
-            patch.object(
-                DBTrainer, "__init__", lambda self, *a, **kw: None
-            ),
+            patch.object(DBTrainer, "__init__", lambda self, *a, **kw: None),
         ):
             trainer = DBTrainer.__new__(DBTrainer)
             trainer._storage = storage
@@ -477,9 +463,7 @@ class TestRelationshipSynapses:
         config = _build_mock_config()
 
         with (
-            patch.object(
-                DBTrainer, "__init__", lambda self, *a, **kw: None
-            ),
+            patch.object(DBTrainer, "__init__", lambda self, *a, **kw: None),
         ):
             trainer = DBTrainer.__new__(DBTrainer)
             trainer._storage = storage
@@ -510,7 +494,8 @@ class TestRelationshipSynapses:
             assert result.relationships_mapped == 1
             # Synapse added for the relationship
             synapse_calls = [
-                c for c in storage.add_synapse.call_args_list
+                c
+                for c in storage.add_synapse.call_args_list
                 if c[0][0].metadata.get("db_relationship")
             ]
             assert len(synapse_calls) == 1
@@ -522,9 +507,7 @@ class TestRelationshipSynapses:
         config = _build_mock_config()
 
         with (
-            patch.object(
-                DBTrainer, "__init__", lambda self, *a, **kw: None
-            ),
+            patch.object(DBTrainer, "__init__", lambda self, *a, **kw: None),
         ):
             trainer = DBTrainer.__new__(DBTrainer)
             trainer._storage = storage
@@ -560,9 +543,7 @@ class TestIntrospectionFailure:
         config = _build_mock_config()
 
         with (
-            patch.object(
-                DBTrainer, "__init__", lambda self, *a, **kw: None
-            ),
+            patch.object(DBTrainer, "__init__", lambda self, *a, **kw: None),
         ):
             trainer = DBTrainer.__new__(DBTrainer)
             trainer._storage = storage
@@ -615,18 +596,14 @@ class TestDBTrainHandler:
     @pytest.mark.asyncio
     async def test_connection_string_too_long(self) -> None:
         handler = self._make_handler()
-        result = await handler._train_db_schema(
-            {"connection_string": "sqlite:///" + "a" * 500}
-        )
+        result = await handler._train_db_schema({"connection_string": "sqlite:///" + "a" * 500})
         assert "error" in result
         assert "too long" in result["error"]
 
     @pytest.mark.asyncio
     async def test_non_sqlite_rejected(self) -> None:
         handler = self._make_handler()
-        result = await handler._train_db_schema(
-            {"connection_string": "postgresql://localhost/db"}
-        )
+        result = await handler._train_db_schema({"connection_string": "postgresql://localhost/db"})
         assert "error" in result
         assert "SQLite" in result["error"]
 
@@ -677,9 +654,7 @@ class TestDBTrainHandler:
         # Override: get_brain returns None
         storage = await handler.get_storage()
         storage.get_brain = AsyncMock(return_value=None)
-        result = await handler._train_db_schema(
-            {"connection_string": "sqlite:///test.db"}
-        )
+        result = await handler._train_db_schema({"connection_string": "sqlite:///test.db"})
         assert "error" in result
         assert "No brain" in result["error"]
 
@@ -930,9 +905,7 @@ class TestPatternSkipForUnencoded:
                 entities=(),
                 relationships=(),
                 patterns=(
-                    KnowledgePattern(
-                        SchemaPatternType.AUDIT_TRAIL, "unknown", {}, "desc", 0.7
-                    ),
+                    KnowledgePattern(SchemaPatternType.AUDIT_TRAIL, "unknown", {}, "desc", 0.7),
                 ),
                 properties=(),
             )

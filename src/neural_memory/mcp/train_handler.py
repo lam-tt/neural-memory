@@ -120,9 +120,7 @@ class TrainHandler:
             type=NeuronType.CONCEPT,
             limit=1000,
         )
-        trained_count = sum(
-            1 for n in doc_neurons if n.metadata.get("doc_train")
-        )
+        trained_count = sum(1 for n in doc_neurons if n.metadata.get("doc_train"))
 
         return {
             "trained_chunks": trained_count,

@@ -449,12 +449,17 @@ class TestSchemaFingerprint:
 class TestAbsolutePathRejected:
     """Security: absolute paths are rejected to prevent arbitrary file access."""
 
-    @pytest.mark.skipif(sys.platform == "win32", reason="Unix absolute path not detected on Windows")
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="Unix absolute path not detected on Windows"
+    )
     def test_absolute_unix_path_rejected(self) -> None:
         introspector = SchemaIntrospector()
         with pytest.raises(ValueError, match="Absolute paths"):
             introspector._extract_path("sqlite:////etc/data.db", "sqlite")
 
+    @pytest.mark.skipif(
+        sys.platform != "win32", reason="Windows path detection only works on Windows"
+    )
     def test_absolute_windows_path_rejected(self) -> None:
         introspector = SchemaIntrospector()
         with pytest.raises(ValueError, match="Absolute paths"):

@@ -82,9 +82,7 @@ async def compute_topology(
         )
 
     all_synapses = (
-        _preloaded_synapses
-        if _preloaded_synapses is not None
-        else await storage.get_all_synapses()
+        _preloaded_synapses if _preloaded_synapses is not None else await storage.get_all_synapses()
     )
 
     # ── Density (undirected: n*(n-1)/2) ────────────────────────
@@ -96,9 +94,7 @@ async def compute_topology(
 
     # ── Enriched synapse ratio ───────────────────────────────
     enriched_count = sum(
-        1
-        for s in all_synapses
-        if getattr(s, "metadata", None) and s.metadata.get("_enriched")
+        1 for s in all_synapses if getattr(s, "metadata", None) and s.metadata.get("_enriched")
     )
     enriched_ratio = enriched_count / max(1, len(all_synapses))
 

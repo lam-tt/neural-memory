@@ -84,16 +84,18 @@ async def _train_async(
         storage.enable_auto_save()
 
     if json_output:
-        output_result({
-            "files_processed": result.files_processed,
-            "chunks_encoded": result.chunks_encoded,
-            "chunks_skipped": result.chunks_skipped,
-            "neurons_created": result.neurons_created,
-            "synapses_created": result.synapses_created,
-            "hierarchy_synapses": result.hierarchy_synapses,
-            "enrichment_synapses": result.enrichment_synapses,
-            "brain_name": result.brain_name,
-        })
+        output_result(
+            {
+                "files_processed": result.files_processed,
+                "chunks_encoded": result.chunks_encoded,
+                "chunks_skipped": result.chunks_skipped,
+                "neurons_created": result.neurons_created,
+                "synapses_created": result.synapses_created,
+                "hierarchy_synapses": result.hierarchy_synapses,
+                "enrichment_synapses": result.enrichment_synapses,
+                "brain_name": result.brain_name,
+            }
+        )
     else:
         typer.echo(f"Files processed:      {result.files_processed}")
         typer.echo(f"Chunks encoded:       {result.chunks_encoded}")

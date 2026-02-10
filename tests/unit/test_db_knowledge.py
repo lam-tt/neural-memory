@@ -67,9 +67,7 @@ def _make_table(name: str = "test", fk_col: str = "ref_id") -> TableInfo:
         name=name,
         schema=None,
         columns=(ColumnInfo("id", "INTEGER", False, True),),
-        foreign_keys=(
-            ForeignKeyInfo(fk_col, "other_table", "id", None, None),
-        ),
+        foreign_keys=(ForeignKeyInfo(fk_col, "other_table", "id", None, None),),
         indexes=(),
         row_count_estimate=0,
     )
@@ -256,9 +254,7 @@ class TestJoinTableDetector:
                 ColumnInfo("user_id", "INTEGER", False, False),
                 ColumnInfo("title", "TEXT", False, False),
             ),
-            foreign_keys=(
-                ForeignKeyInfo("user_id", "users", "id", None, None),
-            ),
+            foreign_keys=(ForeignKeyInfo("user_id", "users", "id", None, None),),
             indexes=(),
             row_count_estimate=0,
         )
@@ -312,9 +308,7 @@ class TestPatternDetector:
         self_fk: bool = False,
     ) -> TableInfo:
         """Helper: build table with named columns."""
-        columns = tuple(
-            ColumnInfo(c, "TEXT", True, c == "id") for c in col_names
-        )
+        columns = tuple(ColumnInfo(c, "TEXT", True, c == "id") for c in col_names)
         fks: tuple[ForeignKeyInfo, ...] = ()
         if self_fk:
             fks = (ForeignKeyInfo("parent_id", name, "id", None, None),)
@@ -341,9 +335,7 @@ class TestPatternDetector:
 
     def test_audit_trail_timestamps_only(self) -> None:
         """created_at + updated_at without user tracking → 0.70."""
-        table = self._make_table_with_cols(
-            "orders", ["id", "name", "created_at", "updated_at"]
-        )
+        table = self._make_table_with_cols("orders", ["id", "name", "created_at", "updated_at"])
         results = self.detector.detect_all(table)
         audit = [r for r in results if r[0] == SchemaPatternType.AUDIT_TRAIL]
         assert len(audit) == 1
@@ -351,9 +343,7 @@ class TestPatternDetector:
 
     def test_no_audit_trail_just_created_at(self) -> None:
         """Just created_at alone → NOT audit trail."""
-        table = self._make_table_with_cols(
-            "events", ["id", "name", "created_at"]
-        )
+        table = self._make_table_with_cols("events", ["id", "name", "created_at"])
         results = self.detector.detect_all(table)
         audit = [r for r in results if r[0] == SchemaPatternType.AUDIT_TRAIL]
         assert len(audit) == 0
@@ -362,9 +352,7 @@ class TestPatternDetector:
 
     def test_soft_delete_deleted_at(self) -> None:
         """deleted_at → 0.90."""
-        table = self._make_table_with_cols(
-            "users", ["id", "name", "deleted_at"]
-        )
+        table = self._make_table_with_cols("users", ["id", "name", "deleted_at"])
         results = self.detector.detect_all(table)
         soft = [r for r in results if r[0] == SchemaPatternType.SOFT_DELETE]
         assert len(soft) == 1
@@ -372,9 +360,7 @@ class TestPatternDetector:
 
     def test_soft_delete_is_deleted(self) -> None:
         """is_deleted → 0.80."""
-        table = self._make_table_with_cols(
-            "users", ["id", "name", "is_deleted"]
-        )
+        table = self._make_table_with_cols("users", ["id", "name", "is_deleted"])
         results = self.detector.detect_all(table)
         soft = [r for r in results if r[0] == SchemaPatternType.SOFT_DELETE]
         assert len(soft) == 1
@@ -382,9 +368,7 @@ class TestPatternDetector:
 
     def test_soft_delete_archived_at(self) -> None:
         """archived_at → 0.60."""
-        table = self._make_table_with_cols(
-            "posts", ["id", "body", "archived_at"]
-        )
+        table = self._make_table_with_cols("posts", ["id", "body", "archived_at"])
         results = self.detector.detect_all(table)
         soft = [r for r in results if r[0] == SchemaPatternType.SOFT_DELETE]
         assert len(soft) == 1
@@ -392,9 +376,7 @@ class TestPatternDetector:
 
     def test_soft_delete_removed_at(self) -> None:
         """removed_at → 0.70."""
-        table = self._make_table_with_cols(
-            "items", ["id", "name", "removed_at"]
-        )
+        table = self._make_table_with_cols("items", ["id", "name", "removed_at"])
         results = self.detector.detect_all(table)
         soft = [r for r in results if r[0] == SchemaPatternType.SOFT_DELETE]
         assert len(soft) == 1
@@ -404,9 +386,7 @@ class TestPatternDetector:
 
     def test_tree_hierarchy_self_fk(self) -> None:
         """Self-referencing FK → 0.95."""
-        table = self._make_table_with_cols(
-            "categories", ["id", "name", "parent_id"], self_fk=True
-        )
+        table = self._make_table_with_cols("categories", ["id", "name", "parent_id"], self_fk=True)
         results = self.detector.detect_all(table)
         tree = [r for r in results if r[0] == SchemaPatternType.TREE_HIERARCHY]
         assert len(tree) == 1
@@ -421,9 +401,7 @@ class TestPatternDetector:
                 ColumnInfo("id", "INTEGER", False, True),
                 ColumnInfo("parent_id", "INTEGER", True, False),
             ),
-            foreign_keys=(
-                ForeignKeyInfo("parent_id", "users", "id", None, None),
-            ),
+            foreign_keys=(ForeignKeyInfo("parent_id", "users", "id", None, None),),
             indexes=(),
             row_count_estimate=0,
         )
@@ -446,9 +424,7 @@ class TestPatternDetector:
 
     def test_no_polymorphic_type_without_id(self) -> None:
         """Only _type column without matching _id → no detection."""
-        table = self._make_table_with_cols(
-            "things", ["id", "item_type", "name"]
-        )
+        table = self._make_table_with_cols("things", ["id", "item_type", "name"])
         results = self.detector.detect_all(table)
         poly = [r for r in results if r[0] == SchemaPatternType.POLYMORPHIC]
         assert len(poly) == 0
@@ -457,9 +433,7 @@ class TestPatternDetector:
 
     def test_enum_table_with_name_col(self) -> None:
         """Small table with 'name' column and no FKs → 0.70."""
-        table = self._make_table_with_cols(
-            "statuses", ["id", "name"]
-        )
+        table = self._make_table_with_cols("statuses", ["id", "name"])
         results = self.detector.detect_all(table)
         enum_results = [r for r in results if r[0] == SchemaPatternType.ENUM_TABLE]
         assert len(enum_results) == 1
@@ -467,18 +441,14 @@ class TestPatternDetector:
 
     def test_enum_table_with_label_col(self) -> None:
         """Small table with 'label' column → detected."""
-        table = self._make_table_with_cols(
-            "priorities", ["id", "label", "code"]
-        )
+        table = self._make_table_with_cols("priorities", ["id", "label", "code"])
         results = self.detector.detect_all(table)
         enum_results = [r for r in results if r[0] == SchemaPatternType.ENUM_TABLE]
         assert len(enum_results) == 1
 
     def test_no_enum_large_table(self) -> None:
         """Table with >4 columns → NOT enum table."""
-        table = self._make_table_with_cols(
-            "users", ["id", "name", "email", "phone", "address"]
-        )
+        table = self._make_table_with_cols("users", ["id", "name", "email", "phone", "address"])
         results = self.detector.detect_all(table)
         enum_results = [r for r in results if r[0] == SchemaPatternType.ENUM_TABLE]
         assert len(enum_results) == 0
@@ -492,9 +462,7 @@ class TestPatternDetector:
                 ColumnInfo("id", "INTEGER", False, True),
                 ColumnInfo("name", "TEXT", False, False),
             ),
-            foreign_keys=(
-                ForeignKeyInfo("category_id", "categories", "id", None, None),
-            ),
+            foreign_keys=(ForeignKeyInfo("category_id", "categories", "id", None, None),),
             indexes=(),
             row_count_estimate=0,
         )
@@ -580,9 +548,7 @@ def _build_ecommerce_snapshot() -> SchemaSnapshot:
             ColumnInfo("name", "TEXT", False, False),
             ColumnInfo("parent_id", "INTEGER", True, False),
         ),
-        foreign_keys=(
-            ForeignKeyInfo("parent_id", "categories", "id", None, None),
-        ),
+        foreign_keys=(ForeignKeyInfo("parent_id", "categories", "id", None, None),),
         indexes=(),
         row_count_estimate=20,
     )
@@ -599,9 +565,7 @@ def _build_ecommerce_snapshot() -> SchemaSnapshot:
             ColumnInfo("updated_at", "TEXT", True, False),
             ColumnInfo("deleted_at", "TEXT", True, False),
         ),
-        foreign_keys=(
-            ForeignKeyInfo("category_id", "categories", "id", None, None),
-        ),
+        foreign_keys=(ForeignKeyInfo("category_id", "categories", "id", None, None),),
         indexes=(),
         row_count_estimate=500,
     )
@@ -670,10 +634,7 @@ class TestKnowledgeExtractor:
     def test_join_table_creates_co_occurs(self) -> None:
         """product_tags join table → CO_OCCURS between products and tags."""
         result = self.extractor.extract(self.snapshot)
-        co_occurs = [
-            r for r in result.relationships
-            if r.synapse_type == SynapseType.CO_OCCURS
-        ]
+        co_occurs = [r for r in result.relationships if r.synapse_type == SynapseType.CO_OCCURS]
         assert len(co_occurs) >= 1
         sources_targets = {(r.source_table, r.target_table) for r in co_occurs}
         assert ("products", "tags") in sources_targets
@@ -682,7 +643,8 @@ class TestKnowledgeExtractor:
         """category_id FK → IS_A relationship."""
         result = self.extractor.extract(self.snapshot)
         cat_rels = [
-            r for r in result.relationships
+            r
+            for r in result.relationships
             if r.source_table == "products" and r.target_table == "categories"
         ]
         assert len(cat_rels) == 1
@@ -692,8 +654,7 @@ class TestKnowledgeExtractor:
         """categories.parent_id self-FK → TREE_HIERARCHY pattern."""
         result = self.extractor.extract(self.snapshot)
         tree_patterns = [
-            p for p in result.patterns
-            if p.pattern_type == SchemaPatternType.TREE_HIERARCHY
+            p for p in result.patterns if p.pattern_type == SchemaPatternType.TREE_HIERARCHY
         ]
         assert len(tree_patterns) == 1
         assert tree_patterns[0].table_name == "categories"
@@ -701,20 +662,14 @@ class TestKnowledgeExtractor:
     def test_soft_delete_detected(self) -> None:
         """products.deleted_at → SOFT_DELETE pattern."""
         result = self.extractor.extract(self.snapshot)
-        soft_del = [
-            p for p in result.patterns
-            if p.pattern_type == SchemaPatternType.SOFT_DELETE
-        ]
+        soft_del = [p for p in result.patterns if p.pattern_type == SchemaPatternType.SOFT_DELETE]
         assert len(soft_del) == 1
         assert soft_del[0].table_name == "products"
 
     def test_audit_trail_detected(self) -> None:
         """products.created_at + updated_at → AUDIT_TRAIL pattern."""
         result = self.extractor.extract(self.snapshot)
-        audit = [
-            p for p in result.patterns
-            if p.pattern_type == SchemaPatternType.AUDIT_TRAIL
-        ]
+        audit = [p for p in result.patterns if p.pattern_type == SchemaPatternType.AUDIT_TRAIL]
         # products and users both have created_at + updated_at
         audit_tables = {p.table_name for p in audit}
         assert "products" in audit_tables
@@ -724,8 +679,7 @@ class TestKnowledgeExtractor:
         """tags (small, has 'name', no FKs) → ENUM_TABLE."""
         result = self.extractor.extract(self.snapshot)
         enum_patterns = [
-            p for p in result.patterns
-            if p.pattern_type == SchemaPatternType.ENUM_TABLE
+            p for p in result.patterns if p.pattern_type == SchemaPatternType.ENUM_TABLE
         ]
         enum_tables = {p.table_name for p in enum_patterns}
         assert "tags" in enum_tables
@@ -742,27 +696,21 @@ class TestKnowledgeExtractor:
     def test_entity_description_is_semantic(self) -> None:
         """Entity descriptions contain table name and purpose."""
         result = self.extractor.extract(self.snapshot)
-        users_entity = next(
-            e for e in result.entities if e.table_name == "users"
-        )
+        users_entity = next(e for e in result.entities if e.table_name == "users")
         assert "users" in users_entity.description
         assert "Columns:" in users_entity.description
 
     def test_entity_with_fk_context(self) -> None:
         """Entity description includes FK targets."""
         result = self.extractor.extract(self.snapshot)
-        products_entity = next(
-            e for e in result.entities if e.table_name == "products"
-        )
+        products_entity = next(e for e in result.entities if e.table_name == "products")
         assert "Links to:" in products_entity.description
         assert "categories" in products_entity.description
 
     def test_entity_confidence_without_comment(self) -> None:
         """Tables without comments get 0.75 confidence."""
         result = self.extractor.extract(self.snapshot)
-        users_entity = next(
-            e for e in result.entities if e.table_name == "users"
-        )
+        users_entity = next(e for e in result.entities if e.table_name == "users")
         assert users_entity.confidence == 0.75
 
     def test_entity_confidence_with_comment(self) -> None:
@@ -958,9 +906,7 @@ class TestColumnTruncation:
     """Entity description truncates column summary at 8 columns."""
 
     def test_more_than_8_columns_truncated(self) -> None:
-        cols = tuple(
-            ColumnInfo(f"col_{i}", "TEXT", True, i == 0) for i in range(12)
-        )
+        cols = tuple(ColumnInfo(f"col_{i}", "TEXT", True, i == 0) for i in range(12))
         table = TableInfo("wide_table", None, cols, (), (), 0)
         snapshot = SchemaSnapshot("test.db", "sqlite", (table,))
         extractor = KnowledgeExtractor()

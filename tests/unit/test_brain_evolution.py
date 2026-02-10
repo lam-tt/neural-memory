@@ -414,9 +414,7 @@ class TestComputeDecay:
     def test_uses_created_at_fallback(self) -> None:
         """When last_conducted is None, uses created_at."""
         now = utcnow()
-        fibers = [
-            _mock_fiber(last_conducted=None, created_at=now - timedelta(hours=1))
-        ]
+        fibers = [_mock_fiber(last_conducted=None, created_at=now - timedelta(hours=1))]
         decay = _compute_decay(fibers, now)
         assert decay > 0.9
 
@@ -547,16 +545,10 @@ class TestEvolutionEngine:
             return_value={"neuron_count": 1, "synapse_count": 100, "fiber_count": 10}
         )
         # All synapses are new → max plasticity
-        synapses = [
-            _mock_synapse(created_at=now - timedelta(hours=i))
-            for i in range(100)
-        ]
+        synapses = [_mock_synapse(created_at=now - timedelta(hours=i)) for i in range(100)]
         mock_storage.get_all_synapses = AsyncMock(return_value=synapses)
         # Recent fibers
-        fibers = [
-            _mock_fiber(last_conducted=now - timedelta(hours=1))
-            for _ in range(10)
-        ]
+        fibers = [_mock_fiber(last_conducted=now - timedelta(hours=1)) for _ in range(10)]
         mock_storage.get_fibers = AsyncMock(return_value=fibers)
 
         engine = EvolutionEngine(mock_storage)
@@ -656,8 +648,12 @@ class TestEvolutionEngine:
         # Synapses: mix of new, reinforced, and old
         synapses = [
             _mock_synapse("a", "b", created_at=now - timedelta(days=1)),
-            _mock_synapse("b", "c", created_at=now - timedelta(days=30),
-                          last_activated=now - timedelta(days=2)),
+            _mock_synapse(
+                "b",
+                "c",
+                created_at=now - timedelta(days=30),
+                last_activated=now - timedelta(days=2),
+            ),
             _mock_synapse("c", "a", created_at=now - timedelta(days=60)),
             _mock_synapse("a", "c", created_at=now - timedelta(days=2)),
         ]
@@ -734,9 +730,7 @@ class TestMCPEvolutionHandler:
         assert result["error"] == "No brain configured"
 
     @pytest.mark.asyncio
-    async def test_evolution_handler_engine_error(
-        self, mock_storage: AsyncMock
-    ) -> None:
+    async def test_evolution_handler_engine_error(self, mock_storage: AsyncMock) -> None:
         """_evolution handler catches engine errors gracefully."""
         from neural_memory.mcp.server import MCPServer
 
