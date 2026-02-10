@@ -4,7 +4,7 @@
 > Every feature passes the VISION.md 4-question test + brain test.
 > ZERO LLM dependency — pure algorithmic, regex, graph-based.
 
-**Current state**: v1.6.0 shipped. DB-to-Brain schema training pipeline. 18 MCP tools, 1648 tests.
+**Current state**: v1.6.0 shipped. DB-to-Brain schema training pipeline. 3 composable AI skills. 18 MCP tools, 1648 tests.
 **Next milestone**: v1.7.0 — Ecosystem Expansion (Marketplace, Neo4j, multi-language).
 
 ---
@@ -1388,6 +1388,18 @@ Brain  (neurons = tables/patterns, synapses = relationships)
 | MOD | `mcp/server.py` — Register DBTrainHandler mixin |
 | MOD | `mcp/tool_schemas.py` — `nmem_train_db` schema |
 
+### Composable AI Agent Skills (post-release)
+
+3 skills following the [ship-faster](https://github.com/Heyvhuang/ship-faster) SKILL.md pattern, installable to `~/.claude/skills/`:
+
+| Skill | Stage | Description |
+|-------|-------|-------------|
+| **memory-intake** | workflow | Messy notes → structured memories. 1-question-at-a-time clarification, 6-phase pipeline (triage → clarify → enrich → dedup → batch store → report) |
+| **memory-audit** | review | 6-dimension quality review (purity 25%, freshness 20%, coverage 20%, clarity 15%, relevance 10%, structure 10%). A-F grading, prioritized findings |
+| **memory-evolution** | workflow | Evidence-based optimization from usage patterns. Consolidation, enrichment, pruning, tag normalization, priority rebalancing. Checkpoint Q&A between cycles |
+
+Invoke via `/memory-intake`, `/memory-audit`, `/memory-evolution` in Claude Code.
+
 ---
 
 ## Phase 7: v1.7.0 — Ecosystem Expansion
@@ -1530,4 +1542,4 @@ All post-v1.0 milestones through v1.6.0 complete. Next: v1.7.0 Ecosystem Expansi
 ---
 
 *See [VISION.md](VISION.md) for the north star guiding all decisions.*
-*Last updated: 2026-02-10 (v1.6.0 shipped: DB-to-Brain schema training pipeline. 18 MCP tools, 1648 tests.)*
+*Last updated: 2026-02-10 (v1.6.0 shipped: DB-to-Brain schema training pipeline + 3 composable AI skills. 18 MCP tools, 1648 tests.)*

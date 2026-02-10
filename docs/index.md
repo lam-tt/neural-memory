@@ -191,6 +191,7 @@ nmem serve
 - **Memory Decay** - Ebbinghaus forgetting curve
 - **Brain Sharing** - Export, import, merge brains
 - **DB-to-Brain Training** - Teach brains to understand database schemas (v1.6.0+)
+- **AI Agent Skills** - Composable memory-intake, memory-audit, memory-evolution workflows (v1.6.0+)
 
 ## Next Steps
 

@@ -187,6 +187,46 @@ nmem_train_db(action="status")
 
 This shows how many schema entities have been trained into the current brain.
 
+## AI Agent Skills
+
+### Q: What are NeuralMemory skills?
+
+Composable AI agent workflows that follow the [ship-faster](https://github.com/Heyvhuang/ship-faster) SKILL.md pattern. They give Claude Code structured methods for memory management:
+
+| Skill | What it does |
+|-------|-------------|
+| `memory-intake` | Converts messy notes into well-typed, tagged memories via 1-question-at-a-time clarification |
+| `memory-audit` | 6-dimension quality review (purity, freshness, coverage, clarity, relevance, structure) with A-F grading |
+| `memory-evolution` | Evidence-based optimization — consolidation, enrichment, pruning, tag normalization |
+
+### Q: How do I install the skills?
+
+Copy from the NeuralMemory repo to your Claude Code skills directory:
+
+```bash
+# Linux/macOS
+cp -r skills/memory-* ~/.claude/skills/
+
+# Windows
+xcopy /E /I skills\memory-intake %USERPROFILE%\.claude\skills\memory-intake
+xcopy /E /I skills\memory-audit %USERPROFILE%\.claude\skills\memory-audit
+xcopy /E /I skills\memory-evolution %USERPROFILE%\.claude\skills\memory-evolution
+```
+
+### Q: How do I use them?
+
+In Claude Code, invoke by name:
+
+```
+/memory-intake "Meeting notes: decided on Redis caching, Bob handles migration, deadline Friday"
+/memory-audit
+/memory-evolution "Focus on the auth topic"
+```
+
+### Q: Do they require anything besides NeuralMemory?
+
+Just the NeuralMemory MCP server configured in Claude Code. The skills use existing MCP tools (`nmem_remember`, `nmem_recall`, `nmem_stats`, `nmem_health`, etc.) — no new dependencies.
+
 ## Data & Multi-tool Sharing
 
 ### Q: Do I need to install NeuralMemory per project?

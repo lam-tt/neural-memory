@@ -46,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version bumped to 1.6.0
 - Tests: 1648 passed (up from 1596)
 
+### Skills
+
+- **3 composable AI agent skills** — ship-faster SKILL.md pattern, installable to `~/.claude/skills/`
+  - `memory-intake` — structured memory creation from messy notes, 1-question-at-a-time clarification, batch store with preview
+  - `memory-audit` — 6-dimension quality review (purity, freshness, coverage, clarity, relevance, structure), A-F grading
+  - `memory-evolution` — evidence-based optimization from usage patterns, consolidation, enrichment, pruning, checkpoint Q&A
+
 ---
 
 ## [1.5.0] - 2026-02-10
