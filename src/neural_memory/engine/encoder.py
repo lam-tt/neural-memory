@@ -94,6 +94,8 @@ class MemoryEncoder:
         *,
         skip_conflicts: bool = False,
         skip_time_neurons: bool = False,
+        initial_stage: str = "",
+        salience_ceiling: float = 0.0,
     ) -> EncodingResult:
         """
         Encode content into neural structures.
@@ -106,6 +108,8 @@ class MemoryEncoder:
             language: Language hint ("vi", "en", or "auto")
             skip_conflicts: Skip conflict detection (for bulk doc training).
             skip_time_neurons: Skip TIME neuron creation (for bulk doc training).
+            initial_stage: Override maturation stage (e.g. "episodic" for doc training).
+            salience_ceiling: Cap initial fiber salience (0 = no cap).
 
         Returns:
             EncodingResult with created structures
@@ -303,16 +307,21 @@ class MemoryEncoder:
         # Calculate coherence (simple: edges / possible edges)
         possible_edges = len(neuron_ids) * (len(neuron_ids) - 1) / 2
         coherence = len(synapse_ids) / max(1, possible_edges)
-        fiber = fiber.with_salience(min(1.0, coherence + 0.3))
+        salience = min(1.0, coherence + 0.3)
+        if salience_ceiling > 0:
+            salience = min(salience, salience_ceiling)
+        fiber = fiber.with_salience(salience)
 
         await self._storage.add_fiber(fiber)
 
-        # Initialize maturation tracking (start as SHORT_TERM)
-        from neural_memory.engine.memory_stages import MaturationRecord
+        # Initialize maturation tracking
+        from neural_memory.engine.memory_stages import MaturationRecord, MemoryStage
 
+        stage = MemoryStage(initial_stage) if initial_stage else MemoryStage.SHORT_TERM
         maturation = MaturationRecord(
             fiber_id=fiber.id,
             brain_id=self._storage._current_brain_id or "",
+            stage=stage,
         )
         try:
             await self._storage.save_maturation(maturation)

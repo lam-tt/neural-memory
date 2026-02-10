@@ -907,18 +907,14 @@ class ReflexPipeline:
             fibers = [f for f in fibers if _fiber_valid_at(f, valid_at)]
 
         # Sort by composite score: salience * freshness * conductivity
-        # Doc-trained fibers are dampened so organic memories are not drowned
-        doc_train_dampening = 0.6
-
+        # Doc-trained fibers start at lower salience (ceiling 0.5) and EPISODIC stage,
+        # so lifecycle naturally handles ranking without retrieval-time hacks.
         def _fiber_score(fiber: Fiber) -> float:
             freshness = 0.5
             if fiber.last_conducted:
                 hours_ago = (utcnow() - fiber.last_conducted).total_seconds() / 3600
                 freshness = max(0.1, 1.0 / (1.0 + math.exp((hours_ago - 72) / 36)))
-            score = fiber.salience * freshness * fiber.conductivity
-            if "doc_train" in (fiber.auto_tags | fiber.agent_tags):
-                score *= doc_train_dampening
-            return score
+            return fiber.salience * freshness * fiber.conductivity
 
         fibers.sort(key=_fiber_score, reverse=True)
 

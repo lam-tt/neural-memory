@@ -18,6 +18,7 @@ from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.doc_chunker import DocChunk, chunk_markdown, discover_files
 from neural_memory.engine.encoder import MemoryEncoder
+from neural_memory.utils.timeutils import utcnow
 
 if TYPE_CHECKING:
     from neural_memory.core.brain import BrainConfig
@@ -38,6 +39,10 @@ class TrainingConfig:
         memory_type: Memory type override for all chunks.
         consolidate: Run ENRICH consolidation after encoding.
         extensions: File extensions to include.
+        initial_stage: Maturation stage for doc chunks ("episodic" = skip fragile
+            STM/WORKING stages since book-knowledge is not real-time memory).
+        salience_ceiling: Cap initial fiber salience so doc chunks start weaker
+            than organic memories and must earn salience through retrieval.
     """
 
     domain_tag: str = ""
@@ -47,6 +52,8 @@ class TrainingConfig:
     memory_type: str = "reference"
     consolidate: bool = True
     extensions: tuple[str, ...] = (".md",)
+    initial_stage: str = "episodic"
+    salience_ceiling: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -61,6 +68,7 @@ class TrainingResult:
         neurons_created: Total neurons created across all chunks.
         synapses_created: Total synapses from encoding (excluding hierarchy).
         hierarchy_synapses: CONTAINS synapses from heading tree.
+        session_synapses: HAPPENED_AT + BEFORE synapses for temporal topology.
         enrichment_synapses: Synapses created by ENRICH consolidation.
         brain_name: Name of the brain that was trained.
     """
@@ -72,6 +80,7 @@ class TrainingResult:
     neurons_created: int = 0
     synapses_created: int = 0
     hierarchy_synapses: int = 0
+    session_synapses: int = 0
     enrichment_synapses: int = 0
     brain_name: str = "current"
 
@@ -79,13 +88,29 @@ class TrainingResult:
 class DocTrainer:
     """Trains a neural memory brain from documentation files.
 
+    NOT a RAG pipeline. The differences:
+    - RAG: chunks are static, ranking is frozen, no lifecycle.
+    - NM: chunks start at EPISODIC stage with capped salience (0.5), decay
+      without use, mature to SEMANTIC only through spaced retrieval (3+ distinct
+      days), and get cross-linked by ENRICH consolidation. A used doc brain
+      looks fundamentally different from a freshly-trained one.
+
     Mirrors CodebaseEncoder's architecture: file hierarchy maps to
     heading hierarchy with CONTAINS synapses, while MemoryEncoder
     handles the actual NLP encoding pipeline.
 
+    Biological model:
+    - Reading a textbook → episodic declarative memory (not yet semantic)
+    - One temporal context per reading session (session TIME neuron)
+    - Local document order preserved (sibling BEFORE synapses)
+    - Unretrieved knowledge decays naturally at EPISODIC rate (1.0x)
+    - Frequently retrieved chunks earn higher salience via Hebbian learning
+
     Key optimizations over naive encoding:
     - skip_conflicts=True: Avoids false-positive conflict detection between doc chunks
-    - skip_time_neurons=True: Avoids TIME neuron super-hub (2000 chunks at same time)
+    - skip_time_neurons=True: Per-chunk TIME neurons skipped (session TIME used instead)
+    - initial_stage="episodic": Skip fragile STM/WORKING stages for static knowledge
+    - salience_ceiling=0.5: Doc chunks start weaker than organic memories
     - Per-chunk error isolation: One chunk failure doesn't abort the batch
     - Heading neuron deduplication: Checks storage before creating heading neurons
     """
@@ -195,16 +220,32 @@ class DocTrainer:
         """Encode chunks into neural structures and build heading hierarchy.
 
         This is the core pipeline:
-        1. Encode each chunk via MemoryEncoder.encode() (skip conflicts + time neurons)
-        2. Build heading hierarchy as CONCEPT neurons + CONTAINS synapses
-        3. Include heading neurons in chunk fibers for retrieval traversal
-        4. Optionally run ENRICH consolidation
+        1. Create session-level TIME neuron (one per training run, not per chunk)
+        2. Encode each chunk via MemoryEncoder.encode() (skip conflicts + time neurons)
+        3. Build heading hierarchy as CONCEPT neurons + CONTAINS synapses
+        4. Connect top-level headings to session TIME via HAPPENED_AT
+        5. Create BEFORE synapses between sibling chunks for document order
+        6. Optionally run ENRICH consolidation
         """
         tc = training_config
         total_neurons = 0
         total_synapses = 0
         chunks_encoded = 0
         chunks_failed = 0
+
+        # Create ONE session-level TIME neuron (avoids per-chunk super-hub)
+        session_time = utcnow()
+        session_time_neuron = Neuron.create(
+            type=NeuronType.TIME,
+            content=f"doc_train:{session_time.strftime('%Y-%m-%d %H:%M')}",
+            metadata={
+                "absolute_start": session_time.isoformat(),
+                "granularity": "session",
+                "doc_train_session": True,
+            },
+        )
+        await self._storage.add_neuron(session_time_neuron)
+        total_neurons += 1
 
         # Track heading → neuron ID for hierarchy building
         heading_neuron_ids: dict[tuple[str, ...], str] = {}
@@ -232,6 +273,8 @@ class DocTrainer:
                     metadata=metadata,
                     skip_conflicts=True,
                     skip_time_neurons=True,
+                    initial_stage=tc.initial_stage,
+                    salience_ceiling=tc.salience_ceiling,
                 )
             except Exception:
                 logger.warning(
@@ -253,9 +296,14 @@ class DocTrainer:
                     (chunk.heading_path, result.fiber.anchor_neuron_id)
                 )
 
-        # Build heading hierarchy (with dedup against storage)
+        # Build heading hierarchy + temporal topology
         hierarchy_synapses = await self._build_heading_hierarchy(
             chunks=chunks,
+            heading_neuron_ids=heading_neuron_ids,
+            chunk_anchors=chunk_anchors,
+        )
+        session_synapses = await self._build_temporal_topology(
+            session_time_neuron_id=session_time_neuron.id,
             heading_neuron_ids=heading_neuron_ids,
             chunk_anchors=chunk_anchors,
         )
@@ -273,6 +321,7 @@ class DocTrainer:
             neurons_created=total_neurons,
             synapses_created=total_synapses,
             hierarchy_synapses=hierarchy_synapses,
+            session_synapses=session_synapses,
             enrichment_synapses=enrichment_synapses,
             brain_name=tc.brain_name or "current",
         )
@@ -356,6 +405,58 @@ class DocTrainer:
                     target_id=anchor_id,
                     type=SynapseType.CONTAINS,
                     weight=0.8,
+                )
+                await self._storage.add_synapse(synapse)
+                synapse_count += 1
+
+        return synapse_count
+
+    async def _build_temporal_topology(
+        self,
+        *,
+        session_time_neuron_id: str,
+        heading_neuron_ids: dict[tuple[str, ...], str],
+        chunk_anchors: list[tuple[tuple[str, ...], str]],
+    ) -> int:
+        """Create temporal topology: session TIME + sibling BEFORE synapses.
+
+        Biological model: when you read a textbook, you remember ONE temporal
+        context for the reading session, and a vague sense of document order
+        within each section. This avoids per-chunk TIME neuron super-hubs
+        while preserving VISION.md Pillar 2 (temporal-causal topology).
+
+        Returns the number of temporal synapses created.
+        """
+        # Weight just above activation_threshold (0.2) to be traversable
+        doc_sequence_weight = 0.25
+        synapse_count = 0
+
+        # Connect top-level heading neurons to session TIME neuron
+        for path, neuron_id in heading_neuron_ids.items():
+            if len(path) == 1:
+                synapse = Synapse.create(
+                    source_id=neuron_id,
+                    target_id=session_time_neuron_id,
+                    type=SynapseType.HAPPENED_AT,
+                    weight=0.3,
+                )
+                await self._storage.add_synapse(synapse)
+                synapse_count += 1
+
+        # Create BEFORE synapses between sibling chunks under same heading
+        # (preserves local document order without runaway activation chains)
+        siblings: dict[tuple[str, ...], list[str]] = {}
+        for heading_path, anchor_id in chunk_anchors:
+            siblings.setdefault(heading_path, []).append(anchor_id)
+
+        for anchor_ids in siblings.values():
+            for i in range(len(anchor_ids) - 1):
+                synapse = Synapse.create(
+                    source_id=anchor_ids[i],
+                    target_id=anchor_ids[i + 1],
+                    type=SynapseType.BEFORE,
+                    weight=doc_sequence_weight,
+                    metadata={"doc_sequence": True},
                 )
                 await self._storage.add_synapse(synapse)
                 synapse_count += 1

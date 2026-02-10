@@ -96,6 +96,7 @@ class TrainHandler:
             "neurons_created": result.neurons_created,
             "synapses_created": result.synapses_created,
             "hierarchy_synapses": result.hierarchy_synapses,
+            "session_synapses": result.session_synapses,
             "enrichment_synapses": result.enrichment_synapses,
             "brain_name": result.brain_name,
             "message": (

@@ -46,6 +46,8 @@ class TestTrainingConfig:
         assert tc.memory_type == "reference"
         assert tc.consolidate is True
         assert tc.extensions == (".md",)
+        assert tc.initial_stage == "episodic"
+        assert tc.salience_ceiling == 0.5
 
     def test_custom_values(self) -> None:
         """Custom values are preserved."""
@@ -57,10 +59,14 @@ class TestTrainingConfig:
             memory_type="fact",
             consolidate=False,
             extensions=(".md", ".mdx"),
+            initial_stage="working",
+            salience_ceiling=0.7,
         )
         assert tc.domain_tag == "react"
         assert tc.brain_name == "react-expert"
         assert tc.consolidate is False
+        assert tc.initial_stage == "working"
+        assert tc.salience_ceiling == 0.7
 
 
 class TestTrainingResult:
@@ -89,6 +95,7 @@ class TestTrainingResult:
             chunks_skipped=0,
         )
         assert result.chunks_failed == 0
+        assert result.session_synapses == 0
         assert result.brain_name == "current"
 
     def test_chunks_failed_set(self) -> None:
@@ -100,6 +107,16 @@ class TestTrainingResult:
             chunks_failed=3,
         )
         assert result.chunks_failed == 3
+
+    def test_session_synapses_field(self) -> None:
+        """session_synapses tracks temporal topology count."""
+        result = TrainingResult(
+            files_processed=1,
+            chunks_encoded=5,
+            chunks_skipped=0,
+            session_synapses=7,
+        )
+        assert result.session_synapses == 7
 
 
 class TestDocTrainer:
@@ -129,8 +146,71 @@ class TestDocTrainer:
         assert result.chunks_encoded >= 1
         assert result.neurons_created >= 1
         assert result.chunks_failed == 0
-        # add_neuron called for encoded chunks + heading hierarchy neurons
-        assert mock_storage.add_neuron.call_count >= 1
+        # add_neuron called for: session TIME + encoded chunks + heading neurons
+        assert mock_storage.add_neuron.call_count >= 2
+
+    @pytest.mark.asyncio
+    async def test_session_time_neuron_created(
+        self, mock_storage: AsyncMock, mock_config: MagicMock, tmp_path: Path
+    ) -> None:
+        """A session-level TIME neuron is created per training run."""
+        md = "# Test\n\n" + " ".join(["content for session time test word"] * 8)
+        (tmp_path / "test.md").write_text(md, encoding="utf-8")
+
+        trainer = DocTrainer(mock_storage, mock_config)
+        with patch.object(trainer, "_run_enrichment", return_value=0):
+            result = await trainer.train_file(tmp_path / "test.md")
+
+        # Session TIME neuron counts as 1 extra neuron
+        assert result.neurons_created >= 1
+
+        # First add_neuron call should be the session TIME neuron
+        first_call = mock_storage.add_neuron.call_args_list[0]
+        session_neuron = first_call[0][0]
+        assert session_neuron.type.value == "time"
+        assert "doc_train_session" in session_neuron.metadata
+
+    @pytest.mark.asyncio
+    async def test_session_synapses_created(
+        self, mock_storage: AsyncMock, mock_config: MagicMock, tmp_path: Path
+    ) -> None:
+        """HAPPENED_AT synapses connect top-level headings to session TIME."""
+        md = (
+            "# Root\n\n"
+            + " ".join(["root content text word"] * 8)
+            + "\n\n## Child\n\n"
+            + " ".join(["child content text word"] * 8)
+        )
+        (tmp_path / "test.md").write_text(md, encoding="utf-8")
+
+        trainer = DocTrainer(mock_storage, mock_config)
+        with patch.object(trainer, "_run_enrichment", return_value=0):
+            result = await trainer.train_file(tmp_path / "test.md")
+
+        # Should have session synapses (HAPPENED_AT for top-level heading)
+        assert result.session_synapses >= 1
+
+    @pytest.mark.asyncio
+    async def test_sibling_before_synapses(
+        self, mock_storage: AsyncMock, mock_config: MagicMock, tmp_path: Path
+    ) -> None:
+        """BEFORE synapses are created between sibling chunks under same heading."""
+        md = (
+            "# Section\n\n"
+            + " ".join(["first paragraph content word here"] * 8)
+            + "\n\n"
+            + " ".join(["second paragraph content word here"] * 8)
+        )
+        (tmp_path / "test.md").write_text(md, encoding="utf-8")
+
+        tc = TrainingConfig(max_chunk_words=35, min_chunk_words=10, consolidate=False)
+        trainer = DocTrainer(mock_storage, mock_config)
+        with patch.object(trainer, "_run_enrichment", return_value=0):
+            result = await trainer.train_file(tmp_path / "test.md", tc)
+
+        # If there are 2+ chunks under the same heading, BEFORE synapses should exist
+        if result.chunks_encoded >= 2:
+            assert result.session_synapses >= 1
 
     @pytest.mark.asyncio
     async def test_train_directory(
@@ -230,6 +310,7 @@ class TestDocTrainer:
         assert result.chunks_encoded == 0
         assert result.neurons_created == 0
         assert result.chunks_failed == 0
+        assert result.session_synapses == 0
         assert result.brain_name == "current"
 
     @pytest.mark.asyncio
@@ -283,11 +364,11 @@ class TestDocTrainer:
         assert result.chunks_encoded >= 1
 
     @pytest.mark.asyncio
-    async def test_encoder_called_with_skip_flags(
+    async def test_encoder_called_with_all_flags(
         self, mock_storage: AsyncMock, mock_config: MagicMock, tmp_path: Path
     ) -> None:
-        """Encoder is called with skip_conflicts=True, skip_time_neurons=True."""
-        md = "# Test\n\n" + " ".join(["content checking encoder skip flags word"] * 8)
+        """Encoder is called with skip flags + maturation overrides."""
+        md = "# Test\n\n" + " ".join(["content checking encoder flags word"] * 8)
         (tmp_path / "test.md").write_text(md, encoding="utf-8")
 
         trainer = DocTrainer(mock_storage, mock_config)
@@ -309,6 +390,8 @@ class TestDocTrainer:
         for call_kwargs in encode_calls:
             assert call_kwargs.get("skip_conflicts") is True
             assert call_kwargs.get("skip_time_neurons") is True
+            assert call_kwargs.get("initial_stage") == "episodic"
+            assert call_kwargs.get("salience_ceiling") == 0.5
 
     @pytest.mark.asyncio
     async def test_custom_extensions(
