@@ -212,12 +212,13 @@ class MCPServer(
             _source = os.environ.get("NEURALMEMORY_SOURCE", "")[:256]
             mcp_source = f"mcp:{_source}" if _source else "mcp_tool"
 
+            expiry_days = args.get("expires_days")
             typed_mem = TypedMemory.create(
                 fiber_id=result.fiber.id,
                 memory_type=mem_type,
                 priority=priority,
                 source=mcp_source,
-                expires_in_days=args.get("expires_days"),
+                expires_in_days=expiry_days,
                 tags=tags if tags else None,
             )
             await storage.add_typed_memory(typed_mem)
@@ -254,6 +255,9 @@ class MCPServer(
             "neurons_created": len(result.neurons_created),
             "message": f"Remembered: {content[:50]}{'...' if len(content) > 50 else ''}",
         }
+
+        if expiry_days is not None:
+            response["expires_in_days"] = expiry_days
 
         try:
             conflicts_detected = int(result.conflicts_detected)
