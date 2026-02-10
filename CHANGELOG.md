@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-02-10
+
+### Fixed
+
+- CLI brain commands (`export`, `import`, `create`, `delete`, `health`, `transplant`) now work correctly in SQLite mode
+- `brain export` no longer produces empty files when brain was created with `brain create`
+- `brain delete` correctly removes `.db` files in unified config mode
+- `brain health` uses storage-agnostic `find_neurons()` instead of JSON-internal `_neurons` dict
+- All `version` subcommands (`create`, `list`, `rollback`, `diff`) now find brains in SQLite mode
+- `shared sync` uses correct storage backend
+
 ## [1.6.0] - 2026-02-10
 
 ### Added
