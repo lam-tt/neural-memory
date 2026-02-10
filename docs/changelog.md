@@ -380,6 +380,160 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidation report now includes `synapses_inferred` and `co_activations_pruned`
 - Tests: 908 passed (up from 838)
 
+## [0.14.0] - 2026-02-08
+
+### Added
+
+- **Relation Extraction Engine** — Auto-create causal, comparative, and sequential synapses from text
+  - `RelationExtractor` with regex patterns for 3 relation families (EN + VI)
+  - Causal: "because", "caused by", "due to", "therefore", "vì", "nên", "do đó" → `CAUSED_BY`, `LEADS_TO`
+  - Comparative: "similar to", "better than", "unlike", "khác với" → `SIMILAR_TO`, `CONTRADICTS`
+  - Sequential: "then", "after", "before", "sau khi", "trước khi" → `BEFORE`, `AFTER`
+  - `RelationCandidate` frozen dataclass with confidence scoring (0.65–0.85 range)
+  - Zero LLM — pure regex pattern matching
+- **Tag Origin Tracking** (Expert E4 feedback)
+  - `Fiber.auto_tags` — content-derived tags from entity/keyword extraction
+  - `Fiber.agent_tags` — user-provided tags
+  - `Fiber.tags` property — backward-compatible union of both sets
+  - Storage: JSON format `{"auto": [...], "agent": [...]}`
+- **Confirmatory Weight Boost** (Hebbian tag confirmation, Expert E4)
+  - Agent tag matching auto-tag → +0.1 anchor synapse weight boost (capped at 1.0)
+  - Divergent agent tags → new `RELATED_TO` synapse with weight 0.3 (provisional)
+- **Auto Memory Type Inference** — `suggest_memory_type()` integrated into encoder as fallback
+
+### Fixed
+
+- **Event loop lifecycle** — `asyncio.run()` replaced with `run_async()` helper for proper aiosqlite cleanup
+- **"Event loop is closed" noise** — aiosqlite connections close before event loop teardown
+
+### Changed
+
+- SQLite schema version 7 → 8 (auto_tags/agent_tags columns)
+- Encoder pipeline gains steps 6b (relation extraction) and 6c (confirmatory boost)
+- Tests: 838 passed (up from 776)
+
+---
+
+## [0.13.0] - 2026-02-07
+
+### Added
+
+- **Cognitive Runtime Phases 1–4** (v0.10.0 → v0.13.0 shipped as single release)
+  - **Phase 1 (Hebbian Learning Rule)** — Formal novelty adaptation, natural weight saturation, competitive normalization, anti-Hebbian update for conflict resolution
+  - **Phase 2a (Activation Stabilization)** — Iterative dampening, multi-neuron answer reconstruction with 3 strategies (single, fiber-summary, multi-neuron)
+  - **Phase 2b (Memory Maturation)** — STM → Working → Episodic → Semantic lifecycle with stage-aware decay multipliers, spacing effect for semantic promotion, pattern extraction from episodic clusters
+  - **Phase 3 (Conflict Detection)** — Real-time conflict detection at encode time via regex predicate extraction, dispute resolution with anti-Hebbian confidence reduction, `CONTRADICTS` synapse type, retrieval deprioritization of disputed neurons
+  - **Phase 4 (Evaluation Benchmarks)** — 30 ground-truth memories, 25 queries across 5 categories, standard IR metrics (P@K, R@K, MRR, NDCG@K), naive keyword baseline, long-horizon coherence test framework
+- Schema migration v5 → v7
+
+### Changed
+
+- Tests: 776 passed (141 new, up from 635)
+
+---
+
+## [0.9.5] - 2026-02-06
+
+### Added
+
+- **Type-Aware Decay** — Facts persist (0.02/day), TODOs expire fast (0.15/day), configurable per memory type
+- **Score Breakdown** — Expose confidence components in retrieval results and MCP response
+- **SimHash Deduplication** — 64-bit locality-sensitive hashing for near-duplicate detection in encoder and auto-capture
+- **Point-in-Time Temporal Queries** — `valid_at` parameter filters fibers by time window
+- Schema migration v4 → v5 (content_hash column)
+
+### Changed
+
+- Tests: 613 passed (up from 584)
+
+---
+
+## [0.9.3] - 2026-02-06
+
+### Added
+
+- **Eternal Context System** — 3-tier auto-save (critical/session/context) with file-based JSON persistence
+  - `BrainPersistence` for `~/.neuralmemory/eternal/<brain_id>/`
+  - `TriggerEngine` with auto-save on decisions, errors, milestones, checkpoints
+  - `nmem_eternal` MCP tool (status/save/load/compact)
+  - `nmem_recap` MCP tool (level 1-3, topic filtering)
+  - VS Code commands: recap, recapTopic, eternalSave, eternalStatus
+- **External Adapters** — Cognee, Graphiti, LlamaIndex adapters for symbiotic integration
+  - Adapter registry (6 adapters total), MCP tool schema, server kwargs mapping
+  - VS Code import command with source picker UI
+
+### Fixed
+
+- **Security hardening** — `max_tokens` clamped to 10000, env var preference for API keys
+- **CLI refactor** — `remember()` 157→48 lines, `recall()` 121→50 lines, `brain_health()` 131→35 lines
+- **MCP server** — Split into handler mixins, eliminate bare excepts
+
+### Changed
+
+- Tests: 584 passed (up from 546)
+
+---
+
+## [0.9.1] - 2026-02-06
+
+### Changed
+
+- VS Code extension synced with codebase indexing features
+
+---
+
+## [0.9.0] - 2026-02-06
+
+### Added
+
+- **Codebase Indexing** — Index Python codebases into neural graph for code-aware recall
+  - `nmem_index` MCP tool, `nmem index` CLI
+  - `PythonExtractor` (stdlib ast), `CodebaseEncoder`, `GitContext` utility
+  - Branch-aware sessions auto-detect git branch/commit/repo
+- **Smart Auto-Capture** — Brain grows naturally through MCP usage
+  - Auto-capture insights, decisions, errors from recall queries (passive learning)
+  - `INSIGHT_PATTERNS` for EN + VI "aha moments"
+  - Passive capture on `nmem_recall` (≥50 char queries, confidence 0.8)
+- **Enhanced Stats** — Hot neurons, DB size, daily activity, synapse stats by type, neuron type breakdown
+- **Consolidation Engine** — Prune (dead synapses + orphan neurons), merge (Jaccard similarity), summarize (tag clusters)
+  - `nmem consolidate` CLI with `--strategy` and `--dry-run`
+  - POST `/brain/{id}/consolidate` API endpoint
+- **Conflict Resolution** — Pure `merge_snapshots()` with 4-phase algorithm and provenance tracking
+- **Extraction Intelligence** — Parallel activation (~3x speedup), scored intent, weighted keywords, code entity detection
+- **Intelligence Upgrade** — Multi-factor confidence scoring, frequency-boosted activation, batch neuron fetch
+
+### Fixed
+
+- **Server storage** — Replace InMemoryStorage with `get_shared_storage()` (data persists across restarts)
+- **Brain name fallback** — `find_brain_by_name()` when `X-Brain-ID` is name, not UUID
+
+### Changed
+
+- Schema migration v3 → v4 (fiber_neurons junction table)
+- API versioned routes (`/api/v1/`) with backward-compatible legacy routes
+- Tests: 503 passed (up from 431)
+
+---
+
+## [0.8.0] - 2026-02-05
+
+### Added
+
+- **Hebbian Plasticity** — Co-activated neurons auto-strengthen synaptic connections during retrieval
+  - `hebbian_delta`, `hebbian_threshold`, `hebbian_initial_weight` in BrainConfig
+  - `_strengthen_co_activated` hook in ReflexPipeline after fiber conduction
+  - `consolidate()` method in DecayManager for boosting high-frequency fibers
+- **FTS5 Full-Text Search** — BM25 ranked retrieval with Porter stemming for neuron content
+  - `neurons_fts` virtual table with auto-sync triggers
+  - Multi-word implicit AND search, graceful LIKE fallback
+  - Schema migration v2 → v3
+
+### Changed
+
+- Tests: 431 passed (up from 413)
+
+---
+
 ## [0.7.2] - 2026-02-05
 
 ### Fixed
@@ -609,6 +763,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.17.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.17.0
 [0.16.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.16.0
 [0.15.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.15.0
+[0.14.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.14.0
+[0.13.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.13.0
+[0.9.5]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.9.5
+[0.9.3]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.9.3
+[0.9.1]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.9.1
+[0.9.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.9.0
+[0.8.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.8.0
+[0.7.2]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.7.2
+[0.7.1]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.7.1
 [0.7.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.7.0
 [0.6.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.6.0
 [0.5.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v0.5.0

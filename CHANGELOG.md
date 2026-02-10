@@ -7,6 +7,209 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-02-10
+
+### Added
+
+- **DB-to-Brain Schema Training (`nmem_train_db`)** — Teach brains to understand database structure
+  - 3-layer pipeline: `SchemaIntrospector` → `KnowledgeExtractor` → `DBTrainer`
+  - Extracts **schema knowledge** (table structures, relationships, patterns) — NOT raw data rows
+  - SQLite dialect (v1) via `aiosqlite` read-only connections
+  - Schema fingerprint (SHA256) for re-training detection
+- **Schema Introspection** — `engine/db_introspector.py`
+  - `SchemaDialect` protocol with `SQLiteDialect` implementation
+  - Frozen dataclasses: `ColumnInfo`, `ForeignKeyInfo`, `IndexInfo`, `TableInfo`, `SchemaSnapshot`
+  - PRAGMA-based metadata extraction (table_info, foreign_key_list, index_list)
+- **Knowledge Extraction** — `engine/db_knowledge.py`
+  - FK-to-SynapseType mapping with confidence scoring (IS_A, INVOLVES, AT_LOCATION, RELATED_TO)
+  - Structure-based join table detection (2+ FKs, ≤1 business column → CO_OCCURS synapse)
+  - 5 schema pattern detectors: audit_trail, soft_delete, tree_hierarchy, polymorphic, enum_table
+- **Training Orchestrator** — `engine/db_trainer.py`
+  - Mirrors DocTrainer architecture: batch save, per-table error isolation, shared domain neuron
+  - Configurable: `max_tables` (1-500), `salience_ceiling`, `consolidate`, `domain_tag`
+- **MCP Tool: `nmem_train_db`** — `train` and `status` actions
+
+### Fixed
+
+- Security: read-only SQLite connections, absolute path rejection, SQL identifier sanitization, info leakage prevention
+
+### Changed
+
+- MCP tools expanded from 17 to 18
+- Tests: 1648 passed (up from 1596)
+
+## [1.5.0] - 2026-02-10
+
+### Added
+
+- **Conflict Management MCP Tool (`nmem_conflicts`)** — List, resolve, and pre-check memory conflicts
+  - `list`, `resolve` (keep_existing/keep_new/keep_both), `check` actions
+  - `ConflictHandler` mixin with full input validation
+- **Recall Conflict Surfacing** — `has_conflicts` flag and `conflict_count` in default recall response
+- **Provenance Source Enrichment** — `NEURALMEMORY_SOURCE` env var → `mcp:{source}` provenance
+- **Purity Score Conflict Penalty** — Unresolved CONTRADICTS reduce health score (max -10 points)
+
+### Fixed
+
+- 20+ performance bottlenecks — storage index optimization, encoder batch operations
+- 25+ bugs across engine/storage/MCP — deep audit fixes including deprecated `datetime.utcnow()` replacement
+
+### Changed
+
+- MCP tools expanded from 16 to 17
+- Tests: 1372 passed (up from 1352)
+
+## [1.4.0] - 2026-02-09
+
+### Added
+
+- **OpenClaw Memory Plugin** — `@neuralmemory/openclaw-plugin` npm package
+  - MCP stdio client: JSON-RPC 2.0 with Content-Length framing
+  - 6 core tools, 2 hooks (before_agent_start, agent_end), 1 service
+  - Plugin manifest with `configSchema` + `uiHints`
+
+### Changed
+
+- Dashboard Integrations tab simplified to status-only with deep links (Option B)
+
+## [1.3.0] - 2026-02-09
+
+### Added
+
+- **Deep Integration Status** — Enhanced status cards, activity log, setup wizards, import sources
+- **Source Attribution** — `NEURALMEMORY_SOURCE` env var for integration tracking
+- 25 new i18n keys in EN + VI (87 total)
+
+### Changed
+
+- Tests: 1352 passed (up from 1340)
+
+## [1.2.0] - 2026-02-09
+
+### Added
+
+- **Dashboard** — Full-featured SPA at `/dashboard` (Alpine.js + Tailwind CDN, zero-build)
+  - 5 tabs: Overview, Neural Graph (Cytoscape.js), Integrations, Health (radar chart), Settings
+  - Graph toolbar, toast notifications, skeleton loading, brain management, EN/VI i18n
+  - ARIA accessibility, 44px mobile touch targets, design system
+
+### Fixed
+
+- `ModuleNotFoundError: typing_extensions` on fresh Python 3.12 — added dependency
+
+### Changed
+
+- Tests: 1340 passed (up from 1264)
+
+## [1.1.0] - 2026-02-09
+
+### Added
+
+- **ClawHub SKILL.md** — Published `neural-memory@1.0.0` to ClawHub
+- **Nanobot Integration** — 4 tools adapted for Nanobot's action interface
+- **Architecture Doc** — `docs/ARCHITECTURE_V1_EXTENDED.md`
+
+### Changed
+
+- OpenClaw PR [#12596](https://github.com/openclaw/openclaw/pull/12596) submitted
+
+## [1.0.2] - 2026-02-09
+
+### Fixed
+
+- Empty recall for broad queries — `format_context()` truncates long fiber content to fit token budget
+- Diversity metric normalization — Shannon entropy normalized against 8 expected synapse types
+- Temporal synapse diversity — `_link_temporal_neighbors()` creates BEFORE/AFTER instead of always RELATED_TO
+- Consolidation prune crash — Fixed `Fiber(tags=...)` TypeError, uses `dataclasses.replace()`
+
+## [1.0.0] - 2026-02-09
+
+### Added
+
+- **Brain Versioning** — Snapshot, rollback, diff (schema v11, `brain_versions` table)
+- **Partial Brain Transplant** — Topic-filtered merge between brains with conflict resolution
+- **Brain Quality Badge** — Grade A-F from BrainHealthReport, marketplace eligibility
+- **Optional Embedding Layer** — SentenceTransformer + OpenAI providers (OFF by default)
+- **Optional LLM Extraction** — Enhanced relation extraction beyond regex (OFF by default)
+
+### Changed
+
+- Version 1.0.0 — Production/Stable, schema v10 → v11
+- MCP tools expanded from 14 to 16 (nmem_version, nmem_transplant)
+
+## [0.20.0] - 2026-02-09
+
+### Added
+
+- **Habitual Recall** — ENRICH, DREAM, LEARN_HABITS consolidation strategies
+  - Action event log (hippocampal buffer), sequence mining, workflow suggestions
+  - `nmem_habits` MCP tool, `nmem habits` CLI, `nmem update` CLI
+  - Prune enhancements: dream synapse 10x decay, high-salience resistance
+- Schema v10: `action_events` table
+- 6 new BrainConfig fields for habit/dream configuration
+
+### Changed
+
+- `ConsolidationStrategy` extended with ENRICH, DREAM, LEARN_HABITS
+- Schema version 9 → 10
+
+## [0.19.0] - 2026-02-08
+
+### Added
+
+- **Temporal Reasoning** — Causal chain traversal, temporal range queries, event sequence tracing
+  - `trace_causal_chain()`, `query_temporal_range()`, `trace_event_sequence()`
+  - `CAUSAL_CHAIN` and `TEMPORAL_SEQUENCE` synthesis methods
+  - Pipeline integration: "Why?" → causal, "When?" → temporal, "What happened after?" → event sequence
+  - Router enhancement with traversal metadata in `RouteDecision`
+
+### Changed
+
+- Tests: 1019 passed (up from 987)
+
+## [0.17.0] - 2026-02-08
+
+### Added
+
+- **Brain Diagnostics** — `BrainHealthReport` with 7 component scores and composite purity (0-100)
+  - Grade A/B/C/D/F, 7 warning codes, automatic recommendations
+  - Tag drift detection via `TagNormalizer.detect_drift()`
+- **MCP tool: `nmem_health`** — Brain health diagnostics
+- **CLI command: `nmem health`** — Terminal health report with ASCII progress bars
+
+## [0.16.0] - 2026-02-08
+
+### Added
+
+- **Emotional Valence** — Lexicon-based sentiment extraction (EN + VI, zero LLM)
+  - `SentimentExtractor`, `Valence` enum, 7 emotion tag categories
+  - Negation handling, intensifier detection
+  - `FELT` synapses from anchor → emotion STATE neurons
+- **Emotional Resonance Scoring** — Up to +0.1 retrieval boost for matching-valence memories
+- **Emotional Decay Modulation** — High-intensity emotions decay slower (trauma persistence)
+
+### Changed
+
+- Tests: 950 passed (up from 908)
+
+## [0.15.0] - 2026-02-08
+
+### Added
+
+- **Associative Inference Engine** — Co-activation patterns → persistent CO_OCCURS synapses
+  - `compute_inferred_weight()`, `identify_candidates()`, `create_inferred_synapse()`
+  - `generate_associative_tags()` from BFS clustering
+- **Co-Activation Persistence** — `co_activation_events` table (schema v8 → v9)
+  - `record_co_activation()`, `get_co_activation_counts()`, `prune_co_activations()`
+- **INFER Consolidation Strategy** — Create synapses from co-activation patterns
+- **Tag Normalizer** — ~25 synonym groups + SimHash fuzzy matching + drift detection
+- 6 new BrainConfig fields for co-activation configuration
+
+### Changed
+
+- Schema version 8 → 9
+- Tests: 908 passed (up from 838)
+
 ## [0.14.0] - 2026-02-08
 
 ### Added

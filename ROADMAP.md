@@ -4,8 +4,8 @@
 > Every feature passes the VISION.md 4-question test + brain test.
 > ZERO LLM dependency — pure algorithmic, regex, graph-based.
 
-**Current state**: v1.5.0 shipped. Conflict detection surfaced, provenance tracking, deep audit clean. 17 MCP tools, 1372 tests.
-**Next milestone**: v1.6.0 — Ecosystem Expansion.
+**Current state**: v1.6.0 shipped. DB-to-Brain schema training pipeline. 18 MCP tools, 1648 tests.
+**Next milestone**: v1.7.0 — Ecosystem Expansion (Marketplace, Neo4j, multi-language).
 
 ---
 
@@ -937,7 +937,7 @@ Starting from 1105 tests (v0.20.0) → targeting ~1,455+ tests at v1.0.0.
 >
 > **Three pillars**: Dashboard + Integrations + Community
 >
-> **Current state**: v1.5.0 shipped. 1,372 tests. 17 MCP tools. Conflict detection surfaced, provenance tracking, deep audit clean.
+> **Current state**: v1.6.0 shipped. 1,648 tests. 18 MCP tools. DB-to-Brain schema training pipeline.
 
 ## Strategic Context
 
@@ -1341,13 +1341,62 @@ When OpenClaw plugin is active, NM dashboard's Integrations status card shows:
 
 ---
 
-## Phase 6: v1.6.0 — Ecosystem Expansion
+## Phase 6: v1.6.0 — DB-to-Brain Schema Training ✅
+
+> Teach your brain to understand database structure — zero LLM, pure schema introspection.
+
+**Status**: ✅ Shipped (2026-02-10). 1,648 tests. 18 MCP tools. Published to PyPI.
+
+### What shipped
+
+| Feature | Description |
+|---------|-------------|
+| **SchemaIntrospector** | SQLite dialect using PRAGMA statements, frozen dataclasses, SHA256 fingerprinting |
+| **KnowledgeExtractor** | FK-to-SynapseType mapping (IS_A, INVOLVES, AT_LOCATION, RELATED_TO) with confidence scoring |
+| **Join table detection** | Structure-based (not name-based) — composite PK from FKs, no meaningful text cols |
+| **5 pattern detectors** | Audit trail, soft delete, tree hierarchy, polymorphic, enum table — all with confidence |
+| **DBTrainer** | Batch encode via MemoryEncoder, per-table error isolation, optional ENRICH consolidation |
+| **`nmem_train_db` MCP tool** | `train` and `status` actions, validates connection strings, max_tables guard |
+| **Security hardening** | Read-only SQLite (`?mode=ro`), absolute path rejection, SQL identifier sanitization |
+
+### Architecture
+
+```
+Connection String (sqlite:///path)
+    │
+SchemaIntrospector  (SQLite dialect, PRAGMA-based)
+    │
+SchemaSnapshot  (frozen: tables, columns, FKs, indexes, fingerprint)
+    │
+KnowledgeExtractor  (confidence-scored FK mapping + pattern detection)
+    │
+SchemaKnowledge  (entities, relationships, patterns — all with confidence)
+    │
+DBTrainer  (batch encode via MemoryEncoder + direct relationship synapses)
+    │
+Brain  (neurons = tables/patterns, synapses = relationships)
+```
+
+### Files
+
+| Action | File |
+|--------|------|
+| NEW | `engine/db_introspector.py` — Schema introspection (SQLite dialect) |
+| NEW | `engine/db_knowledge.py` — Schema → teachable knowledge extraction |
+| NEW | `engine/db_trainer.py` — DB-to-Brain training orchestrator |
+| NEW | `mcp/db_train_handler.py` — MCP tool handler (train/status) |
+| MOD | `mcp/server.py` — Register DBTrainHandler mixin |
+| MOD | `mcp/tool_schemas.py` — `nmem_train_db` schema |
+
+---
+
+## Phase 7: v1.7.0 — Ecosystem Expansion
 
 > Marketplace, storage backends, more languages.
 
-**Target**: 1-2 months after v1.5.0
+**Target**: After v1.6.0
 
-### 6.1 Brain Marketplace (Preview)
+### 7.1 Brain Marketplace (Preview)
 
 NM dashboard gains a "Marketplace" tab (6th tab — the exception where NM IS the hub):
 - Public brain gallery
@@ -1356,7 +1405,7 @@ NM dashboard gains a "Marketplace" tab (6th tab — the exception where NM IS th
 - Search by tags, language, grade
 - Brain transplant from marketplace → local brain
 
-### 6.2 Neo4j Storage Backend
+### 7.2 Neo4j Storage Backend
 
 For users with large-scale graph requirements:
 - `Neo4jStorage` implementing `BaseStorage` ABC
@@ -1365,7 +1414,7 @@ For users with large-scale graph requirements:
 - Optional — SQLite remains default
 - Dashboard graph tab auto-detects Neo4j and uses native traversal
 
-### 6.3 Multi-Language Expansion
+### 7.3 Multi-Language Expansion
 
 Beyond EN/VI:
 - Japanese (large AI dev community)
@@ -1376,7 +1425,7 @@ Beyond EN/VI:
 
 ---
 
-## Phase 7: v2.0.0 — Platform
+## Phase 8: v2.0.0 — Platform
 
 > NeuralMemory becomes the universal memory layer for AI agents.
 
@@ -1416,13 +1465,14 @@ v1.1.0 ✅ (Community Foundations)
   │       └──→ v1.3.0 ✅ (Deep Integration Status + activity logs)
   └──→ v1.4.0 ✅ (OpenClaw Memory Plugin — NM inside the hub)
               └──→ v1.5.0 ✅ (Conflict Detection + Quality Hardening)
-                        └──→ v1.6.0 (Ecosystem — Marketplace, Neo4j, i18n)
-                                  └──→ v2.0.0 (Platform — protocol, federation, real-time)
+                        └──→ v1.6.0 ✅ (DB-to-Brain Schema Training)
+                                  └──→ v1.7.0 (Ecosystem — Marketplace, Neo4j, i18n)
+                                            └──→ v2.0.0 (Platform — protocol, federation, real-time)
 ```
 
-**Critical path**: v1.1.0 ✅ → v1.2.0 ✅ → v1.3.0 ✅ → v1.4.0 ✅ → v1.5.0 ✅ → v1.6.0
+**Critical path**: v1.1.0 ✅ → v1.2.0 ✅ → v1.3.0 ✅ → v1.4.0 ✅ → v1.5.0 ✅ → v1.6.0 ✅ → v1.7.0
 
-**Next**: v1.5.0 — Ecosystem Expansion (Marketplace, Neo4j, multi-language)
+**Next**: v1.7.0 — Ecosystem Expansion (Marketplace, Neo4j, multi-language)
 
 ---
 
@@ -1434,16 +1484,18 @@ v1.1.0 ✅ (Community Foundations)
 | **v1.2.0** ✅ | High | High | **P1** | Dashboard is the face of NM |
 | **v1.3.0** ✅ | Medium | Low | **P2** | Richer status + activity logs, shipped |
 | **v1.4.0** ✅ | Critical | Medium | **P1** | 178k-star ecosystem — NM inside the hub, shipped |
-| **v1.5.0** | High | High | **P3** | THOR + Marketplace + Neo4j, can be incremental |
+| **v1.5.0** ✅ | High | Medium | **P1** | Conflict detection surfaced, quality hardening, shipped |
+| **v1.6.0** ✅ | High | Medium | **P2** | DB-to-Brain schema training, 18 MCP tools, shipped |
+| **v1.7.0** | High | High | **P3** | Marketplace + Neo4j + i18n, can be incremental |
 | **v2.0.0** | Critical | Very High | **P4** | Protocol + federation + real-time, long-term vision |
 
 ### Recommended Execution Order
 
 ```
-v1.1.0 ✅ → v1.2.0 ✅ → v1.4.0 ✅ → v1.3.0 ✅ → v1.5.0 (ongoing)
+v1.1.0 ✅ → v1.2.0 ✅ → v1.4.0 ✅ → v1.3.0 ✅ → v1.5.0 ✅ → v1.6.0 ✅ → v1.7.0
 ```
 
-All post-v1.0 milestones through v1.4.0 complete. Next: v1.5.0 Ecosystem Expansion.
+All post-v1.0 milestones through v1.6.0 complete. Next: v1.7.0 Ecosystem Expansion.
 
 ---
 
@@ -1478,4 +1530,4 @@ All post-v1.0 milestones through v1.4.0 complete. Next: v1.5.0 Ecosystem Expansi
 ---
 
 *See [VISION.md](VISION.md) for the north star guiding all decisions.*
-*Last updated: 2026-02-09 (v1.3.0 shipped: Deep integration status, activity log, setup wizards. v1.4.0 shipped: OpenClaw plugin @1.4.1)*
+*Last updated: 2026-02-10 (v1.6.0 shipped: DB-to-Brain schema training pipeline. 18 MCP tools, 1648 tests.)*
