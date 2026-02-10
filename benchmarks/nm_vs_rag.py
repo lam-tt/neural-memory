@@ -21,7 +21,6 @@ from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.retrieval import DepthLevel, ReflexPipeline
 from neural_memory.storage.memory_store import InMemoryStorage
 
-
 # -- Memories ---------------------------------------------
 
 MEMORIES = [
@@ -133,7 +132,13 @@ async def main() -> None:
             print(f"    {RED}(no results){RESET}")
 
         # NeuralMemory
-        result = await pipeline.query(query, depth=DepthLevel.DEEP)
+        try:
+            result = await pipeline.query(query, depth=DepthLevel.DEEP)
+        except Exception as exc:
+            print(f"\n  {GREEN}{BOLD}NeuralMemory (spreading activation):{RESET}")
+            print(f"    {RED}Error: {exc}{RESET}")
+            print(f"\n{DIM}{'-' * 80}{RESET}\n")
+            continue
         print(f"\n  {GREEN}{BOLD}NeuralMemory (spreading activation):{RESET}")
         print(f"    {DIM}Neurons activated: {result.neurons_activated} | Confidence: {result.confidence:.2f}{RESET}")
 
@@ -174,12 +179,12 @@ async def main() -> None:
     # Summary
     print(f"{BOLD}Key Differences:{RESET}\n")
     print(f"  {YELLOW}Vector Search{RESET}:  Returns the single best-matching text chunk.")
-    print(f"                  Great for: 'Find me the doc that mentions X'")
-    print(f"                  Fails at:  'Why did X happen?' (needs chain traversal)")
+    print("                  Great for: 'Find me the doc that mentions X'")
+    print("                  Fails at:  'Why did X happen?' (needs chain traversal)")
     print()
     print(f"  {GREEN}NeuralMemory{RESET}:   Returns activated context -- memories + connections.")
-    print(f"                  Great for: Causal chains, temporal queries, associations")
-    print(f"                  Graph grows smarter with more memories (consolidation)")
+    print("                  Great for: Causal chains, temporal queries, associations")
+    print("                  Graph grows smarter with more memories (consolidation)")
     print()
     print(f"  {DIM}15 memories | 5 queries | Baseline: bag-of-words cosine similarity{RESET}")
     print(f"  {DIM}NeuralMemory: ReflexPipeline depth=DEEP (spreading activation + causal){RESET}")

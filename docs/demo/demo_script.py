@@ -1,4 +1,4 @@
-"""NeuralMemory demo script — run this to generate a terminal recording.
+"""NeuralMemory demo script -- run this to generate a terminal recording.
 
 Usage:
     # Record with asciinema:
@@ -13,7 +13,6 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import sys
 import time
 
@@ -54,9 +53,9 @@ def output(text: str) -> None:
 def section(title: str) -> None:
     """Print section header."""
     print()
-    print(f"{PURPLE}{BOLD}{'─' * 50}{RESET}")
+    print(f"{PURPLE}{BOLD}{'-' * 50}{RESET}")
     print(f"{PURPLE}{BOLD}  {title}{RESET}")
-    print(f"{PURPLE}{BOLD}{'─' * 50}{RESET}")
+    print(f"{PURPLE}{BOLD}{'-' * 50}{RESET}")
     print()
     time.sleep(0.5)
 
@@ -69,7 +68,7 @@ def pause(seconds: float = 1.0) -> None:
 # ── Demo flow ────────────────────────────────────────────
 
 
-async def main() -> None:
+def main() -> None:
     """Run the NeuralMemory demo."""
     print()
     print(f"{BOLD}  NeuralMemory Demo{RESET}")
@@ -121,8 +120,8 @@ async def main() -> None:
   {GRAY}(fact, priority 5, created 2 min ago){RESET}
 
   {DIM}Related:{RESET}
-  {GRAY}  ← CAUSED_BY ← JWT auth config{RESET}
-  {GRAY}  ← INVOLVES  ← Alice{RESET}
+  {GRAY}  <- CAUSED_BY <- JWT auth config{RESET}
+  {GRAY}  <- INVOLVES  <- Alice{RESET}
 """)
     pause(1.5)
 
@@ -138,9 +137,9 @@ async def main() -> None:
   {CYAN}Confidence:{RESET} 0.82
 
   {BOLD}Causal chain:{RESET}
-  {YELLOW}outage{RESET} ← {PURPLE}CAUSED_BY{RESET} ← {YELLOW}JWT config{RESET} ← {PURPLE}SUGGESTED_BY{RESET} ← {YELLOW}Alice{RESET}
-                                       ↑
-                              {PURPLE}HAPPENED_AT{RESET} → {CYAN}Tuesday{RESET}
+  {YELLOW}outage{RESET} <- {PURPLE}CAUSED_BY{RESET} <- {YELLOW}JWT config{RESET} <- {PURPLE}INVOLVES{RESET} <- {YELLOW}Alice{RESET}
+                                       |
+                              {PURPLE}HAPPENED_AT{RESET} -> {CYAN}Tuesday{RESET}
 
   {BOLD}Context:{RESET}
   Alice suggested JWT for auth, caused Tuesday outage.
@@ -191,8 +190,8 @@ async def main() -> None:
     output(f"""
   {BOLD}Result:{RESET}
   Table 'orders' stores order records. Links to: customers, products.
-  {GRAY}  orders.customer_id → customers.id  (INVOLVES, confidence: 0.75){RESET}
-  {GRAY}  orders.product_id  → products.id   (RELATED_TO, confidence: 0.60){RESET}
+  {GRAY}  orders.customer_id -> customers.id  (INVOLVES, confidence: 0.75){RESET}
+  {GRAY}  orders.product_id  -> products.id   (RELATED_TO, confidence: 0.60){RESET}
 
   {DIM}Pattern: orders uses audit trail (created_at + updated_at){RESET}
 """)
@@ -200,13 +199,13 @@ async def main() -> None:
 
     # ── Done ──
     print()
-    print(f"{GREEN}{BOLD}{'─' * 50}{RESET}")
+    print(f"{GREEN}{BOLD}{'-' * 50}{RESET}")
     print(f"{GREEN}{BOLD}  That's NeuralMemory.{RESET}")
     print(f"{DIM}  pip install neural-memory{RESET}")
     print(f"{DIM}  github.com/nhadaututtheky/neural-memory{RESET}")
-    print(f"{GREEN}{BOLD}{'─' * 50}{RESET}")
+    print(f"{GREEN}{BOLD}{'-' * 50}{RESET}")
     print()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

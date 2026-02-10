@@ -42,7 +42,7 @@ NeuralMemory implements this model directly:
 - `HAPPENED_AT` / `BEFORE` / `AFTER` — temporal ordering
 - `IS_A` / `CONTAINS` — hierarchy
 - `CO_OCCURS` / `INVOLVES` — association
-- 15+ types total
+- 20 types total
 
 **Fibers** — memory traces that strengthen with use (like myelin in real neurons)
 
@@ -52,7 +52,7 @@ NeuralMemory implements this model directly:
 
 When you tell NeuralMemory "Alice suggested we use PostgreSQL because MongoDB failed the benchmark on Tuesday", it:
 
-1. Creates neurons: `Alice` (PERSON), `PostgreSQL` (CONCEPT), `MongoDB` (CONCEPT), `benchmark` (EVENT), `Tuesday` (TIME)
+1. Creates neurons: `Alice` (ENTITY), `PostgreSQL` (CONCEPT), `MongoDB` (CONCEPT), `benchmark` (ACTION), `Tuesday` (TIME)
 2. Creates synapses: PostgreSQL `CAUSED_BY` benchmark failure, benchmark `HAPPENED_AT` Tuesday, Alice `INVOLVES` suggestion
 3. Creates a fiber (memory trace) anchoring everything together
 
@@ -65,7 +65,7 @@ When you ask "why did the Tuesday outage happen?", NeuralMemory:
 1. Activates neurons matching "Tuesday" and "outage"
 2. Activation spreads through synapses (weighted by strength and type)
 3. `CAUSED_BY` synapses get priority in this context (causal query)
-4. Returns the activation trail: `outage ← CAUSED_BY ← JWT config ← SUGGESTED_BY ← Alice`
+4. Returns the activation trail: `outage ← CAUSED_BY ← JWT config ← INVOLVES ← Alice`
 
 One query. Full causal chain. No multi-step prompt engineering.
 
@@ -107,14 +107,14 @@ ReflexPipeline (spreading activation → ranked results)
 Context Output (injectable into any LLM)
 ```
 
-Everything is async Python. Storage is pluggable (SQLite default, in-memory for testing). The MCP server exposes 18 tools that any AI assistant can call.
+Everything is async Python. Storage is pluggable (SQLite default, in-memory for testing). The MCP server exposes 20 tools that any AI assistant can call.
 
 ### Numbers
 
-- **1,648 tests** passing
-- **18 MCP tools** (remember, recall, context, train, conflicts, health, habits, ...)
+- **1,649 tests** passing
+- **20 MCP tools** (remember, recall, context, train, conflicts, health, habits, ...)
 - **Python 3.11+**, async-first
-- **Zero external LLM dependency** — encoding uses local NLP, not API calls
+- **No LLM API required by default** — encoding uses local NLP (optional LLM enhancement available)
 - **SQLite storage** — no infrastructure required
 
 ## Real-World Usage
