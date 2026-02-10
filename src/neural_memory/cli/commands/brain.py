@@ -8,8 +8,13 @@ from typing import Annotated
 
 import typer
 
-from neural_memory.cli._helpers import get_config, output_result, run_async
-from neural_memory.cli.storage import PersistentStorage
+from neural_memory.cli._helpers import (
+    get_brain_path_auto,
+    get_config,
+    get_storage,
+    output_result,
+    run_async,
+)
 from neural_memory.safety.freshness import analyze_freshness
 from neural_memory.safety.sensitive import check_sensitive_content
 
@@ -89,8 +94,7 @@ def brain_create(
             raise typer.Exit(1)
 
         # Create new brain by loading storage (which creates if not exists)
-        brain_path = config.get_brain_path(name)
-        await PersistentStorage.load(brain_path)
+        await get_storage(config, brain_name=name)
 
         if use:
             config.current_brain = name
@@ -125,13 +129,13 @@ def brain_export(
     async def _export() -> None:
         config = get_config()
         brain_name = name or config.current_brain
-        brain_path = config.get_brain_path(brain_name)
+        brain_path = get_brain_path_auto(config, brain_name)
 
         if not brain_path.exists():
             typer.secho(f"Brain '{brain_name}' not found.", fg=typer.colors.RED)
             raise typer.Exit(1)
 
-        storage = await PersistentStorage.load(brain_path)
+        storage = await get_storage(config, brain_name=brain_name)
         snapshot = await storage.export_brain(storage._current_brain_id)
 
         # Filter sensitive content if requested
@@ -263,8 +267,7 @@ def brain_import(
         )
 
         # Load/create storage and import
-        brain_path = config.get_brain_path(brain_name)
-        storage = await PersistentStorage.load(brain_path)
+        storage = await get_storage(config, brain_name=brain_name)
         await storage.import_brain(snapshot, storage._current_brain_id)
         await storage.save()
 
@@ -309,7 +312,7 @@ def brain_delete(
             typer.echo("Cancelled.")
             return
 
-    brain_path = config.get_brain_path(name)
+    brain_path = get_brain_path_auto(config, name)
     brain_path.unlink()
     typer.secho(f"Deleted brain: {name}", fg=typer.colors.GREEN)
 
@@ -417,16 +420,16 @@ def brain_transplant(
 
         config = get_config()
         target_name = config.current_brain
-        target_path = config.get_brain_path(target_name)
-        source_path = config.get_brain_path(source)
+        source_path = get_brain_path_auto(config, source)
+        target_path = get_brain_path_auto(config, target_name)
 
         if not source_path.exists():
             return {"error": f"Source brain '{source}' not found."}
         if not target_path.exists():
             return {"error": f"Target brain '{target_name}' not found."}
 
-        source_storage = await PersistentStorage.load(source_path)
-        target_storage = await PersistentStorage.load(target_path)
+        source_storage = await get_storage(config, brain_name=source)
+        target_storage = await get_storage(config, brain_name=target_name)
         try:
             source_brain = await source_storage.get_brain(source_storage._current_brain_id)
             target_brain = await target_storage.get_brain(target_storage._current_brain_id)
@@ -500,17 +503,17 @@ def brain_health(
     async def _health() -> dict:
         config = get_config()
         brain_name = name or config.current_brain
-        brain_path = config.get_brain_path(brain_name)
+        brain_path = get_brain_path_auto(config, brain_name)
 
         if not brain_path.exists():
             return {"error": f"Brain '{brain_name}' not found."}
 
-        storage = await PersistentStorage.load(brain_path)
+        storage = await get_storage(config, brain_name=brain_name)
         brain = await storage.get_brain(storage._current_brain_id)
         if not brain:
             return {"error": "No brain configured"}
 
-        neurons = list(storage._neurons[storage._current_brain_id].values())
+        neurons = await storage.find_neurons(limit=10000)
         fibers = await storage.get_fibers(limit=10000)
 
         sensitive_neurons = _scan_sensitive_neurons(neurons)

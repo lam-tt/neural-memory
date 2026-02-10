@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Coroutine
+from pathlib import Path
 from typing import Any, TypeVar
 
 import typer
@@ -50,6 +51,7 @@ def run_async(coro: Coroutine[Any, Any, T]) -> T:
 async def get_storage(
     config: CLIConfig,
     *,
+    brain_name: str | None = None,
     force_shared: bool = False,
     force_local: bool = False,
     force_sqlite: bool = False,
@@ -59,6 +61,7 @@ async def get_storage(
 
     Args:
         config: CLI configuration
+        brain_name: Brain name override (default: config.current_brain)
         force_shared: Override config to use remote shared mode
         force_local: Override config to use local JSON mode
         force_sqlite: Override config to use local SQLite mode
@@ -66,6 +69,8 @@ async def get_storage(
     Returns:
         Storage instance (local JSON, local SQLite, or remote shared)
     """
+    name = brain_name or config.current_brain
+
     # Remote shared mode (via server)
     use_shared = (config.is_shared_mode or force_shared) and not force_local
     if use_shared:
@@ -73,7 +78,7 @@ async def get_storage(
 
         storage = SharedStorage(
             server_url=config.shared.server_url,
-            brain_id=config.current_brain,
+            brain_id=name,
             timeout=config.shared.timeout,
             api_key=config.shared.api_key,
         )
@@ -85,13 +90,20 @@ async def get_storage(
     if config.use_sqlite or force_sqlite:
         from neural_memory.unified_config import get_shared_storage
 
-        storage = await get_shared_storage(config.current_brain)
+        storage = await get_shared_storage(name)
         _active_storages.append(storage)
         return storage  # type: ignore[return-value]
 
     # Legacy JSON mode
-    brain_path = config.get_brain_path()
+    brain_path = config.get_brain_path(name)
     return await PersistentStorage.load(brain_path)
+
+
+def get_brain_path_auto(config: CLIConfig, brain_name: str | None = None) -> Path:
+    """Get brain file path, choosing .db or .json based on storage mode."""
+    if config.use_sqlite:
+        return config.get_brain_db_path(brain_name)
+    return config.get_brain_path(brain_name)
 
 
 def output_result(data: dict, as_json: bool = False) -> None:

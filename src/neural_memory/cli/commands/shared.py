@@ -7,8 +7,7 @@ from typing import Annotated
 
 import typer
 
-from neural_memory.cli._helpers import get_config, run_async
-from neural_memory.cli.storage import PersistentStorage
+from neural_memory.cli._helpers import get_config, get_storage, run_async
 
 shared_app = typer.Typer(help="Real-time brain sharing configuration")
 
@@ -188,8 +187,8 @@ def shared_sync(
     async def _sync() -> dict:
         from neural_memory.storage.shared_store import SharedStorage
 
-        # Load local storage
-        local_storage = await PersistentStorage.load(config.get_brain_path())
+        # Load local storage (force local to avoid recursion into shared mode)
+        local_storage = await get_storage(config, force_local=True)
 
         # Connect to remote
         remote = SharedStorage(

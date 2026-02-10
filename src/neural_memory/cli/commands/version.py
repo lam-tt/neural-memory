@@ -6,8 +6,13 @@ from typing import Annotated
 
 import typer
 
-from neural_memory.cli._helpers import get_config, output_result, run_async
-from neural_memory.cli.storage import PersistentStorage
+from neural_memory.cli._helpers import (
+    get_brain_path_auto,
+    get_config,
+    get_storage,
+    output_result,
+    run_async,
+)
 
 version_app = typer.Typer(help="Brain version control commands")
 
@@ -28,12 +33,12 @@ def version_create(
     async def _create() -> dict:
         config = get_config()
         brain_name = config.current_brain
-        brain_path = config.get_brain_path(brain_name)
+        brain_path = get_brain_path_auto(config, brain_name)
 
         if not brain_path.exists():
             return {"error": f"Brain '{brain_name}' not found."}
 
-        storage = await PersistentStorage.load(brain_path)
+        storage = await get_storage(config)
         try:
             brain = await storage.get_brain(storage._current_brain_id)
             if not brain:
@@ -89,12 +94,12 @@ def version_list(
     async def _list() -> dict:
         config = get_config()
         brain_name = config.current_brain
-        brain_path = config.get_brain_path(brain_name)
+        brain_path = get_brain_path_auto(config, brain_name)
 
         if not brain_path.exists():
             return {"error": f"Brain '{brain_name}' not found."}
 
-        storage = await PersistentStorage.load(brain_path)
+        storage = await get_storage(config)
         try:
             brain = await storage.get_brain(storage._current_brain_id)
             if not brain:
@@ -157,12 +162,12 @@ def version_rollback(
     async def _rollback() -> dict:
         config = get_config()
         brain_name = config.current_brain
-        brain_path = config.get_brain_path(brain_name)
+        brain_path = get_brain_path_auto(config, brain_name)
 
         if not brain_path.exists():
             return {"error": f"Brain '{brain_name}' not found."}
 
-        storage = await PersistentStorage.load(brain_path)
+        storage = await get_storage(config)
         try:
             brain = await storage.get_brain(storage._current_brain_id)
             if not brain:
@@ -210,12 +215,12 @@ def version_diff(
     async def _diff() -> dict:
         config = get_config()
         brain_name = config.current_brain
-        brain_path = config.get_brain_path(brain_name)
+        brain_path = get_brain_path_auto(config, brain_name)
 
         if not brain_path.exists():
             return {"error": f"Brain '{brain_name}' not found."}
 
-        storage = await PersistentStorage.load(brain_path)
+        storage = await get_storage(config)
         try:
             brain = await storage.get_brain(storage._current_brain_id)
             if not brain:
