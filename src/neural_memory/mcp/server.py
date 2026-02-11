@@ -293,7 +293,8 @@ class MCPServer(
                 # descending, cap to top 20 to limit I/O from get_neurons_batch
                 candidates = sorted(
                     (
-                        ar for ar in activations.values()
+                        ar
+                        for ar in activations.values()
                         if ar.hop_distance > 0 and ar.neuron_id != anchor_id
                     ),
                     key=lambda ar: ar.activation_level,
@@ -305,9 +306,7 @@ class MCPServer(
                 if candidate_ids:
                     related_neurons = await storage.get_neurons_batch(candidate_ids)
                     anchor_neurons = {
-                        nid: n
-                        for nid, n in related_neurons.items()
-                        if n.metadata.get("is_anchor")
+                        nid: n for nid, n in related_neurons.items() if n.metadata.get("is_anchor")
                     }
 
                     if anchor_neurons:
@@ -322,25 +321,24 @@ class MCPServer(
                         fibers = await storage.find_fibers_batch(sorted_anchors)
                         fiber_by_anchor: dict[str, Any] = {}
                         for fiber in fibers:
-                            if fiber.anchor_neuron_id in anchor_neurons and fiber.id != result.fiber.id:
+                            if (
+                                fiber.anchor_neuron_id in anchor_neurons
+                                and fiber.id != result.fiber.id
+                            ):
                                 fiber_by_anchor.setdefault(fiber.anchor_neuron_id, fiber)
 
                         related_memories = []
                         for nid in sorted_anchors:
                             fiber = fiber_by_anchor.get(nid)
                             if fiber:
-                                preview = (
-                                    fiber.summary
-                                    or anchor_neurons[nid].content
-                                    or ""
-                                )[:100]
-                                related_memories.append({
-                                    "fiber_id": fiber.id,
-                                    "preview": preview,
-                                    "similarity": round(
-                                        activations[nid].activation_level, 2
-                                    ),
-                                })
+                                preview = (fiber.summary or anchor_neurons[nid].content or "")[:100]
+                                related_memories.append(
+                                    {
+                                        "fiber_id": fiber.id,
+                                        "preview": preview,
+                                        "similarity": round(activations[nid].activation_level, 2),
+                                    }
+                                )
 
                         if related_memories:
                             response["related_memories"] = related_memories

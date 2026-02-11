@@ -80,17 +80,13 @@ class MaintenanceHandler:
         neuron_count = stats.get("neuron_count", 0)
         synapse_count = stats.get("synapse_count", 0)
 
-        connectivity = (
-            synapse_count / neuron_count if neuron_count > 0 else 0.0
-        )
+        connectivity = synapse_count / neuron_count if neuron_count > 0 else 0.0
 
         # Estimate orphan ratio: neurons not covered by fibers
         # Heuristic: each fiber typically creates ~5 neurons
         estimated_linked = fiber_count * 5
         orphan_ratio = (
-            max(0.0, (neuron_count - estimated_linked) / neuron_count)
-            if neuron_count > 0
-            else 0.0
+            max(0.0, (neuron_count - estimated_linked) / neuron_count) if neuron_count > 0 else 0.0
         )
 
         # Expired memory count (cheap COUNT query)
@@ -103,15 +99,11 @@ class MaintenanceHandler:
         # Stale fiber count (cheap COUNT query)
         stale_fiber_count = 0
         try:
-            stale_fiber_count = await storage.get_stale_fiber_count(
-                brain_id, cfg.stale_fiber_days
-            )
+            stale_fiber_count = await storage.get_stale_fiber_count(brain_id, cfg.stale_fiber_days)
         except Exception:
             logger.debug("Health pulse: get_stale_fiber_count failed", exc_info=True)
 
-        stale_fiber_ratio = (
-            stale_fiber_count / fiber_count if fiber_count > 0 else 0.0
-        )
+        stale_fiber_ratio = stale_fiber_count / fiber_count if fiber_count > 0 else 0.0
 
         hints = _evaluate_thresholds(
             fiber_count=fiber_count,
@@ -172,14 +164,10 @@ class MaintenanceHandler:
             )
 
             storage = await self.get_storage()  # type: ignore[attr-defined]
-            strategies = [
-                ConsolidationStrategy(s) for s in cfg.auto_consolidate_strategies
-            ]
+            strategies = [ConsolidationStrategy(s) for s in cfg.auto_consolidate_strategies]
             engine = ConsolidationEngine(storage)
             report = await engine.run(strategies=strategies)
-            logger.info(
-                "Auto-consolidation complete: %s", report.summary()
-            )
+            logger.info("Auto-consolidation complete: %s", report.summary())
         except Exception:
             logger.error("Auto-consolidation failed", exc_info=True)
 
@@ -247,8 +235,7 @@ def _evaluate_thresholds(
 
     if fiber_count > cfg.fiber_warn_threshold:
         hints.append(
-            f"High fiber count ({fiber_count}). "
-            "Consider running consolidation with merge strategy."
+            f"High fiber count ({fiber_count}). Consider running consolidation with merge strategy."
         )
 
     if synapse_count > cfg.synapse_warn_threshold:
@@ -265,10 +252,7 @@ def _evaluate_thresholds(
 
     if neuron_count >= 10 and orphan_ratio > cfg.orphan_ratio_threshold:
         pct = int(orphan_ratio * 100)
-        hints.append(
-            f"High orphan ratio ({pct}%). "
-            "Consider running nmem_health for diagnostics."
-        )
+        hints.append(f"High orphan ratio ({pct}%). Consider running nmem_health for diagnostics.")
 
     if expired_memory_count > cfg.expired_memory_warn_threshold:
         hints.append(

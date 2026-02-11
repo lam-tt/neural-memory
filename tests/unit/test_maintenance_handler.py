@@ -414,9 +414,7 @@ class TestAutoConsolidation:
         server = _FakeServer(storage, cfg)
 
         # Set last consolidation to 30 min ago (within cooldown)
-        server._last_consolidation_at = datetime.now(UTC) - timedelta(
-            minutes=30
-        )
+        server._last_consolidation_at = datetime.now(UTC) - timedelta(minutes=30)
         original_time = server._last_consolidation_at
 
         pulse = HealthPulse(
@@ -441,9 +439,7 @@ class TestAutoConsolidation:
         server = _FakeServer(storage, cfg)
 
         # Set last consolidation to 90 min ago (past cooldown)
-        server._last_consolidation_at = datetime.now(UTC) - timedelta(
-            minutes=90
-        )
+        server._last_consolidation_at = datetime.now(UTC) - timedelta(minutes=90)
 
         pulse = HealthPulse(
             fiber_count=0,
@@ -457,9 +453,7 @@ class TestAutoConsolidation:
             should_consolidate=True,
         )
 
-        with patch.object(
-            server, "_run_auto_consolidation", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(server, "_run_auto_consolidation", new_callable=AsyncMock) as mock_run:
             await server._maybe_auto_consolidate(pulse)
             # create_task fires the coroutine; give it a tick
             await asyncio.sleep(0.05)
@@ -586,7 +580,9 @@ class TestFireHealthTrigger:
 
         storage.get_stats = _high_stats  # type: ignore[assignment]
 
-        with patch.object(server, "_fire_health_trigger", wraps=server._fire_health_trigger) as mock_fire:
+        with patch.object(
+            server, "_fire_health_trigger", wraps=server._fire_health_trigger
+        ) as mock_fire:
             pulse = await server._check_maintenance()
             assert pulse is not None
             assert pulse.hints  # should have neuron warning
