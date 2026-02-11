@@ -364,11 +364,11 @@ def _infer_purpose(table_name: str) -> str:
     """Infer business purpose from table name using heuristics."""
     lower = table_name.lower()
 
-    if lower.endswith("_log") or lower.endswith("_logs"):
+    if lower.endswith(("_log", "_logs")):
         return "stores activity or audit logs"
-    if lower.endswith("_history") or lower.endswith("_histories"):
+    if lower.endswith(("_history", "_histories")):
         return "stores historical snapshots"
-    if lower.endswith("_config") or lower.endswith("_settings"):
+    if lower.endswith(("_config", "_settings")):
         return "stores configuration settings"
     if lower.startswith("dim_"):
         return "is a dimension table for analytics"
@@ -378,7 +378,7 @@ def _infer_purpose(table_name: str) -> str:
     # Singularize for description
     if lower.endswith("ies"):
         singular = lower[:-3] + "y"
-    elif lower.endswith("ses") or lower.endswith("xes"):
+    elif lower.endswith(("ses", "xes")):
         singular = lower[:-2]
     elif lower.endswith("s") and not lower.endswith("ss"):
         singular = lower[:-1]

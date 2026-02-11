@@ -320,7 +320,7 @@ class MemoryEncoder:
         stage = MemoryStage(initial_stage) if initial_stage else MemoryStage.SHORT_TERM
         maturation = MaturationRecord(
             fiber_id=fiber.id,
-            brain_id=self._storage._current_brain_id or "",
+            brain_id=self._storage.current_brain_id or "",
             stage=stage,
         )
         try:

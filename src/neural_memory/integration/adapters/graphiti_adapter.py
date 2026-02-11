@@ -29,12 +29,20 @@ class GraphitiAdapter:
         records = await adapter.fetch_all()
     """
 
+    _ALLOWED_SCHEMES = frozenset({"bolt://", "bolt+s://", "bolt+ssc://"})
+
     def __init__(
         self,
         uri: str | None = None,
         group_id: str | None = None,
     ) -> None:
-        self._uri = uri or os.environ.get("GRAPHITI_URI", "bolt://localhost:7687")
+        resolved_uri = uri or os.environ.get("GRAPHITI_URI", "bolt://localhost:7687")
+        if not any(resolved_uri.startswith(s) for s in self._ALLOWED_SCHEMES):
+            raise ValueError(
+                f"Invalid Graphiti URI scheme. Must start with one of: "
+                f"{', '.join(sorted(self._ALLOWED_SCHEMES))}"
+            )
+        self._uri = resolved_uri
         self._group_id = group_id or os.environ.get("GRAPHITI_GROUP_ID")
         self._client: Any = None
 

@@ -120,7 +120,7 @@ def mine_sequential_pairs(
     # Count pairs
     pair_gaps: dict[tuple[str, str], list[float]] = defaultdict(list)
 
-    for _session_id, session_events in sessions.items():
+    for session_events in sessions.values():
         sorted_events = sorted(session_events, key=lambda e: e.created_at)
         for i in range(len(sorted_events) - 1):
             a = sorted_events[i]

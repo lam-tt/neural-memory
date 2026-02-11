@@ -255,7 +255,6 @@ def decay(
         nmem decay --prune 0.05       # More aggressive pruning
     """
     from neural_memory.engine.lifecycle import DecayManager
-    from neural_memory.unified_config import get_config, get_shared_storage
 
     async def _decay() -> None:
         config = get_config()
@@ -265,7 +264,7 @@ def decay(
         if dry_run:
             typer.echo("(dry run - no changes will be saved)")
 
-        storage = await get_shared_storage(brain_name)
+        storage = await get_storage(config, brain_name=brain_name)
 
         manager = DecayManager(
             decay_rate=config.brain.decay_rate,
@@ -324,7 +323,6 @@ def consolidate(
         ConsolidationEngine,
         ConsolidationStrategy,
     )
-    from neural_memory.unified_config import get_config, get_shared_storage
 
     async def _consolidate() -> None:
         config = get_config()
@@ -334,7 +332,7 @@ def consolidate(
         if dry_run:
             typer.echo("(dry run - no changes will be saved)")
 
-        storage = await get_shared_storage(brain_name)
+        storage = await get_storage(config, brain_name=brain_name)
 
         strategies = [ConsolidationStrategy(strategy)]
         cons_config = ConsolidationConfig(

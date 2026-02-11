@@ -268,7 +268,7 @@ async def merge_brain(
         strategy=conflict_strategy,
     )
 
-    # Clear and reimport
+    # Reset brain data then reimport merged snapshot
     await storage.clear(brain_id)
     await storage.import_brain(merged_snapshot, brain_id)
 

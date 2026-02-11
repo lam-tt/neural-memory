@@ -83,10 +83,14 @@ def _lazy_load_adapter(name: str) -> type | None:
             raise ValueError(msg) from e
 
     if name == "awf":
-        from neural_memory.integration.adapters.awf_adapter import AWFAdapter
+        try:
+            from neural_memory.integration.adapters.awf_adapter import AWFAdapter
 
-        register_adapter("awf", AWFAdapter)
-        return AWFAdapter
+            register_adapter("awf", AWFAdapter)
+            return AWFAdapter
+        except ImportError as e:
+            msg = "AWF adapter requires 'aiohttp' package. Install with: pip install neural-memory"
+            raise ValueError(msg) from e
 
     if name == "cognee":
         try:

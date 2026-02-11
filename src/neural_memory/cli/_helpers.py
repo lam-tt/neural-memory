@@ -44,6 +44,10 @@ def run_async(coro: Coroutine[Any, Any, T]) -> T:
                     except Exception:
                         pass
             _active_storages.clear()
+            # Yield once so any pending callbacks from aiosqlite worker
+            # threads are drained before asyncio.run() tears down the loop.
+            # Prevents "Event loop is closed" on Python 3.12+.
+            await asyncio.sleep(0)
 
     return asyncio.run(_with_cleanup())
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "neural-memory"
-version = "1.7.1"
+version = "1.7.2"
 description = "Reflex-based memory system for AI agents - retrieval through activation, not search"
 readme = "README.md"
 license = "MIT"
@@ -142,6 +142,14 @@ select = [
     "SIM",    # flake8-simplify
     "TC",     # flake8-type-checking
     "RUF",    # ruff-specific
+    "S",      # flake8-bandit (security)
+    "A",      # flake8-builtins
+    "DTZ",    # flake8-datetimez
+    "T20",    # flake8-print
+    "PT",     # flake8-pytest-style
+    "PERF",   # perflint
+    "PIE",    # flake8-pie
+    "ERA",    # eradicate (commented-out code)
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
@@ -157,7 +165,26 @@ ignore = [
     "SIM108", # ternary operator (if-else clearer)
     "SIM117", # nested with statements (clearer in some cases)
     "B904",   # raise from (not always needed)
+    "S101",   # assert usage (fine in tests, checked via per-file-ignores)
+    "S110",   # try-except-pass (used for graceful cleanup/fallback)
+    "S112",   # try-except-continue (used for graceful iteration)
+    "S311",   # pseudo-random (not used for crypto)
+    "S324",   # MD5 (used for simhash fingerprints, not crypto)
+    "A002",   # builtin shadowing (type param in public API is intentional)
+    "PERF401",# manual list comprehension (loop is often clearer)
+    "PT023",  # pytest mark parentheses (style preference)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S108", "DTZ001", "DTZ005", "T20", "ERA001", "PT001", "PT006", "PT011", "PT018"]
+"src/neural_memory/mcp/server.py" = ["T201"]    # stdio transport uses print
+"src/neural_memory/utils/config.py" = ["S104"]   # configurable bind address
+"src/neural_memory/utils/simhash.py" = ["S324"]  # MD5 for fingerprint, not crypto
+"src/neural_memory/storage/sqlite_*.py" = ["S608"] # SQL with hardcoded column names
+"src/neural_memory/cli/**" = ["T201", "S603", "S607", "S310"]  # CLI: print, subprocess, url open
+"src/neural_memory/safety/sensitive.py" = ["S105"] # pattern names, not actual secrets
+"src/neural_memory/engine/db_introspector.py" = ["S608"]  # identifier-validated SQL
+"src/neural_memory/git_context.py" = ["S603", "S607"]     # git subprocess calls
 
 [tool.ruff.lint.isort]
 known-first-party = ["neural_memory"]
@@ -197,6 +224,7 @@ source = ["src/neural_memory"]
 branch = true
 
 [tool.coverage.report]
+fail_under = 67
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
@@ -205,3 +233,7 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "@abstractmethod",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101", "B311", "B324"]

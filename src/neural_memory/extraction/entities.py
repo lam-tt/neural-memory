@@ -216,7 +216,7 @@ class EntityExtractor:
                 # Use cumulative offset to handle duplicate words
                 offset = 0
                 for word, tag in ner_results:
-                    if tag.startswith("B-") or tag.startswith("I-"):
+                    if tag.startswith(("B-", "I-")):
                         entity_type = self._map_underthesea_type(tag[2:])
                         if entity_type:
                             # Find position in text from current offset

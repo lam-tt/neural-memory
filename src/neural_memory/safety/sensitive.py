@@ -141,7 +141,7 @@ def get_default_patterns() -> list[SensitivePattern]:
             description="Credit card number",
             severity=3,
         ),
-        # SSN (US)
+        # Social Security Number pattern
         SensitivePattern(
             name="SSN",
             pattern=r"\b\d{3}-\d{2}-\d{4}\b",

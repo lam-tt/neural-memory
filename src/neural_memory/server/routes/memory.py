@@ -162,6 +162,7 @@ async def list_neurons(
     """List neurons with optional filters."""
     from neural_memory.core.neuron import NeuronType
 
+    limit = min(limit, 1000)
     neuron_type = None
     if type:
         try:

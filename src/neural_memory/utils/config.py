@@ -15,7 +15,7 @@ class Config:
     """
 
     # Server settings
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8000
     debug: bool = False
 
@@ -33,7 +33,9 @@ class Config:
     default_max_context_tokens: int = 1500
 
     # CORS settings
-    cors_origins: list[str] = field(default_factory=lambda: ["*"])
+    cors_origins: list[str] = field(
+        default_factory=lambda: ["http://localhost:*", "http://127.0.0.1:*"]
+    )
 
     @classmethod
     def from_env(cls) -> Config:
@@ -64,7 +66,7 @@ class Config:
             return [s.strip() for s in value.split(",")]
 
         return cls(
-            host=os.getenv("NEURAL_MEMORY_HOST", "0.0.0.0"),
+            host=os.getenv("NEURAL_MEMORY_HOST", "127.0.0.1"),
             port=get_int("NEURAL_MEMORY_PORT", 8000),
             debug=get_bool("NEURAL_MEMORY_DEBUG", False),
             storage_backend=os.getenv("NEURAL_MEMORY_STORAGE", "memory"),
@@ -76,7 +78,10 @@ class Config:
             default_activation_threshold=get_float("NEURAL_MEMORY_ACTIVATION_THRESHOLD", 0.2),
             default_max_spread_hops=get_int("NEURAL_MEMORY_MAX_SPREAD_HOPS", 4),
             default_max_context_tokens=get_int("NEURAL_MEMORY_MAX_CONTEXT_TOKENS", 1500),
-            cors_origins=get_list("NEURAL_MEMORY_CORS_ORIGINS", ["*"]),
+            cors_origins=get_list(
+                "NEURAL_MEMORY_CORS_ORIGINS",
+                ["http://localhost:*", "http://127.0.0.1:*"],
+            ),
         )
 
 

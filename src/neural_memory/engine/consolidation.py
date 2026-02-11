@@ -373,7 +373,7 @@ class ConsolidationEngine:
             groups.setdefault(root, []).append(i)
 
         # Merge groups with more than 1 member
-        for _root, members in groups.items():
+        for members in groups.values():
             if len(members) < 2:
                 continue
 
@@ -496,7 +496,7 @@ class ConsolidationEngine:
             root = find(i)
             groups.setdefault(root, []).append(i)
 
-        for _root, members in groups.items():
+        for members in groups.values():
             if len(members) < self._config.summarize_min_cluster_size:
                 continue
 

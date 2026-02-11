@@ -156,6 +156,19 @@ class RecordMapper:
         Returns:
             MappingResult with all created structures
         """
+        # Check for sensitive content before importing
+        from neural_memory.safety.sensitive import check_sensitive_content
+
+        sensitive_matches = check_sensitive_content(record.content, min_severity=2)
+        if sensitive_matches:
+            types_found = sorted({m.type.value for m in sensitive_matches})
+            logger.warning(
+                "Skipping import record %s: sensitive content detected (%s)",
+                record.id,
+                ", ".join(types_found),
+            )
+            raise ValueError(f"Sensitive content detected: {', '.join(types_found)}")
+
         tags = set(record.tags) | {
             f"import:{record.source_system}",
             f"collection:{record.source_collection}",

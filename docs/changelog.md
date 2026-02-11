@@ -5,6 +5,34 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2026-02-11
+
+### Security
+
+- CORS default `["*"]` → localhost-only; server bind `0.0.0.0` → `127.0.0.1`
+- Migration errors halt instead of silently advancing schema version
+- Brain names removed from 404 errors; exception types removed from MCP error responses
+- Graphiti URI validated for `bolt://` scheme; import records screened for sensitive content
+
+### Fixed
+
+- Fix `RuntimeError: Event loop is closed` from aiosqlite worker thread on CLI exit (Python 3.12+)
+  - 4 CLI commands (`decay`, `consolidate`, `export`, `import`) bypassed storage cleanup — routed through tracked `get_storage()` + `asyncio.sleep(0)` drain
+- Bounds: habits fetch 10K→1K, context limit capped 200, neurons capped 1K, encode max 100K chars
+- Data integrity: `import_brain` wrapped in `BEGIN IMMEDIATE` with rollback
+- Code quality: AWF adapter ImportError guard, redundant `enable_auto_save()` removed
+
+### Added
+
+- **CLAUDE.md** — project-level AI coding standards
+- **Quality gates** — 8 new ruff rule sets (S/A/DTZ/T20/PT/PERF/PIE/ERA), 67% coverage gate, hardened CI (typecheck blocks build, security scan job), updated pre-commit hooks, `make security` / `make audit` targets
+
+### Changed
+
+- Tests: 1759 passed (up from 1696)
+
+---
+
 ## [1.7.1] - 2026-02-11
 
 ### Fixed

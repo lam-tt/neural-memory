@@ -149,14 +149,18 @@ class SQLiteBrainMixin:
         self.set_brain(brain_id)
 
         try:
-            # Wrap all imports in a single transaction for performance
             conn = self._ensure_conn()
-            await self._import_neurons(snapshot.neurons)
-            await self._import_synapses(snapshot.synapses)
-            await self._import_fibers(snapshot.fibers)
-            await self._import_projects(snapshot.metadata.get("projects", []))
-            await self._import_typed_memories(snapshot.metadata.get("typed_memories", []))
-            await conn.commit()
+            await conn.execute("BEGIN IMMEDIATE")
+            try:
+                await self._import_neurons(snapshot.neurons)
+                await self._import_synapses(snapshot.synapses)
+                await self._import_fibers(snapshot.fibers)
+                await self._import_projects(snapshot.metadata.get("projects", []))
+                await self._import_typed_memories(snapshot.metadata.get("typed_memories", []))
+                await conn.commit()
+            except Exception:
+                await conn.execute("ROLLBACK")
+                raise
         finally:
             self._current_brain_id = old_brain_id
 

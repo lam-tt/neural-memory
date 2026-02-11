@@ -24,6 +24,11 @@ class NeuralStorage(ABC):
     retrieving neurons, synapses, fibers, and brain metadata.
     """
 
+    @property
+    def current_brain_id(self) -> str | None:
+        """The active brain ID, or None if not set."""
+        return getattr(self, "_current_brain_id", None)
+
     # ========== Neuron Operations ==========
 
     @abstractmethod

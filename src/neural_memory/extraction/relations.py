@@ -192,7 +192,7 @@ def _build_comparative_patterns() -> list[_PatternEntry]:
         )
     )
 
-    # "X similar to Y" / "X like Y" (not "would like")
+    # Similarity pattern: similar to, comparable to, resembles
     patterns.append(
         (
             re.compile(
@@ -235,7 +235,7 @@ def _build_comparative_patterns() -> list[_PatternEntry]:
         )
     )
 
-    # Vietnamese: "X tốt hơn Y" / "X nhanh hơn Y"
+    # Vietnamese comparative pattern (hon = than)
     patterns.append(
         (
             re.compile(

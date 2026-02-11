@@ -1,4 +1,4 @@
-.PHONY: install install-dev lint format typecheck test test-cov clean build docs serve
+.PHONY: install install-dev lint format typecheck test test-cov security audit check clean build docs serve
 
 # Install package
 install:
@@ -28,10 +28,19 @@ test:
 
 # Run tests with coverage
 test-cov:
-	pytest tests/ -v --cov=neural_memory --cov-report=term-missing --cov-report=html
+	pytest tests/ -v --cov=neural_memory --cov-report=term-missing --cov-report=html --cov-fail-under=67
 
-# Run all checks
-check: lint typecheck test
+# Run security checks (S rules already in select, filtered by ignore + per-file-ignores)
+security:
+	ruff check src/ --select S --ignore S101,S110,S112,S311,S324
+	@echo "Security scan passed."
+
+# Preview extended rules (non-blocking audit)
+audit:
+	ruff check src/ tests/ --select S,A,DTZ,T20,PT,PERF,PIE,ERA --statistics || true
+
+# Run all checks (full quality gate)
+check: lint typecheck test-cov security
 
 # Clean build artifacts
 clean:

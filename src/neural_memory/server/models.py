@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 class EncodeRequest(BaseModel):
     """Request to encode a new memory."""
 
-    content: str = Field(..., description="The content to encode as a memory")
+    content: str = Field(..., description="The content to encode as a memory", max_length=100_000)
     timestamp: datetime | None = Field(None, description="When this memory occurred (default: now)")
     metadata: dict[str, Any] | None = Field(None, description="Additional metadata to attach")
     tags: list[str] | None = Field(None, description="Tags for categorization")

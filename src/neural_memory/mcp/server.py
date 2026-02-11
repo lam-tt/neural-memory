@@ -463,7 +463,7 @@ class MCPServer(
         """Get recent context."""
         storage = await self.get_storage()
 
-        limit = args.get("limit", 10)
+        limit = min(args.get("limit", 10), 200)
         fresh_only = args.get("fresh_only", False)
 
         fibers = await storage.get_fibers(limit=limit * 2 if fresh_only else limit)
@@ -681,7 +681,8 @@ class MCPServer(
             }
 
         elif action == "list":
-            fibers = await storage.get_fibers(limit=10000)
+            # TODO: filter by metadata in query instead of fetching all fibers
+            fibers = await storage.get_fibers(limit=1000)
             habits = [f for f in fibers if f.metadata.get("_habit_pattern")]
             return {
                 "habits": [
@@ -698,7 +699,7 @@ class MCPServer(
             }
 
         elif action == "clear":
-            fibers = await storage.get_fibers(limit=10000)
+            fibers = await storage.get_fibers(limit=1000)
             habits = [f for f in fibers if f.metadata.get("_habit_pattern")]
             if habits:
                 await asyncio.gather(*[storage.delete_fiber(h.id) for h in habits])

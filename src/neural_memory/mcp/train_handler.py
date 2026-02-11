@@ -33,7 +33,7 @@ class TrainHandler:
         from neural_memory.engine.doc_trainer import DocTrainer, TrainingConfig
 
         storage = await self.get_storage()
-        brain = await storage.get_brain(storage._current_brain_id)
+        brain = await storage.get_brain(storage.current_brain_id)
         if not brain:
             return {"error": "No brain configured"}
 
@@ -84,8 +84,7 @@ class TrainHandler:
             await storage.batch_save()
         except Exception as exc:
             logger.error("Training failed: %s", exc, exc_info=True)
-            storage.enable_auto_save()
-            return {"error": f"Training failed: {type(exc).__name__}"}
+            return {"error": "Training failed unexpectedly"}
         finally:
             storage.enable_auto_save()
 

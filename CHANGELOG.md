@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-02-11
+
+### Security
+
+- **CORS hardening**: Default CORS origins changed from `["*"]` to `["http://localhost:*", "http://127.0.0.1:*"]` (C2)
+- **Bind address**: Default server bind changed from `0.0.0.0` to `127.0.0.1` (C4)
+- **Migration safety**: Non-benign migration errors now halt and raise instead of silently advancing schema version (C8)
+- **Info leakage**: Removed available brain names from 404 error responses (H21)
+- **URI validation**: Graphiti adapter validates `bolt://`/`bolt+s://` URI scheme before connecting (H23)
+- **Error masking**: Exception type names no longer leaked in MCP training error responses (H27)
+- **Import screening**: `RecordMapper.map_record()` now runs `check_sensitive_content()` before importing external records (H33)
+
+### Fixed
+
+- Fix `RuntimeError: Event loop is closed` from aiosqlite worker thread on CLI exit (Python 3.12+)
+  - **Root cause**: 4 CLI commands (`decay`, `consolidate`, `export`, `import`) called `get_shared_storage()` directly, bypassing `_active_storages` tracking — aiosqlite connections were never closed before event loop teardown
+  - Route all CLI storage creation through `get_storage()` in `_helpers.py` so connections are properly tracked and cleaned up
+  - Add `await asyncio.sleep(0)` after storage cleanup to drain pending aiosqlite worker thread callbacks before `asyncio.run()` tears down the loop
+- **Bounds hardening**: MCP `_habits` fiber fetch reduced 10K→1K; `_context` limit capped at 200; REST `list_neurons` capped at 1000; `EncodeRequest.content` max 100K chars (H11-H13, H32)
+- **Data integrity**: `import_brain` wrapped in `BEGIN IMMEDIATE` with rollback on failure (H14)
+- **Code quality**: AWF adapter gets ImportError guard; redundant `enable_auto_save()` removed from train handler (C7, H26)
+- **Public API**: Added `current_brain_id` property to `NeuralStorage`, `SQLiteStorage`, `InMemoryStorage` — replaces private `_current_brain_id` access (H25)
+
+### Added
+
+- **CLAUDE.md**: Project-level AI coding standards (architecture, immutability, datetime, security, bounds, testing, error handling, naming conventions)
+- **Quality gates**: Automated enforcement via ruff, mypy, pytest, and CI
+  - 8 new ruff rule sets: S (bandit), A (builtins), DTZ (datetimez), T20 (print), PT (pytest), PERF (perflint), PIE, ERA (eradicate)
+  - Per-file-ignores for intentional patterns (CLI print, simhash MD5, SQL column names, etc.)
+  - Coverage threshold: 67% enforced in CI and Makefile
+  - CI: typecheck job now fails build (removed `continue-on-error` and `|| true`); build requires `[lint, typecheck, test]`; added security scan job
+  - Pre-commit: updated hooks (ruff v0.9.6, mypy v1.15.0); added `no-commit-to-branch` and `bandit`
+  - Makefile: added `security`, `audit` targets; `check` now includes `security`
+
+### Changed
+
+- Tests: 1759 passed (up from 1696)
+
 ## [1.7.1] - 2026-02-11
 
 ### Fixed

@@ -177,8 +177,7 @@ class ReflexActivation:
             hops += 1
             neuron_id = fiber.pathway[pos]
 
-            # Trail decay formula
-            # level * (1 - decay) * fiber.conductivity * time_factor
+            # Trail decay: level decays by rate, scaled by conductivity and time
             current_level = current_level * (1 - decay_rate) * fiber.conductivity * time_factor
 
             # Stop if below threshold

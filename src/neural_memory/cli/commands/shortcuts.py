@@ -267,12 +267,10 @@ def export_brain_cmd(
     """
     from pathlib import Path
 
-    from neural_memory.unified_config import get_config, get_shared_storage
-
     async def _export() -> None:
         config = get_config()
         brain_name = brain or config.current_brain
-        storage = await get_shared_storage(brain_name)
+        storage = await get_storage(config, brain_name=brain_name)
 
         snapshot = await storage.export_brain(brain_name)
 
@@ -324,7 +322,6 @@ def import_brain_cmd(
     from pathlib import Path
 
     from neural_memory.core.brain import BrainSnapshot
-    from neural_memory.unified_config import get_shared_storage
 
     async def _import() -> None:
         input_path = Path(input_file)
@@ -335,7 +332,7 @@ def import_brain_cmd(
         data = json.loads(input_path.read_text())
 
         brain_name = brain or data.get("brain_name", "imported")
-        storage = await get_shared_storage(brain_name)
+        storage = await get_storage(config=get_config(), brain_name=brain_name)
 
         incoming_snapshot = BrainSnapshot(
             brain_id=data.get("brain_id", brain_name),

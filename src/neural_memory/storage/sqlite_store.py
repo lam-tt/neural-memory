@@ -109,6 +109,11 @@ class SQLiteStorage(
             await self._conn.close()
             self._conn = None
 
+    @property
+    def current_brain_id(self) -> str | None:
+        """The active brain ID, or None if not set."""
+        return self._current_brain_id
+
     def set_brain(self, brain_id: str) -> None:
         """Set the current brain context for operations."""
         self._current_brain_id = brain_id
@@ -162,8 +167,6 @@ class SQLiteStorage(
             }
 
     async def get_enhanced_stats(self, brain_id: str) -> dict[str, Any]:
-        from datetime import datetime as dt
-
         conn = self._ensure_conn()
         basic_stats = await self.get_stats(brain_id)
 
@@ -194,7 +197,9 @@ class SQLiteStorage(
                 )
 
         # Today's fibers
-        today_midnight = dt.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        from neural_memory.utils.timeutils import utcnow
+
+        today_midnight = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         async with conn.execute(
             "SELECT COUNT(*) as cnt FROM fibers WHERE brain_id = ? AND created_at >= ?",
             (brain_id, today_midnight.isoformat()),

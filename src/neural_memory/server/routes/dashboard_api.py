@@ -189,7 +189,7 @@ async def switch_brain(request: SwitchBrainRequest) -> dict[str, str]:
     if request.brain_name not in available:
         raise HTTPException(
             status_code=404,
-            detail=f"Brain '{request.brain_name}' not found. Available: {available}",
+            detail=f"Brain '{request.brain_name}' not found.",
         )
 
     cfg.switch_brain(request.brain_name)

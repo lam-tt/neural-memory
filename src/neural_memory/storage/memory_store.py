@@ -42,6 +42,11 @@ class InMemoryStorage(InMemoryCollectionsMixin, InMemoryBrainMixin, NeuralStorag
         self._versions: dict[str, dict[str, tuple[BrainVersion, str]]] = defaultdict(dict)
         self._current_brain_id: str | None = None
 
+    @property
+    def current_brain_id(self) -> str | None:
+        """The active brain ID, or None if not set."""
+        return self._current_brain_id
+
     def set_brain(self, brain_id: str) -> None:
         """Set the current brain context for operations."""
         self._current_brain_id = brain_id

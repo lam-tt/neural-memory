@@ -597,7 +597,7 @@ class ReflexPipeline:
 
         # Build lookup: (source, target) -> Synapse
         existing_map: dict[tuple[str, str], Synapse] = {}
-        for _nid, synapses in outgoing.items():
+        for synapses in outgoing.values():
             for syn in synapses:
                 existing_map[(syn.source_id, syn.target_id)] = syn
 

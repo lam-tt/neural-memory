@@ -236,7 +236,14 @@ async def run_migrations(conn: aiosqlite.Connection, current_version: int) -> in
                 ):
                     logger.debug("Migration already applied: %s", e)
                 else:
-                    logger.warning("Migration statement failed: %s â€” %s", sql[:80], e)
+                    logger.error(
+                        "Migration %d->%d failed: %s -- %s",
+                        version,
+                        next_version,
+                        sql[:80],
+                        e,
+                    )
+                    raise
 
         version = next_version
 

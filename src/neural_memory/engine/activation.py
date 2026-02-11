@@ -360,7 +360,7 @@ class SpreadingActivation:
         all_synapses = await self._storage.get_synapses_for_neurons(
             selected_neurons, direction="out"
         )
-        for _neuron_id, synapses in all_synapses.items():
+        for synapses in all_synapses.values():
             for synapse in synapses:
                 if synapse.target_id in selected_set:
                     synapse_ids.append(synapse.id)
