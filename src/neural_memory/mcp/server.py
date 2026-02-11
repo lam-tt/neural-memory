@@ -48,6 +48,7 @@ from neural_memory.mcp.constants import MAX_CONTENT_LENGTH
 from neural_memory.mcp.db_train_handler import DBTrainHandler
 from neural_memory.mcp.eternal_handler import EternalHandler
 from neural_memory.mcp.index_handler import IndexHandler
+from neural_memory.mcp.maintenance_handler import MaintenanceHandler
 from neural_memory.mcp.prompt import get_system_prompt
 from neural_memory.mcp.session_handler import SessionHandler
 from neural_memory.mcp.tool_schemas import get_tool_schemas
@@ -70,6 +71,7 @@ class MCPServer(
     ConflictHandler,
     TrainHandler,
     DBTrainHandler,
+    MaintenanceHandler,
 ):
     """MCP server that exposes NeuralMemory tools.
 
@@ -77,13 +79,14 @@ class MCPServer(
     Configuration from ~/.neuralmemory/config.toml
 
     Handler mixins:
-        SessionHandler  — _session, _get_active_session
-        EternalHandler  — _eternal, _recap, _fire_eternal_trigger
-        AutoHandler     — _auto, _passive_capture, _save_detected_memories
-        IndexHandler    — _index, _import
-        ConflictHandler — _conflicts (list, resolve, check)
-        TrainHandler    — _train (train docs into brain, status)
-        DBTrainHandler  — _train_db (train DB schema into brain, status)
+        SessionHandler      — _session, _get_active_session
+        EternalHandler      — _eternal, _recap, _fire_eternal_trigger
+        AutoHandler         — _auto, _passive_capture, _save_detected_memories
+        IndexHandler        — _index, _import
+        ConflictHandler     — _conflicts (list, resolve, check)
+        TrainHandler        — _train (train docs into brain, status)
+        DBTrainHandler      — _train_db (train DB schema into brain, status)
+        MaintenanceHandler  — _check_maintenance, health pulse
     """
 
     def __init__(self) -> None:
@@ -248,6 +251,8 @@ class MCPServer(
 
         await self._record_tool_action("remember", content[:100])
 
+        pulse = await self._check_maintenance()
+
         response: dict[str, Any] = {
             "success": True,
             "fiber_id": result.fiber.id,
@@ -266,6 +271,81 @@ class MCPServer(
         if conflicts_detected > 0:
             response["conflicts_detected"] = conflicts_detected
             response["message"] += f" ({conflicts_detected} conflict(s) detected)"
+
+        hint = self._get_maintenance_hint(pulse)
+        if hint:
+            response["maintenance_hint"] = hint
+
+        # Related memory discovery via 2-hop spreading activation
+        try:
+            anchor_id = result.fiber.anchor_neuron_id
+            if anchor_id:
+                from neural_memory.engine.activation import SpreadingActivation
+
+                activator = SpreadingActivation(storage, brain.config)
+                activations = await activator.activate(
+                    anchor_neurons=[anchor_id],
+                    max_hops=2,
+                    min_activation=0.05,
+                )
+
+                # Pre-filter: only keep hop>0 candidates, sort by activation
+                # descending, cap to top 20 to limit I/O from get_neurons_batch
+                candidates = sorted(
+                    (
+                        ar for ar in activations.values()
+                        if ar.hop_distance > 0 and ar.neuron_id != anchor_id
+                    ),
+                    key=lambda ar: ar.activation_level,
+                    reverse=True,
+                )[:20]
+
+                candidate_ids = [c.neuron_id for c in candidates]
+
+                if candidate_ids:
+                    related_neurons = await storage.get_neurons_batch(candidate_ids)
+                    anchor_neurons = {
+                        nid: n
+                        for nid, n in related_neurons.items()
+                        if n.metadata.get("is_anchor")
+                    }
+
+                    if anchor_neurons:
+                        # Take top 3 anchor neurons by activation level
+                        sorted_anchors = sorted(
+                            anchor_neurons.keys(),
+                            key=lambda nid: activations[nid].activation_level,
+                            reverse=True,
+                        )[:3]
+
+                        # Map anchor neurons to their fibers
+                        fibers = await storage.find_fibers_batch(sorted_anchors)
+                        fiber_by_anchor: dict[str, Any] = {}
+                        for fiber in fibers:
+                            if fiber.anchor_neuron_id in anchor_neurons and fiber.id != result.fiber.id:
+                                fiber_by_anchor.setdefault(fiber.anchor_neuron_id, fiber)
+
+                        related_memories = []
+                        for nid in sorted_anchors:
+                            fiber = fiber_by_anchor.get(nid)
+                            if fiber:
+                                preview = (
+                                    fiber.summary
+                                    or anchor_neurons[nid].content
+                                    or ""
+                                )[:100]
+                                related_memories.append({
+                                    "fiber_id": fiber.id,
+                                    "preview": preview,
+                                    "similarity": round(
+                                        activations[nid].activation_level, 2
+                                    ),
+                                })
+
+                        if related_memories:
+                            response["related_memories"] = related_memories
+        except Exception:
+            logger.warning("Related memory discovery failed (non-critical)", exc_info=True)
 
         return response
 
@@ -370,6 +450,11 @@ class MCPServer(
                 ]
 
         await self._record_tool_action("recall", query[:100])
+
+        pulse = await self._check_maintenance()
+        hint = self._get_maintenance_hint(pulse)
+        if hint:
+            response["maintenance_hint"] = hint
 
         return response
 

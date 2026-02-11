@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal
 
 from neural_memory.core.fiber import Fiber
@@ -217,6 +217,24 @@ class SQLiteFiberMixin:
         await conn.commit()
 
         return cursor.rowcount > 0
+
+    async def get_stale_fiber_count(self, brain_id: str, stale_days: int = 90) -> int:
+        conn = self._ensure_conn()
+        from neural_memory.utils.timeutils import utcnow
+
+        cutoff = (utcnow() - timedelta(days=stale_days)).isoformat()
+
+        async with conn.execute(
+            """SELECT COUNT(*) FROM fibers
+               WHERE brain_id = ?
+                 AND (
+                   (last_conducted IS NULL AND created_at <= ?)
+                   OR (last_conducted IS NOT NULL AND last_conducted <= ?)
+                 )""",
+            (brain_id, cutoff, cutoff),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 0
 
     async def get_fibers(
         self,

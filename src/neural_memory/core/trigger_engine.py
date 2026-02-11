@@ -27,6 +27,7 @@ class TriggerType(StrEnum):
     USER_LEAVING = "user_leaving"
     CHECKPOINT = "checkpoint"
     CONTEXT_WARNING = "context_warning"
+    HEALTH_DEGRADATION = "health_degradation"
 
 
 @dataclass(frozen=True)

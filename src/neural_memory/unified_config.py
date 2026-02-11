@@ -12,6 +12,7 @@ Brain data is stored in ~/.neuralmemory/brains/<name>.db (SQLite)
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -151,6 +152,64 @@ class EternalConfig:
         )
 
 
+@dataclass(frozen=True)
+class MaintenanceConfig:
+    """Proactive brain maintenance configuration.
+
+    Controls the health pulse system that piggybacks on remember/recall
+    operations to detect brain degradation and surface maintenance hints.
+    """
+
+    enabled: bool = True
+    check_interval: int = 25
+    fiber_warn_threshold: int = 500
+    neuron_warn_threshold: int = 2000
+    synapse_warn_threshold: int = 5000
+    orphan_ratio_threshold: float = 0.25
+    expired_memory_warn_threshold: int = 10
+    stale_fiber_ratio_threshold: float = 0.3
+    stale_fiber_days: int = 90
+    auto_consolidate: bool = False
+    auto_consolidate_strategies: tuple[str, ...] = ("prune", "merge")
+    consolidate_cooldown_minutes: int = 60
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "check_interval": self.check_interval,
+            "fiber_warn_threshold": self.fiber_warn_threshold,
+            "neuron_warn_threshold": self.neuron_warn_threshold,
+            "synapse_warn_threshold": self.synapse_warn_threshold,
+            "orphan_ratio_threshold": self.orphan_ratio_threshold,
+            "expired_memory_warn_threshold": self.expired_memory_warn_threshold,
+            "stale_fiber_ratio_threshold": self.stale_fiber_ratio_threshold,
+            "stale_fiber_days": self.stale_fiber_days,
+            "auto_consolidate": self.auto_consolidate,
+            "auto_consolidate_strategies": list(self.auto_consolidate_strategies),
+            "consolidate_cooldown_minutes": self.consolidate_cooldown_minutes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> MaintenanceConfig:
+        strategies = data.get("auto_consolidate_strategies", ("prune", "merge"))
+        if isinstance(strategies, list):
+            strategies = tuple(strategies)
+        return cls(
+            enabled=data.get("enabled", True),
+            check_interval=data.get("check_interval", 25),
+            fiber_warn_threshold=data.get("fiber_warn_threshold", 500),
+            neuron_warn_threshold=data.get("neuron_warn_threshold", 2000),
+            synapse_warn_threshold=data.get("synapse_warn_threshold", 5000),
+            orphan_ratio_threshold=data.get("orphan_ratio_threshold", 0.25),
+            expired_memory_warn_threshold=data.get("expired_memory_warn_threshold", 10),
+            stale_fiber_ratio_threshold=data.get("stale_fiber_ratio_threshold", 0.3),
+            stale_fiber_days=data.get("stale_fiber_days", 90),
+            auto_consolidate=data.get("auto_consolidate", False),
+            auto_consolidate_strategies=strategies,
+            consolidate_cooldown_minutes=data.get("consolidate_cooldown_minutes", 60),
+        )
+
+
 @dataclass
 class UnifiedConfig:
     """Unified configuration for NeuralMemory.
@@ -178,6 +237,9 @@ class UnifiedConfig:
 
     # Eternal context settings
     eternal: EternalConfig = field(default_factory=EternalConfig)
+
+    # Proactive maintenance settings
+    maintenance: MaintenanceConfig = field(default_factory=MaintenanceConfig)
 
     # CLI preferences
     json_output: bool = False
@@ -212,6 +274,7 @@ class UnifiedConfig:
             brain=BrainSettings.from_dict(data.get("brain", {})),
             auto=AutoConfig.from_dict(data.get("auto", {})),
             eternal=EternalConfig.from_dict(data.get("eternal", {})),
+            maintenance=MaintenanceConfig.from_dict(data.get("maintenance", {})),
             json_output=data.get("cli", {}).get("json_output", False),
             default_depth=data.get("cli", {}).get("default_depth"),
             default_max_tokens=data.get("cli", {}).get("default_max_tokens", 500),
@@ -257,6 +320,21 @@ class UnifiedConfig:
             f"auto_save_interval = {self.eternal.auto_save_interval}",
             f"context_warning_threshold = {self.eternal.context_warning_threshold}",
             f"max_context_tokens = {self.eternal.max_context_tokens}",
+            "",
+            "# Proactive maintenance settings",
+            "[maintenance]",
+            f"enabled = {'true' if self.maintenance.enabled else 'false'}",
+            f"check_interval = {self.maintenance.check_interval}",
+            f"fiber_warn_threshold = {self.maintenance.fiber_warn_threshold}",
+            f"neuron_warn_threshold = {self.maintenance.neuron_warn_threshold}",
+            f"synapse_warn_threshold = {self.maintenance.synapse_warn_threshold}",
+            f"orphan_ratio_threshold = {self.maintenance.orphan_ratio_threshold}",
+            f"expired_memory_warn_threshold = {self.maintenance.expired_memory_warn_threshold}",
+            f"stale_fiber_ratio_threshold = {self.maintenance.stale_fiber_ratio_threshold}",
+            f"stale_fiber_days = {self.maintenance.stale_fiber_days}",
+            f"auto_consolidate = {'true' if self.maintenance.auto_consolidate else 'false'}",
+            f"auto_consolidate_strategies = {json.dumps(list(self.maintenance.auto_consolidate_strategies))}",
+            f"consolidate_cooldown_minutes = {self.maintenance.consolidate_cooldown_minutes}",
             "",
             "# CLI preferences",
             "[cli]",

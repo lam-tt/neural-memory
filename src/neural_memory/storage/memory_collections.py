@@ -186,6 +186,10 @@ class InMemoryCollectionsMixin:
         brain_id = self._get_brain_id()
         return [tm for tm in self._typed_memories[brain_id].values() if tm.is_expired]
 
+    async def get_expired_memory_count(self) -> int:
+        brain_id = self._get_brain_id()
+        return sum(1 for tm in self._typed_memories[brain_id].values() if tm.is_expired)
+
     async def get_project_memories(
         self,
         project_id: str,

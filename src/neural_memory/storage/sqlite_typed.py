@@ -160,6 +160,18 @@ class SQLiteTypedMemoryMixin:
             rows = await cursor.fetchall()
             return [row_to_typed_memory(row) for row in rows]
 
+    async def get_expired_memory_count(self) -> int:
+        conn = self._ensure_conn()
+        brain_id = self._get_brain_id()
+
+        async with conn.execute(
+            """SELECT COUNT(*) FROM typed_memories
+               WHERE brain_id = ? AND expires_at IS NOT NULL AND expires_at <= ?""",
+            (brain_id, utcnow().isoformat()),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 0
+
     async def get_project_memories(
         self,
         project_id: str,

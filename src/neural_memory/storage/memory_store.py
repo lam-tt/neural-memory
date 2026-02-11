@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -472,6 +472,17 @@ class InMemoryStorage(InMemoryCollectionsMixin, InMemoryBrainMixin, NeuralStorag
             "oldest_memory": oldest_memory,
             "newest_memory": newest_memory,
         }
+
+    async def get_stale_fiber_count(self, brain_id: str, stale_days: int = 90) -> int:
+        cutoff = utcnow() - timedelta(days=stale_days)
+        count = 0
+        for fiber in self._fibers[brain_id].values():
+            if fiber.last_conducted is None:
+                if fiber.created_at <= cutoff:
+                    count += 1
+            elif fiber.last_conducted <= cutoff:
+                count += 1
+        return count
 
     # ========== Co-Activation Operations ==========
 

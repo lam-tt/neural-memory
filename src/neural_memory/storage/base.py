@@ -655,6 +655,31 @@ class NeuralStorage(ABC):
         """
         raise NotImplementedError
 
+    async def get_expired_memory_count(self) -> int:
+        """Get count of expired typed memories for the current brain.
+
+        Cheap COUNT query for health pulse — avoids materializing full objects.
+
+        Returns:
+            Number of expired typed memories
+        """
+        raise NotImplementedError
+
+    async def get_stale_fiber_count(self, brain_id: str, stale_days: int = 90) -> int:
+        """Get count of fibers that are stale (unused for a long time).
+
+        A fiber is stale if it was never conducted and created_at is older
+        than stale_days, or if last_conducted is older than stale_days.
+
+        Args:
+            brain_id: The brain ID
+            stale_days: Number of days after which a fiber is considered stale
+
+        Returns:
+            Number of stale fibers
+        """
+        raise NotImplementedError
+
     # ========== Maturation Operations ==========
 
     async def save_maturation(self, record: MaturationRecord) -> None:  # noqa: B027
