@@ -269,6 +269,7 @@ class SQLiteStorage(
         conn = self._ensure_conn()
 
         brain_tables = (
+            "sync_states",
             "action_events",
             "brain_versions",
             "memory_maturations",

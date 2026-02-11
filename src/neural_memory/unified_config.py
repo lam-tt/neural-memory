@@ -23,6 +23,10 @@ from typing import Any
 # Valid brain name: alphanumeric, hyphens, underscores, dots (no path separators)
 _BRAIN_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
+# Valid sync identifier: alphanumeric, hyphens, underscores, dots, @ (for emails)
+_SYNC_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.@]*$")
+_SYNC_ID_MAX_LEN = 128
+
 # Try to import tomllib (Python 3.11+) or fallback
 try:
     import tomllib
@@ -241,15 +245,35 @@ class Mem0SyncConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Mem0SyncConfig:
+        user_id = _sanitize_sync_id(data.get("user_id", ""))
+        agent_id = _sanitize_sync_id(data.get("agent_id", ""))
+        cooldown = max(1, min(int(data.get("cooldown_minutes", 60)), 1440))
+        raw_limit = data.get("limit")
+        limit = max(1, min(int(raw_limit), 100_000)) if raw_limit is not None else None
         return cls(
             enabled=data.get("enabled", True),
             self_hosted=data.get("self_hosted", False),
-            user_id=data.get("user_id", ""),
-            agent_id=data.get("agent_id", ""),
-            cooldown_minutes=data.get("cooldown_minutes", 60),
+            user_id=user_id,
+            agent_id=agent_id,
+            cooldown_minutes=cooldown,
             sync_on_startup=data.get("sync_on_startup", True),
-            limit=data.get("limit"),
+            limit=limit,
         )
+
+
+def _sanitize_sync_id(value: str) -> str:
+    """Sanitize a sync identifier (user_id, agent_id).
+
+    Strips whitespace, truncates to max length, and validates against
+    allowed characters to prevent TOML injection and log injection.
+    Returns empty string if invalid.
+    """
+    if not isinstance(value, str):
+        return ""
+    cleaned = value.strip()[:_SYNC_ID_MAX_LEN]
+    if not _SYNC_ID_PATTERN.match(cleaned):
+        return ""
+    return cleaned
 
 
 @dataclass
@@ -386,10 +410,16 @@ class UnifiedConfig:
             "[mem0_sync]",
             f"enabled = {'true' if self.mem0_sync.enabled else 'false'}",
             f"self_hosted = {'true' if self.mem0_sync.self_hosted else 'false'}",
-            f'user_id = "{self.mem0_sync.user_id}"',
-            f'agent_id = "{self.mem0_sync.agent_id}"',
+            f'user_id = "{_sanitize_sync_id(self.mem0_sync.user_id)}"',
+            f'agent_id = "{_sanitize_sync_id(self.mem0_sync.agent_id)}"',
             f"cooldown_minutes = {self.mem0_sync.cooldown_minutes}",
             f"sync_on_startup = {'true' if self.mem0_sync.sync_on_startup else 'false'}",
+        ]
+
+        if self.mem0_sync.limit is not None:
+            lines.append(f"limit = {self.mem0_sync.limit}")
+
+        lines += [
             "",
             "# CLI preferences",
             "[cli]",

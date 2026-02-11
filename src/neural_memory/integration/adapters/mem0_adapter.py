@@ -18,6 +18,72 @@ from neural_memory.utils.timeutils import utcnow
 logger = logging.getLogger(__name__)
 
 
+def _parse_mem0_records(
+    memories: list[dict[str, Any]] | dict[str, Any],
+    *,
+    source_system: str,
+    user_id: str | None,
+    agent_id: str | None,
+    limit: int | None,
+) -> list[ExternalRecord]:
+    """Parse raw Mem0 response into ExternalRecord list.
+
+    Shared by both Platform and Self-hosted adapters.
+    """
+    records: list[ExternalRecord] = []
+    items = memories if isinstance(memories, list) else memories.get("results", [])
+
+    for mem in items:
+        if limit and len(records) >= limit:
+            break
+
+        mem_id = mem.get("id", "")
+        content = mem.get("memory", "") or mem.get("text", "")
+        if not content:
+            continue
+
+        metadata = mem.get("metadata", {}) or {}
+
+        created_at = utcnow()
+        if "created_at" in mem:
+            try:
+                created_at = datetime.fromisoformat(str(mem["created_at"]).replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                pass
+
+        updated_at = None
+        if "updated_at" in mem:
+            try:
+                updated_at = datetime.fromisoformat(str(mem["updated_at"]).replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                pass
+
+        source_type = mem.get("category", metadata.get("type", "memory"))
+
+        tags: set[str] = set()
+        if "categories" in mem:
+            tags = set(mem["categories"])
+        if user_id:
+            tags.add(f"user:{user_id}")
+        if agent_id:
+            tags.add(f"agent:{agent_id}")
+
+        record = ExternalRecord.create(
+            id=str(mem_id),
+            source_system=source_system,
+            content=content,
+            source_collection=user_id or agent_id or "default",
+            created_at=created_at,
+            updated_at=updated_at,
+            source_type=source_type,
+            metadata=metadata,
+            tags=tags,
+        )
+        records.append(record)
+
+    return records
+
+
 class Mem0Adapter:
     """Adapter for importing memories from Mem0 memory stores.
 
@@ -91,62 +157,13 @@ class Mem0Adapter:
             lambda: client.get_all(**kwargs),
         )
 
-        records: list[ExternalRecord] = []
-        items = memories if isinstance(memories, list) else memories.get("results", [])
-
-        for mem in items:
-            if limit and len(records) >= limit:
-                break
-
-            mem_id = mem.get("id", "")
-            content = mem.get("memory", "") or mem.get("text", "")
-            if not content:
-                continue
-
-            metadata = mem.get("metadata", {}) or {}
-
-            created_at = utcnow()
-            if "created_at" in mem:
-                try:
-                    created_at = datetime.fromisoformat(
-                        str(mem["created_at"]).replace("Z", "+00:00")
-                    )
-                except (ValueError, TypeError):
-                    pass
-
-            updated_at = None
-            if "updated_at" in mem:
-                try:
-                    updated_at = datetime.fromisoformat(
-                        str(mem["updated_at"]).replace("Z", "+00:00")
-                    )
-                except (ValueError, TypeError):
-                    pass
-
-            source_type = mem.get("category", metadata.get("type", "memory"))
-
-            tags: set[str] = set()
-            if "categories" in mem:
-                tags = set(mem["categories"])
-            if self._user_id:
-                tags.add(f"user:{self._user_id}")
-            if self._agent_id:
-                tags.add(f"agent:{self._agent_id}")
-
-            record = ExternalRecord.create(
-                id=str(mem_id),
-                source_system="mem0",
-                content=content,
-                source_collection=self._user_id or self._agent_id or "default",
-                created_at=created_at,
-                updated_at=updated_at,
-                source_type=source_type,
-                metadata=metadata,
-                tags=tags,
-            )
-            records.append(record)
-
-        return records
+        return _parse_mem0_records(
+            memories,
+            source_system=self.system_name,
+            user_id=self._user_id,
+            agent_id=self._agent_id,
+            limit=limit,
+        )
 
     async def fetch_since(
         self,
@@ -172,10 +189,11 @@ class Mem0Adapter:
                 "message": "Mem0 connected successfully",
                 "system": "mem0",
             }
-        except Exception as e:
+        except Exception:
+            logger.debug("Mem0 health check failed", exc_info=True)
             return {
                 "healthy": False,
-                "message": f"Mem0 connection failed: {e}",
+                "message": "Mem0 connection failed",
                 "system": "mem0",
             }
 
@@ -248,62 +266,13 @@ class Mem0SelfHostedAdapter:
             lambda: client.get_all(**kwargs),
         )
 
-        records: list[ExternalRecord] = []
-        items = memories if isinstance(memories, list) else memories.get("results", [])
-
-        for mem in items:
-            if limit and len(records) >= limit:
-                break
-
-            mem_id = mem.get("id", "")
-            content = mem.get("memory", "") or mem.get("text", "")
-            if not content:
-                continue
-
-            metadata = mem.get("metadata", {}) or {}
-
-            created_at = utcnow()
-            if "created_at" in mem:
-                try:
-                    created_at = datetime.fromisoformat(
-                        str(mem["created_at"]).replace("Z", "+00:00")
-                    )
-                except (ValueError, TypeError):
-                    pass
-
-            updated_at = None
-            if "updated_at" in mem:
-                try:
-                    updated_at = datetime.fromisoformat(
-                        str(mem["updated_at"]).replace("Z", "+00:00")
-                    )
-                except (ValueError, TypeError):
-                    pass
-
-            source_type = mem.get("category", metadata.get("type", "memory"))
-
-            tags: set[str] = set()
-            if "categories" in mem:
-                tags = set(mem["categories"])
-            if self._user_id:
-                tags.add(f"user:{self._user_id}")
-            if self._agent_id:
-                tags.add(f"agent:{self._agent_id}")
-
-            record = ExternalRecord.create(
-                id=str(mem_id),
-                source_system="mem0_self_hosted",
-                content=content,
-                source_collection=self._user_id or self._agent_id or "default",
-                created_at=created_at,
-                updated_at=updated_at,
-                source_type=source_type,
-                metadata=metadata,
-                tags=tags,
-            )
-            records.append(record)
-
-        return records
+        return _parse_mem0_records(
+            memories,
+            source_system=self.system_name,
+            user_id=self._user_id,
+            agent_id=self._agent_id,
+            limit=limit,
+        )
 
     async def fetch_since(
         self,
@@ -329,9 +298,10 @@ class Mem0SelfHostedAdapter:
                 "message": "Mem0 self-hosted connected successfully",
                 "system": "mem0_self_hosted",
             }
-        except Exception as e:
+        except Exception:
+            logger.debug("Mem0 self-hosted health check failed", exc_info=True)
             return {
                 "healthy": False,
-                "message": f"Mem0 self-hosted connection failed: {e}",
+                "message": "Mem0 self-hosted connection failed",
                 "system": "mem0_self_hosted",
             }

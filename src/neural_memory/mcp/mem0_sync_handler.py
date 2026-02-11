@@ -28,13 +28,18 @@ class Mem0SyncHandler:
         """Check config and environment, start background sync if appropriate.
 
         Called once at server startup. Returns the background task or None.
+        Guards against double-start by checking if a task is already running.
 
         Detection logic:
-            MEM0_API_KEY set + not self_hosted → Mem0Adapter (Platform)
-            MEM0_API_KEY set + self_hosted     → Mem0SelfHostedAdapter
-            no API key     + self_hosted       → Mem0SelfHostedAdapter
-            no API key     + not self_hosted   → skip (no sync)
+            MEM0_API_KEY set + not self_hosted -> Mem0Adapter (Platform)
+            MEM0_API_KEY set + self_hosted     -> Mem0SelfHostedAdapter
+            no API key     + self_hosted       -> Mem0SelfHostedAdapter
+            no API key     + not self_hosted   -> skip (no sync)
         """
+        # Guard: prevent duplicate background tasks
+        if self._mem0_sync_task is not None and not self._mem0_sync_task.done():
+            return self._mem0_sync_task
+
         config: UnifiedConfig = self.config  # type: ignore[attr-defined]
         cfg: Mem0SyncConfig = config.mem0_sync
 
@@ -46,7 +51,9 @@ class Mem0SyncHandler:
         if not has_api_key and not cfg.self_hosted:
             return None
 
-        self._mem0_sync_task = asyncio.create_task(self._run_mem0_sync(has_api_key, cfg))
+        task = asyncio.create_task(self._run_mem0_sync(has_api_key, cfg))
+        task.add_done_callback(_log_task_exception)
+        self._mem0_sync_task = task
         return self._mem0_sync_task
 
     async def _run_mem0_sync(self, has_api_key: bool, cfg: Mem0SyncConfig) -> None:
@@ -54,7 +61,7 @@ class Mem0SyncHandler:
 
         Steps:
             1. Get storage + brain
-            2. Load persisted SyncState → check cooldown
+            2. Load persisted SyncState -> check cooldown
             3. Create adapter (Platform vs Self-hosted)
             4. Run SyncEngine.sync()
             5. Persist updated SyncState
@@ -68,7 +75,7 @@ class Mem0SyncHandler:
                 return
 
             # Determine source name and load persisted state
-            use_self_hosted = cfg.self_hosted or (cfg.self_hosted and has_api_key)
+            use_self_hosted = cfg.self_hosted
             source_name = "mem0_self_hosted" if use_self_hosted else "mem0"
             collection = cfg.user_id or cfg.agent_id or "default"
 
@@ -77,7 +84,11 @@ class Mem0SyncHandler:
             # Check cooldown
             if sync_state and sync_state.last_sync_at:
                 cooldown = timedelta(minutes=cfg.cooldown_minutes)
-                elapsed = datetime.now(UTC) - sync_state.last_sync_at.replace(tzinfo=UTC)
+                # Ensure timezone-aware comparison: normalize both sides to UTC
+                last_sync = sync_state.last_sync_at
+                if last_sync.tzinfo is None:
+                    last_sync = last_sync.replace(tzinfo=UTC)
+                elapsed = datetime.now(UTC) - last_sync
                 if elapsed < cooldown:
                     remaining = cooldown - elapsed
                     logger.info(
@@ -89,22 +100,16 @@ class Mem0SyncHandler:
             # Create adapter
             adapter = self._create_mem0_adapter(has_api_key, use_self_hosted, cfg)
 
-            # Run sync
+            # Run sync (SyncEngine manages its own disable/enable_auto_save)
             from neural_memory.integration.sync_engine import SyncEngine
 
             engine = SyncEngine(storage, brain.config)
-            storage.disable_auto_save()
-
-            try:
-                result, updated_state = await engine.sync(
-                    adapter=adapter,
-                    collection=collection,
-                    sync_state=sync_state,
-                    limit=cfg.limit,
-                )
-                await storage.batch_save()
-            finally:
-                storage.enable_auto_save()
+            result, updated_state = await engine.sync(
+                adapter=adapter,
+                collection=collection,
+                sync_state=sync_state,
+                limit=cfg.limit,
+            )
 
             # Persist updated sync state
             await storage.save_sync_state(updated_state, brain_id=brain.id)
@@ -153,3 +158,12 @@ class Mem0SyncHandler:
         if self._mem0_sync_task is not None and not self._mem0_sync_task.done():
             self._mem0_sync_task.cancel()
             logger.debug("Mem0 auto-sync task cancelled")
+
+
+def _log_task_exception(task: asyncio.Task[None]) -> None:
+    """Callback to log unhandled exceptions from the background sync task."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("Mem0 auto-sync task raised unhandled exception: %s", exc)

@@ -154,7 +154,7 @@ class TestMem0SelfHostedAdapter:
 
         result = await adapter.health_check()
         assert result["healthy"] is False
-        assert "timeout" in result["message"]
+        assert "connection failed" in result["message"].lower()
 
     def test_lazy_init_default(self) -> None:
         """Test that _get_client creates Memory() by default."""
