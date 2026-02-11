@@ -247,16 +247,22 @@ class Mem0SyncConfig:
     def from_dict(cls, data: dict[str, Any]) -> Mem0SyncConfig:
         user_id = _sanitize_sync_id(data.get("user_id", ""))
         agent_id = _sanitize_sync_id(data.get("agent_id", ""))
-        cooldown = max(1, min(int(data.get("cooldown_minutes", 60)), 1440))
+        try:
+            cooldown = max(1, min(int(data.get("cooldown_minutes", 60)), 1440))
+        except (ValueError, TypeError):
+            cooldown = 60
         raw_limit = data.get("limit")
-        limit = max(1, min(int(raw_limit), 100_000)) if raw_limit is not None else None
+        try:
+            limit = max(1, min(int(raw_limit), 100_000)) if raw_limit is not None else None
+        except (ValueError, TypeError):
+            limit = None
         return cls(
-            enabled=data.get("enabled", True),
-            self_hosted=data.get("self_hosted", False),
+            enabled=bool(data.get("enabled", True)),
+            self_hosted=bool(data.get("self_hosted", False)),
             user_id=user_id,
             agent_id=agent_id,
             cooldown_minutes=cooldown,
-            sync_on_startup=data.get("sync_on_startup", True),
+            sync_on_startup=bool(data.get("sync_on_startup", True)),
             limit=limit,
         )
 
@@ -474,6 +480,11 @@ class UnifiedConfig:
 
     def switch_brain(self, brain_name: str) -> None:
         """Switch to a different brain and save config."""
+        if not _BRAIN_NAME_PATTERN.match(brain_name):
+            raise ValueError(
+                f"Invalid brain name '{brain_name}': must contain only "
+                "alphanumeric characters, hyphens, underscores, or dots"
+            )
         self.current_brain = brain_name
         self.save()
 

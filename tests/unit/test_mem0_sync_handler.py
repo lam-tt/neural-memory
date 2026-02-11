@@ -91,6 +91,38 @@ class TestMem0SyncConfig:
         with pytest.raises(AttributeError):
             cfg.enabled = False  # type: ignore[misc]
 
+    def test_from_dict_invalid_cooldown_uses_default(self) -> None:
+        cfg = Mem0SyncConfig.from_dict({"cooldown_minutes": "abc"})
+        assert cfg.cooldown_minutes == 60
+
+    def test_from_dict_invalid_limit_uses_none(self) -> None:
+        cfg = Mem0SyncConfig.from_dict({"limit": "xyz"})
+        assert cfg.limit is None
+
+    def test_from_dict_bool_coercion(self) -> None:
+        cfg = Mem0SyncConfig.from_dict({"enabled": 1, "self_hosted": 0})
+        assert cfg.enabled is True
+        assert cfg.self_hosted is False
+
+
+class TestSwitchBrainValidation:
+    def test_valid_brain_name(self) -> None:
+        config = UnifiedConfig()
+        config.current_brain = "default"
+        # Should not raise for valid names
+        config.switch_brain("my-brain.v2")
+        assert config.current_brain == "my-brain.v2"
+
+    def test_invalid_brain_name_rejected(self) -> None:
+        config = UnifiedConfig()
+        with pytest.raises(ValueError, match="Invalid brain name"):
+            config.switch_brain('bad"name\nnewline')
+
+    def test_path_traversal_rejected(self) -> None:
+        config = UnifiedConfig()
+        with pytest.raises(ValueError, match="Invalid brain name"):
+            config.switch_brain("../etc/passwd")
+
 
 # ========== maybe_start_mem0_sync tests ==========
 

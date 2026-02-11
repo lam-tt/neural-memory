@@ -276,6 +276,7 @@ class SQLiteStorage(
             "co_activation_events",
             "typed_memories",
             "projects",
+            "fiber_neurons",
             "fibers",
             "synapses",
             "neuron_states",

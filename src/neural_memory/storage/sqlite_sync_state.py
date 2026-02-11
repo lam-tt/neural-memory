@@ -48,14 +48,23 @@ class SQLiteSyncStateMixin:
             try:
                 last_sync_at = datetime.fromisoformat(row["last_sync_at"])
             except (ValueError, TypeError):
-                pass
+                logger.warning(
+                    "Corrupt last_sync_at in sync_states for %s/%s: %r",
+                    source,
+                    collection,
+                    row["last_sync_at"],
+                )
 
         metadata: dict[str, Any] = {}
         if row["metadata"]:
             try:
                 metadata = json.loads(row["metadata"])
             except (json.JSONDecodeError, TypeError):
-                pass
+                logger.warning(
+                    "Corrupt metadata JSON in sync_states for %s/%s",
+                    source,
+                    collection,
+                )
 
         return SyncState(
             source_system=row["source_system"],

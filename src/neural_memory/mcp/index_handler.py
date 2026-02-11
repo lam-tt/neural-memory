@@ -93,8 +93,8 @@ class IndexHandler:
 
         try:
             adapter = get_adapter(source, **adapter_kwargs)
-        except ValueError as e:
-            return {"error": str(e)}
+        except ValueError:
+            return {"error": f"Unsupported or misconfigured source: {source}"}
 
         engine = SyncEngine(storage, brain.config)
         storage.disable_auto_save()
@@ -106,9 +106,9 @@ class IndexHandler:
                 limit=args.get("limit"),
             )
             await storage.batch_save()
-        except Exception as e:
-            logger.warning("Import from %s failed: %s", source, e)
-            return {"error": f"Import failed: {e}"}
+        except Exception:
+            logger.warning("Import from %s failed", source, exc_info=True)
+            return {"error": f"Import from '{source}' failed unexpectedly"}
         finally:
             storage.enable_auto_save()
 
@@ -148,8 +148,6 @@ def _build_adapter_kwargs(source: str, args: dict[str, Any]) -> dict[str, Any]:
         api_key = os.environ.get("MEM0_API_KEY", "")
         if api_key:
             kwargs["api_key"] = api_key
-        elif connection:
-            kwargs["api_key"] = connection
         if args.get("user_id"):
             kwargs["user_id"] = args["user_id"]
     elif source == "awf" and connection:
@@ -158,8 +156,6 @@ def _build_adapter_kwargs(source: str, args: dict[str, Any]) -> dict[str, Any]:
         api_key = os.environ.get("COGNEE_API_KEY", "")
         if api_key:
             kwargs["api_key"] = api_key
-        elif connection:
-            kwargs["api_key"] = connection
     elif source == "graphiti":
         if connection:
             kwargs["uri"] = connection

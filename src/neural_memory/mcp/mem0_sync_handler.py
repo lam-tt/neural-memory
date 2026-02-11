@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from neural_memory.integration.adapters.mem0_adapter import _BaseMem0Adapter
     from neural_memory.unified_config import Mem0SyncConfig, UnifiedConfig
 
 logger = logging.getLogger(__name__)
@@ -133,7 +134,7 @@ class Mem0SyncHandler:
         has_api_key: bool,
         use_self_hosted: bool,
         cfg: Mem0SyncConfig,
-    ) -> Any:
+    ) -> _BaseMem0Adapter:
         """Create the appropriate Mem0 adapter based on config."""
         kwargs: dict[str, Any] = {}
         if cfg.user_id:

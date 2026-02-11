@@ -897,7 +897,7 @@ class TestMCPProtocol:
         assert response["id"] == 4
         assert "error" in response
         assert response["error"]["code"] == -32000
-        assert "Test error" in response["error"]["message"]
+        assert "failed unexpectedly" in response["error"]["message"]
 
     @pytest.mark.asyncio
     async def test_notifications_initialized(self, server: MCPServer) -> None:
@@ -1666,7 +1666,7 @@ class TestMCPImport:
             result = await server.call_tool("nmem_import", {"source": "unknown_system"})
 
         assert "error" in result
-        assert "Unknown adapter" in result["error"]
+        assert "Unsupported or misconfigured source" in result["error"]
 
     @pytest.mark.asyncio
     async def test_import_sync_failure(self) -> None:
@@ -1689,7 +1689,7 @@ class TestMCPImport:
             result = await server.call_tool("nmem_import", {"source": "chromadb"})
 
         assert "error" in result
-        assert "Import failed" in result["error"]
+        assert "failed unexpectedly" in result["error"]
 
     @pytest.mark.asyncio
     async def test_import_adapter_kwargs_awf(self) -> None:

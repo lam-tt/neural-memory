@@ -1,4 +1,4 @@
-"""Tests for Mem0 self-hosted adapter."""
+"""Tests for Mem0 adapters and shared parsing logic."""
 
 from __future__ import annotations
 
@@ -8,7 +8,130 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from neural_memory.integration.adapters.mem0_adapter import _parse_mem0_records
 from neural_memory.integration.models import SourceCapability, SourceSystemType
+
+# ========== _parse_mem0_records tests ==========
+
+
+class TestParseMem0Records:
+    def test_empty_list(self) -> None:
+        records = _parse_mem0_records(
+            [], source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        assert records == []
+
+    def test_dict_with_results_key(self) -> None:
+        data = {"results": [{"id": "1", "memory": "Hello"}]}
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        assert len(records) == 1
+        assert records[0].content == "Hello"
+
+    def test_text_fallback(self) -> None:
+        """Test that 'text' field is used when 'memory' is empty."""
+        data = [{"id": "1", "text": "Fallback content"}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        assert len(records) == 1
+        assert records[0].content == "Fallback content"
+
+    def test_empty_content_skipped(self) -> None:
+        data = [{"id": "1", "memory": ""}, {"id": "2", "memory": "Valid"}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        assert len(records) == 1
+
+    def test_limit_none_returns_all(self) -> None:
+        data = [{"id": str(i), "memory": f"Mem {i}"} for i in range(20)]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        assert len(records) == 20
+
+    def test_limit_zero_returns_none(self) -> None:
+        """limit=0 should return empty list (not bypass check)."""
+        data = [{"id": "1", "memory": "Hello"}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=0
+        )
+        assert len(records) == 0
+
+    def test_limit_applied(self) -> None:
+        data = [{"id": str(i), "memory": f"Mem {i}"} for i in range(10)]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=3
+        )
+        assert len(records) == 3
+
+    def test_user_id_tag(self) -> None:
+        data = [{"id": "1", "memory": "Test"}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id="alice", agent_id=None, limit=None
+        )
+        assert "user:alice" in records[0].tags
+
+    def test_agent_id_tag(self) -> None:
+        data = [{"id": "1", "memory": "Test"}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id="bot-1", limit=None
+        )
+        assert "agent:bot-1" in records[0].tags
+
+    def test_categories_as_tags(self) -> None:
+        data = [{"id": "1", "memory": "Test", "categories": ["python", "async"]}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        assert "python" in records[0].tags
+        assert "async" in records[0].tags
+
+    def test_categories_tag_length_limit(self) -> None:
+        """Tags longer than 100 chars should be filtered out."""
+        long_tag = "x" * 101
+        data = [{"id": "1", "memory": "Test", "categories": [long_tag, "valid"]}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        assert long_tag not in records[0].tags
+        assert "valid" in records[0].tags
+
+    def test_categories_tag_count_limit(self) -> None:
+        """No more than 50 category tags should be kept."""
+        data = [{"id": "1", "memory": "Test", "categories": [f"cat-{i}" for i in range(60)]}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        # May have user/agent tags too, but category tags capped at 50
+        cat_tags = [t for t in records[0].tags if t.startswith("cat-")]
+        assert len(cat_tags) == 50
+
+    def test_malformed_created_at_uses_default(self) -> None:
+        data = [{"id": "1", "memory": "Test", "created_at": "not-a-date"}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        assert len(records) == 1
+        # Should not raise, uses utcnow() as fallback
+
+    def test_valid_created_at_parsed(self) -> None:
+        data = [{"id": "1", "memory": "Test", "created_at": "2026-01-15T10:00:00Z"}]
+        records = _parse_mem0_records(
+            data, source_system="mem0", user_id=None, agent_id=None, limit=None
+        )
+        assert records[0].created_at.year == 2026
+        assert records[0].created_at.month == 1
+
+    def test_source_system_propagated(self) -> None:
+        data = [{"id": "1", "memory": "Test"}]
+        records = _parse_mem0_records(
+            data, source_system="mem0_self_hosted", user_id=None, agent_id=None, limit=None
+        )
+        assert records[0].source_system == "mem0_self_hosted"
+
 
 # ========== Mem0SelfHostedAdapter tests ==========
 

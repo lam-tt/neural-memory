@@ -726,8 +726,8 @@ class MCPServer(
             description = args.get("description", "")
             try:
                 version = await engine.create_version(brain.id, name, description)
-            except ValueError as e:
-                return {"error": str(e)}
+            except ValueError:
+                return {"error": "Failed to create version: invalid parameters"}
             return {
                 "success": True,
                 "version_id": version.id,
@@ -765,8 +765,8 @@ class MCPServer(
                 return {"error": "version_id is required for rollback"}
             try:
                 rollback_v = await engine.rollback(brain.id, version_id)
-            except ValueError as e:
-                return {"error": str(e)}
+            except ValueError:
+                return {"error": "Rollback failed: version not found or invalid"}
             return {
                 "success": True,
                 "rollback_version_id": rollback_v.id,
@@ -784,8 +784,8 @@ class MCPServer(
                 return {"error": "from_version and to_version are required for diff"}
             try:
                 diff = await engine.diff(brain.id, from_id, to_id)
-            except ValueError as e:
-                return {"error": str(e)}
+            except ValueError:
+                return {"error": "Diff failed: one or both versions not found"}
             return {
                 "summary": diff.summary,
                 "neurons_added": len(diff.neurons_added),
@@ -944,8 +944,13 @@ async def handle_message(server: MCPServer, message: dict[str, Any]) -> dict[str
                 "id": msg_id,
                 "error": {"code": -32000, "message": f"Tool '{tool_name}' timed out after 30s"},
             }
-        except Exception as e:
-            return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32000, "message": str(e)}}
+        except Exception:
+            logger.error("Tool '%s' raised an exception", tool_name, exc_info=True)
+            return {
+                "jsonrpc": "2.0",
+                "id": msg_id,
+                "error": {"code": -32000, "message": f"Tool '{tool_name}' failed unexpectedly"},
+            }
 
     elif method == "notifications/initialized":
         return None  # type: ignore

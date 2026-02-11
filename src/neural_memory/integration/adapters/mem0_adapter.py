@@ -17,6 +17,10 @@ from neural_memory.utils.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
+# Tag constraints (consistent with _remember handler in server.py)
+_MAX_TAGS = 50
+_MAX_TAG_LEN = 100
+
 
 def _parse_mem0_records(
     memories: list[dict[str, Any]] | dict[str, Any],
@@ -34,7 +38,7 @@ def _parse_mem0_records(
     items = memories if isinstance(memories, list) else memories.get("results", [])
 
     for mem in items:
-        if limit and len(records) >= limit:
+        if limit is not None and len(records) >= limit:
             break
 
         mem_id = mem.get("id", "")
@@ -62,7 +66,9 @@ def _parse_mem0_records(
 
         tags: set[str] = set()
         if "categories" in mem:
-            tags = set(mem["categories"])
+            for cat in mem["categories"]:
+                if isinstance(cat, str) and len(cat) <= _MAX_TAG_LEN and len(tags) < _MAX_TAGS:
+                    tags.add(cat)
         if user_id:
             tags.add(f"user:{user_id}")
         if agent_id:
@@ -84,41 +90,24 @@ def _parse_mem0_records(
     return records
 
 
-class Mem0Adapter:
-    """Adapter for importing memories from Mem0 memory stores.
+class _BaseMem0Adapter:
+    """Base class for Mem0 adapters (Platform and Self-hosted).
 
-    Usage:
-        adapter = Mem0Adapter(api_key="...", user_id="alice")
-        records = await adapter.fetch_all()
+    Subclasses must override ``_get_client()`` and ``system_name``.
     """
 
     def __init__(
         self,
-        api_key: str | None = None,
         user_id: str | None = None,
         agent_id: str | None = None,
     ) -> None:
-        self._api_key = api_key
         self._user_id = user_id
         self._agent_id = agent_id
         self._client: Any = None
 
     def _get_client(self) -> Any:
-        """Lazy-initialize Mem0 client."""
-        if self._client is None:
-            from mem0 import MemoryClient  # type: ignore[import-untyped]
-
-            api_key = self._api_key or os.environ.get("MEM0_API_KEY")
-            if not api_key:
-                msg = (
-                    "Mem0 API key required. Provide via api_key parameter "
-                    "or MEM0_API_KEY environment variable."
-                )
-                raise ValueError(msg)
-
-            self._client = MemoryClient(api_key=api_key)
-
-        return self._client
+        """Lazy-initialize the Mem0 client. Must be overridden."""
+        raise NotImplementedError
 
     @property
     def system_type(self) -> SourceSystemType:
@@ -126,7 +115,7 @@ class Mem0Adapter:
 
     @property
     def system_name(self) -> str:
-        return "mem0"
+        raise NotImplementedError
 
     @property
     def capabilities(self) -> frozenset[SourceCapability]:
@@ -173,7 +162,8 @@ class Mem0Adapter:
     ) -> list[ExternalRecord]:
         """Mem0 does not support temporal queries natively."""
         raise NotImplementedError(
-            "Mem0 adapter does not support incremental sync. Use fetch_all() instead."
+            f"{self.system_name} adapter does not support incremental sync. "
+            "Use fetch_all() instead."
         )
 
     async def health_check(self) -> dict[str, Any]:
@@ -186,20 +176,59 @@ class Mem0Adapter:
             )
             return {
                 "healthy": True,
-                "message": "Mem0 connected successfully",
-                "system": "mem0",
+                "message": f"{self.system_name} connected successfully",
+                "system": self.system_name,
             }
         except Exception:
-            logger.debug("Mem0 health check failed", exc_info=True)
+            logger.debug("%s health check failed", self.system_name, exc_info=True)
             return {
                 "healthy": False,
-                "message": "Mem0 connection failed",
-                "system": "mem0",
+                "message": f"{self.system_name} connection failed",
+                "system": self.system_name,
             }
 
 
-class Mem0SelfHostedAdapter:
-    """Adapter for self-hosted Mem0 using `from mem0 import Memory` (no API key).
+class Mem0Adapter(_BaseMem0Adapter):
+    """Adapter for Mem0 Platform (cloud API, requires API key).
+
+    Usage:
+        adapter = Mem0Adapter(api_key="...", user_id="alice")
+        records = await adapter.fetch_all()
+    """
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        user_id: str | None = None,
+        agent_id: str | None = None,
+    ) -> None:
+        super().__init__(user_id=user_id, agent_id=agent_id)
+        self._api_key = api_key
+
+    def _get_client(self) -> Any:
+        """Lazy-initialize Mem0 Platform client."""
+        if self._client is None:
+            from mem0 import MemoryClient  # type: ignore[import-untyped]
+
+            api_key = self._api_key or os.environ.get("MEM0_API_KEY")
+            if not api_key:
+                msg = (
+                    "Mem0 API key required. Provide via api_key parameter "
+                    "or MEM0_API_KEY environment variable."
+                )
+                raise ValueError(msg)
+
+            self._client = MemoryClient(api_key=api_key)
+
+        return self._client
+
+    @property
+    def system_name(self) -> str:
+        return "mem0"
+
+
+class Mem0SelfHostedAdapter(_BaseMem0Adapter):
+    """Adapter for self-hosted Mem0 using ``from mem0 import Memory`` (no API key).
 
     Usage:
         adapter = Mem0SelfHostedAdapter(user_id="alice")
@@ -212,10 +241,8 @@ class Mem0SelfHostedAdapter:
         agent_id: str | None = None,
         config: dict[str, Any] | None = None,
     ) -> None:
-        self._user_id = user_id
-        self._agent_id = agent_id
+        super().__init__(user_id=user_id, agent_id=agent_id)
         self._mem0_config = config
-        self._client: Any = None
 
     def _get_client(self) -> Any:
         """Lazy-initialize self-hosted Mem0 Memory instance."""
@@ -230,78 +257,5 @@ class Mem0SelfHostedAdapter:
         return self._client
 
     @property
-    def system_type(self) -> SourceSystemType:
-        return SourceSystemType.MEMORY_LAYER
-
-    @property
     def system_name(self) -> str:
         return "mem0_self_hosted"
-
-    @property
-    def capabilities(self) -> frozenset[SourceCapability]:
-        return frozenset(
-            {
-                SourceCapability.FETCH_ALL,
-                SourceCapability.FETCH_METADATA,
-                SourceCapability.HEALTH_CHECK,
-            }
-        )
-
-    async def fetch_all(
-        self,
-        collection: str | None = None,
-        limit: int | None = None,
-    ) -> list[ExternalRecord]:
-        """Fetch all memories from self-hosted Mem0."""
-        client = self._get_client()
-
-        kwargs: dict[str, Any] = {}
-        if self._user_id:
-            kwargs["user_id"] = self._user_id
-        if self._agent_id:
-            kwargs["agent_id"] = self._agent_id
-
-        memories = await asyncio.get_running_loop().run_in_executor(
-            None,
-            lambda: client.get_all(**kwargs),
-        )
-
-        return _parse_mem0_records(
-            memories,
-            source_system=self.system_name,
-            user_id=self._user_id,
-            agent_id=self._agent_id,
-            limit=limit,
-        )
-
-    async def fetch_since(
-        self,
-        since: datetime,
-        collection: str | None = None,
-        limit: int | None = None,
-    ) -> list[ExternalRecord]:
-        """Self-hosted Mem0 does not support temporal queries natively."""
-        raise NotImplementedError(
-            "Mem0 self-hosted adapter does not support incremental sync. Use fetch_all() instead."
-        )
-
-    async def health_check(self) -> dict[str, Any]:
-        """Check self-hosted Mem0 connectivity."""
-        try:
-            client = self._get_client()
-            await asyncio.get_running_loop().run_in_executor(
-                None,
-                lambda: client.get_all(user_id=self._user_id or "healthcheck", limit=1),
-            )
-            return {
-                "healthy": True,
-                "message": "Mem0 self-hosted connected successfully",
-                "system": "mem0_self_hosted",
-            }
-        except Exception:
-            logger.debug("Mem0 self-hosted health check failed", exc_info=True)
-            return {
-                "healthy": False,
-                "message": "Mem0 self-hosted connection failed",
-                "system": "mem0_self_hosted",
-            }
