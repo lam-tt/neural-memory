@@ -5,6 +5,42 @@ All notable changes to NeuralMemory are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-02-13
+
+### Added
+
+- **3-Tier LLM Deduplication Pipeline** — Cascade dedup at encode time
+  - Tier 1: SimHash bitwise similarity (zero-dep, instant)
+  - Tier 2: Embedding cosine similarity (0.75-0.85 ambiguous zone)
+  - Tier 3: LLM judgment for borderline cases (OpenAI/Anthropic)
+  - All tiers off by default to preserve zero-LLM core
+- **Smart Auto-Consolidation** — Severity-weighted health monitoring with dynamic strategy selection
+  - `HealthHint` with severity levels and recommended strategies
+  - `auto_consolidate` defaults to `True` for new installs
+- **Adaptive Health Check Intervals** — Healthy brains check less often, unhealthy act faster
+- **Auto-Dream Trigger** — Low-connectivity brains auto-trigger DREAM consolidation
+- **Freshness-Weighted Retrieval** — Creation-age scoring in fiber ranking (opt-in via `freshness_weight`)
+- **Auto-Conflict Resolution** — Trivial contradictions resolved automatically during encoding
+- **Auto-Redact Secrets** — Severity 3+ (API keys, passwords) auto-redacted with `[REDACTED]`
+- **DEDUP Consolidation Strategy** — Batch dedup across existing brain content
+- **Dashboard: WebSocket Real-Time** — Live stats, graph, and toast updates via WebSocket
+- **Dashboard: fCOSE Graph** — GPU-accelerated layout for 2000+ nodes with layout switcher
+- **Dashboard: Timeline** — Chronological memory explorer with playback controls
+- **Dashboard: Mermaid Diagrams** — Fiber structure, type distribution, synapse flow
+- **Dashboard: Graph Pagination** — `/api/graph` with limit/offset validation
+- **39 new i18n keys** in EN + VI
+
+### Fixed
+
+- XSS sanitization in diagrams, prompt injection prevention, Tier 3 DISTINCT logic, graph DI, CDN pinning, SensitiveMatch immutability, consolidation race condition guard
+
+### Changed
+
+- Version bumped to 2.0.0
+- Tests: 1925 passed (up from 1913)
+
+---
+
 ## [1.7.3] - 2026-02-11
 
 ### Added
@@ -839,6 +875,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[2.0.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v2.0.0
 [1.7.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v1.7.0
 [1.6.1]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v1.6.1
 [1.6.0]: https://github.com/nhadaututtheky/neural-memory/releases/tag/v1.6.0
