@@ -48,9 +48,7 @@ def _make_config(data_dir: Path) -> UnifiedConfig:
 
 
 class TestMigrateLegacyDb:
-    def test_copies_when_old_exists_and_new_does_not(
-        self, tmp_data_dir: Path
-    ) -> None:
+    def test_copies_when_old_exists_and_new_does_not(self, tmp_data_dir: Path) -> None:
         old_db = tmp_data_dir / "default.db"
         _create_fake_db(old_db, size=_MIN_LEGACY_DB_BYTES + 1024)
 
@@ -144,9 +142,7 @@ class TestMigrateLegacyDb:
 
     # ── Config brain name resolution ─────────────────────────────
 
-    def test_uses_config_current_brain_when_none(
-        self, tmp_data_dir: Path
-    ) -> None:
+    def test_uses_config_current_brain_when_none(self, tmp_data_dir: Path) -> None:
         """When brain_name is None, uses config.current_brain."""
         old_db = tmp_data_dir / "default.db"
         _create_fake_db(old_db, size=_MIN_LEGACY_DB_BYTES + 1024)

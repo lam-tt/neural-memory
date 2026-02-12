@@ -583,8 +583,7 @@ def _migrate_legacy_db(config: UnifiedConfig, brain_name: str | None) -> None:
         )
     except Exception:
         logger.warning(
-            "Failed to migrate legacy database %s — data is still safe "
-            "in the original location",
+            "Failed to migrate legacy database %s — data is still safe in the original location",
             old_path,
             exc_info=True,
         )
