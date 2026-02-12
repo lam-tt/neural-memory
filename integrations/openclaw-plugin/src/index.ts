@@ -26,16 +26,16 @@ import { createTools } from "./tools.js";
 // ── Config ─────────────────────────────────────────────────
 
 type PluginConfig = {
-  pythonPath?: string;
-  brain?: string;
-  autoContext?: boolean;
-  autoCapture?: boolean;
-  contextDepth?: number;
-  maxContextTokens?: number;
-  timeout?: number;
+  pythonPath: string;
+  brain: string;
+  autoContext: boolean;
+  autoCapture: boolean;
+  contextDepth: number;
+  maxContextTokens: number;
+  timeout: number;
 };
 
-const DEFAULT_CONFIG: Readonly<Required<PluginConfig>> = {
+const DEFAULT_CONFIG: Readonly<PluginConfig> = {
   pythonPath: "python",
   brain: "default",
   autoContext: true,
@@ -45,8 +45,51 @@ const DEFAULT_CONFIG: Readonly<Required<PluginConfig>> = {
   timeout: 30_000,
 };
 
-function resolveConfig(raw?: Record<string, unknown>): Required<PluginConfig> {
-  return { ...DEFAULT_CONFIG, ...(raw ?? {}) };
+const BRAIN_NAME_RE = /^[a-zA-Z0-9_\-.]{1,64}$/;
+const MAX_AUTO_CAPTURE_CHARS = 50_000;
+
+function resolveConfig(raw?: Record<string, unknown>): PluginConfig {
+  const merged = { ...DEFAULT_CONFIG, ...(raw ?? {}) };
+
+  return {
+    pythonPath:
+      typeof merged.pythonPath === "string" && merged.pythonPath.length > 0
+        ? merged.pythonPath
+        : DEFAULT_CONFIG.pythonPath,
+    brain:
+      typeof merged.brain === "string" && BRAIN_NAME_RE.test(merged.brain)
+        ? merged.brain
+        : DEFAULT_CONFIG.brain,
+    autoContext:
+      typeof merged.autoContext === "boolean"
+        ? merged.autoContext
+        : DEFAULT_CONFIG.autoContext,
+    autoCapture:
+      typeof merged.autoCapture === "boolean"
+        ? merged.autoCapture
+        : DEFAULT_CONFIG.autoCapture,
+    contextDepth:
+      typeof merged.contextDepth === "number" &&
+      Number.isInteger(merged.contextDepth) &&
+      merged.contextDepth >= 0 &&
+      merged.contextDepth <= 3
+        ? merged.contextDepth
+        : DEFAULT_CONFIG.contextDepth,
+    maxContextTokens:
+      typeof merged.maxContextTokens === "number" &&
+      Number.isInteger(merged.maxContextTokens) &&
+      merged.maxContextTokens >= 100 &&
+      merged.maxContextTokens <= 10_000
+        ? merged.maxContextTokens
+        : DEFAULT_CONFIG.maxContextTokens,
+    timeout:
+      typeof merged.timeout === "number" &&
+      Number.isFinite(merged.timeout) &&
+      merged.timeout >= 5_000 &&
+      merged.timeout <= 120_000
+        ? merged.timeout
+        : DEFAULT_CONFIG.timeout,
+  };
 }
 
 // ── Plugin definition ──────────────────────────────────────
@@ -162,7 +205,8 @@ const plugin: OpenClawPluginDefinition = {
                   typeof (m as { content?: unknown }).content === "string",
               )
               .map((m) => m.content)
-              .join("\n");
+              .join("\n")
+              .slice(0, MAX_AUTO_CAPTURE_CHARS);
 
             if (text.length > 50) {
               await mcp.callTool("nmem_auto", {

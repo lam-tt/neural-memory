@@ -39,12 +39,18 @@ export function createTools(mcp: NeuralMemoryMcpClient): ToolDefinition[] {
       };
     }
 
-    const raw = await mcp.callTool(toolName, args);
-
     try {
-      return JSON.parse(raw);
-    } catch {
-      return { text: raw };
+      const raw = await mcp.callTool(toolName, args);
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return { text: raw };
+      }
+    } catch (err) {
+      return {
+        error: true,
+        message: `Tool ${toolName} failed: ${(err as Error).message}`,
+      };
     }
   };
 
@@ -57,6 +63,7 @@ export function createTools(mcp: NeuralMemoryMcpClient): ToolDefinition[] {
       parameters: z.object({
         content: z
           .string()
+          .max(100_000)
           .describe("The content to remember"),
         type: z
           .enum([
@@ -81,12 +88,15 @@ export function createTools(mcp: NeuralMemoryMcpClient): ToolDefinition[] {
           .optional()
           .describe("Priority 0-10 (5=normal, 10=critical)"),
         tags: z
-          .array(z.string())
+          .array(z.string().max(100))
+          .max(50)
           .optional()
           .describe("Tags for categorization"),
         expires_days: z
           .number()
           .int()
+          .min(1)
+          .max(3650)
           .optional()
           .describe("Days until memory expires"),
       }),
@@ -101,6 +111,7 @@ export function createTools(mcp: NeuralMemoryMcpClient): ToolDefinition[] {
       parameters: z.object({
         query: z
           .string()
+          .max(10_000)
           .describe("The query to search memories"),
         depth: z
           .number()
@@ -137,6 +148,8 @@ export function createTools(mcp: NeuralMemoryMcpClient): ToolDefinition[] {
         limit: z
           .number()
           .int()
+          .min(1)
+          .max(200)
           .optional()
           .describe("Number of recent memories (default: 10)"),
         fresh_only: z
@@ -154,6 +167,7 @@ export function createTools(mcp: NeuralMemoryMcpClient): ToolDefinition[] {
       parameters: z.object({
         task: z
           .string()
+          .max(10_000)
           .describe("The task to remember"),
         priority: z
           .number()

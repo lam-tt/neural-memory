@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **OpenClaw plugin ID mismatch** — Added explicit `"id": "neuralmemory"` to `openclaw` section in `package.json`, fixing the `plugin id mismatch (manifest uses "neuralmemory", entry hints "openclaw-plugin")` warning
+- **Content-Length framing bug** — Switched from string-based buffer to raw `Buffer` for byte-accurate MCP message parsing. Fixes silent data corruption with non-ASCII content (Vietnamese, emoji, CJK)
+- **Null dereference after close()** — `writeMessage()` and `notify()` now guard against null process reference
+- **Unhandled tool call errors** — `callTool()` exceptions in tools.ts now caught and returned as structured error responses instead of crashing OpenClaw
 
 ### Added
 
@@ -18,6 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ENOENT` → tells user to check `pythonPath` in plugin config
   - Exit code 1 → suggests `pip install neural-memory`
   - Timeout → prints captured stderr + verify command (`python -m neural_memory.mcp`)
+
+### Security
+
+- **Least-privilege child env** — MCP subprocess now receives only whitelisted env vars (`PATH`, `HOME`, `PYTHONPATH`, `NEURALMEMORY_*`) instead of full `process.env`. Prevents leaking API keys and secrets to child process
+- **Config validation** — `resolveConfig()` now validates types, ranges, and brain name pattern (`^[a-zA-Z0-9_\-.]{1,64}$`). Invalid values fall back to defaults instead of passing through
+- **Input bounds on all tools** — Zod schemas now enforce max lengths: content (100K chars), query (10K), tags (50 items × 100 chars), expires_days (1–3650), context limit (1–200)
+- **Buffer overflow protection** — 10 MB cap on stdio buffer; process killed if exceeded
+- **Stderr cap** — Max 50 lines collected during init to prevent unbounded memory growth
+- **Auto-capture truncation** — Agent messages truncated to 50K chars before sending to MCP
+- **Graceful shutdown** — `close()` now removes listeners, waits up to 3s for exit, then escalates to SIGKILL
+- **Config schema hardened** — Added `additionalProperties: false` and brain name `pattern` constraint
 
 ## [1.7.4] - 2026-02-11
 

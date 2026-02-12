@@ -39,6 +39,30 @@ const PROTOCOL_VERSION = "2024-11-05";
 const DEFAULT_TIMEOUT = 30_000;
 const CLIENT_NAME = "openclaw-neuralmemory";
 const CLIENT_VERSION = "1.4.1";
+const MAX_BUFFER_BYTES = 10 * 1024 * 1024; // 10 MB safety cap
+const MAX_STDERR_LINES = 50;
+
+/** Env vars forwarded to the MCP child process (least-privilege). */
+const ALLOWED_ENV_KEYS: ReadonlySet<string> = new Set([
+  "PATH",
+  "PATHEXT",
+  "HOME",
+  "USERPROFILE",
+  "SYSTEMROOT",
+  "TEMP",
+  "TMP",
+  "LANG",
+  "LC_ALL",
+  "VIRTUAL_ENV",
+  "CONDA_PREFIX",
+  "PYTHONPATH",
+  "PYTHONHOME",
+  "NEURALMEMORY_DIR",
+  "NEURALMEMORY_BRAIN",
+  "NEURAL_MEMORY_DIR",
+  "NEURAL_MEMORY_JSON",
+  "NEURAL_MEMORY_DEBUG",
+]);
 
 // ── Client ─────────────────────────────────────────────────
 
@@ -46,7 +70,7 @@ export class NeuralMemoryMcpClient {
   private proc: ChildProcess | null = null;
   private requestId = 0;
   private readonly pending = new Map<number, PendingRequest>();
-  private buffer = "";
+  private rawBuffer: Buffer = Buffer.alloc(0);
   private readonly pythonPath: string;
   private readonly brain: string;
   private readonly logger: PluginLogger;
@@ -65,13 +89,7 @@ export class NeuralMemoryMcpClient {
   }
 
   async connect(): Promise<void> {
-    const env: Record<string, string> = {
-      ...(process.env as Record<string, string>),
-    };
-
-    if (this.brain !== "default") {
-      env.NEURALMEMORY_BRAIN = this.brain;
-    }
+    const env = buildChildEnv(this.brain);
 
     this.proc = spawn(this.pythonPath, ["-m", "neural_memory.mcp"], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -79,16 +97,25 @@ export class NeuralMemoryMcpClient {
     });
 
     this.proc.stdout!.on("data", (chunk: Buffer) => {
-      this.buffer += chunk.toString("utf-8");
+      this.rawBuffer = Buffer.concat([this.rawBuffer, chunk]);
+      if (this.rawBuffer.length > MAX_BUFFER_BYTES) {
+        this.logger.error(
+          `MCP buffer exceeded ${MAX_BUFFER_BYTES} bytes — killing process`,
+        );
+        this.proc?.kill("SIGKILL");
+        return;
+      }
       this.drainBuffer();
     });
 
-    let stderrChunks: string[] = [];
+    const stderrChunks: string[] = [];
 
     this.proc.stderr!.on("data", (chunk: Buffer) => {
       const msg = chunk.toString("utf-8").trim();
       if (msg) {
-        stderrChunks.push(msg);
+        if (stderrChunks.length < MAX_STDERR_LINES) {
+          stderrChunks.push(msg);
+        }
         this.logger.warn(`[mcp stderr] ${msg}`);
       }
     });
@@ -161,12 +188,27 @@ export class NeuralMemoryMcpClient {
     this._connected = false;
     this.rejectAll(new Error("Client closing"));
 
-    if (this.proc) {
-      this.proc.kill("SIGTERM");
-      this.proc = null;
+    const proc = this.proc;
+    this.proc = null;
+    this.rawBuffer = Buffer.alloc(0);
+
+    if (proc) {
+      proc.removeAllListeners();
+      proc.stdout?.removeAllListeners();
+      proc.stderr?.removeAllListeners();
+
+      const exited = new Promise<void>((resolve) => {
+        proc.once("exit", () => resolve());
+        setTimeout(() => {
+          proc.kill("SIGKILL");
+          resolve();
+        }, 3_000);
+      });
+
+      proc.kill("SIGTERM");
+      await exited;
     }
 
-    this.buffer = "";
     this.logger.info("MCP client closed");
   }
 
@@ -191,40 +233,46 @@ export class NeuralMemoryMcpClient {
   }
 
   private notify(method: string, params: unknown): void {
+    if (!this.proc?.stdin?.writable) return;
     this.writeMessage({ jsonrpc: "2.0", method, params });
   }
 
   private writeMessage(message: object): void {
+    if (!this.proc?.stdin?.writable) return;
     const json = JSON.stringify(message);
     const byteLength = Buffer.byteLength(json, "utf-8");
     const frame = `Content-Length: ${byteLength}\r\n\r\n${json}`;
-    this.proc!.stdin!.write(frame);
+    this.proc.stdin.write(frame);
   }
 
-  // ── Response parsing ─────────────────────────────────────
+  // ── Response parsing (byte-accurate) ──────────────────────
 
   private drainBuffer(): void {
+    const HEADER_SEP = Buffer.from("\r\n\r\n");
+
     while (true) {
-      const headerEnd = this.buffer.indexOf("\r\n\r\n");
+      const headerEnd = this.rawBuffer.indexOf(HEADER_SEP);
       if (headerEnd === -1) break;
 
-      const header = this.buffer.slice(0, headerEnd);
+      const header = this.rawBuffer.subarray(0, headerEnd).toString("utf-8");
       const match = header.match(/Content-Length:\s*(\d+)/i);
       if (!match) {
         // Malformed header — skip past it
-        this.buffer = this.buffer.slice(headerEnd + 4);
+        this.rawBuffer = this.rawBuffer.subarray(headerEnd + 4);
         continue;
       }
 
       const contentLength = parseInt(match[1], 10);
       const bodyStart = headerEnd + 4;
 
-      if (this.buffer.length < bodyStart + contentLength) {
+      if (this.rawBuffer.length < bodyStart + contentLength) {
         break; // Incomplete body — wait for more data
       }
 
-      const body = this.buffer.slice(bodyStart, bodyStart + contentLength);
-      this.buffer = this.buffer.slice(bodyStart + contentLength);
+      const body = this.rawBuffer
+        .subarray(bodyStart, bodyStart + contentLength)
+        .toString("utf-8");
+      this.rawBuffer = this.rawBuffer.subarray(bodyStart + contentLength);
 
       try {
         const message = JSON.parse(body) as JsonRpcMessage;
@@ -265,4 +313,24 @@ export class NeuralMemoryMcpClient {
     }
     this.pending.clear();
   }
+}
+
+// ── Helpers ─────────────────────────────────────────────────
+
+/** Build a minimal env for the child process (least-privilege). */
+function buildChildEnv(brain: string): Record<string, string> {
+  const env: Record<string, string> = {};
+
+  for (const key of ALLOWED_ENV_KEYS) {
+    const value = process.env[key];
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
+
+  if (brain !== "default") {
+    env.NEURALMEMORY_BRAIN = brain;
+  }
+
+  return env;
 }

@@ -7,6 +7,7 @@
   "configSchema": {
     "jsonSchema": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "pythonPath": {
           "type": "string",
@@ -15,6 +16,7 @@
         },
         "brain": {
           "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-.]{1,64}$",
           "description": "Brain name to use for this workspace",
           "default": "default"
         },
