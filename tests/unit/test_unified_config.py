@@ -7,8 +7,8 @@ from unittest.mock import patch
 import pytest
 
 from neural_memory.unified_config import (
-    UnifiedConfig,
     _MIN_LEGACY_DB_BYTES,
+    UnifiedConfig,
     _migrate_legacy_db,
 )
 
