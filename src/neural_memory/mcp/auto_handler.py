@@ -133,12 +133,27 @@ class AutoHandler:
             logger.debug("Passive capture failed", exc_info=True)
 
     async def _save_detected_memories(self, detected: list[dict[str, Any]]) -> list[str]:
-        """Save detected memories that meet confidence threshold."""
+        """Save detected memories that meet confidence threshold.
+
+        Auto-redacts high-severity sensitive content before saving.
+        """
         eligible = [
             item for item in detected if item["confidence"] >= self.config.auto.min_confidence
         ]
         if not eligible:
             return []
+
+        # Auto-redact before saving
+        from neural_memory.safety.sensitive import auto_redact_content
+
+        auto_redact_severity = self.config.safety.auto_redact_min_severity
+        redacted_eligible: list[dict[str, Any]] = []
+        for item in eligible:
+            content = item["content"]
+            redacted, matches, _ = auto_redact_content(content, min_severity=auto_redact_severity)
+            if matches:
+                logger.debug("Auto-redacted %d matches in auto-captured memory", len(matches))
+            redacted_eligible.append({**item, "content": redacted})
 
         results = await asyncio.gather(
             *[
@@ -149,12 +164,12 @@ class AutoHandler:
                         "priority": item.get("priority", 5),
                     }
                 )
-                for item in eligible
+                for item in redacted_eligible
             ]
         )
         return [
             item["content"][:50]
-            for item, result in zip(eligible, results, strict=False)
+            for item, result in zip(redacted_eligible, results, strict=False)
             if "error" not in result
         ]
 

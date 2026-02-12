@@ -49,6 +49,9 @@ class SynapseType(StrEnum):
     # Conflict relationships
     CONTRADICTS = "contradicts"  # Memory A contradicts Memory B
 
+    # Deduplication relationships
+    ALIAS = "alias"  # New anchor -> Existing anchor (dedup reuse)
+
 
 class Direction(StrEnum):
     """Direction of synapse connection."""

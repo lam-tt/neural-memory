@@ -61,6 +61,7 @@ class BrainConfig:
     embedding_model: str = "all-MiniLM-L6-v2"
     embedding_similarity_threshold: float = 0.7
     embedding_activation_boost: float = 0.15
+    freshness_weight: float = 0.0
 
     def with_updates(self, **kwargs: Any) -> BrainConfig:
         """Create a new config with updated values."""
@@ -140,6 +141,7 @@ class BrainConfig:
             embedding_activation_boost=kwargs.get(
                 "embedding_activation_boost", self.embedding_activation_boost
             ),
+            freshness_weight=kwargs.get("freshness_weight", self.freshness_weight),
         )
 
 

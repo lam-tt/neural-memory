@@ -44,7 +44,7 @@ class SensitivePattern:
     severity: int = 1  # 1=low, 2=medium, 3=high
 
 
-@dataclass
+@dataclass(frozen=True)
 class SensitiveMatch:
     """A match found in content."""
 
@@ -229,9 +229,11 @@ def check_sensitive_content(
                 prev = merged[-1]
                 new_end = max(prev.end, span.end)
                 best = span if span.severity > prev.severity else prev
+                # Use actual content slice for accurate audit trail
+                merged_text = content[prev.start:new_end]
                 merged[-1] = SensitiveMatch(
                     pattern_name=best.pattern_name,
-                    matched_text=best.matched_text,
+                    matched_text=merged_text,
                     type=best.type,
                     severity=max(prev.severity, span.severity),
                     start=prev.start,
@@ -273,6 +275,54 @@ def filter_sensitive_content(
         filtered = filtered[: match.start] + replacement + filtered[match.end :]
 
     return filtered, matches
+
+
+def auto_redact_content(
+    content: str,
+    min_severity: int = 3,
+    patterns: list[SensitivePattern] | None = None,
+    replacement: str = "[REDACTED]",
+) -> tuple[str, list[SensitiveMatch], str | None]:
+    """Auto-redact sensitive content at or above the given severity.
+
+    Unlike filter_sensitive_content which redacts ALL matches, this
+    selectively redacts only matches at or above min_severity.
+    Preserves a SHA-256 hash of the original content for dedup.
+
+    Args:
+        content: Text to check and redact
+        min_severity: Minimum severity level to auto-redact (1-3)
+        patterns: Patterns to use (default: get_default_patterns())
+        replacement: Replacement text for redacted matches
+
+    Returns:
+        Tuple of (redacted_content, redacted_matches, original_content_hash).
+        If no matches found, returns (content, [], None).
+    """
+    import hashlib
+
+    all_matches = check_sensitive_content(content, patterns, min_severity=1)
+
+    if not all_matches:
+        return content, [], None
+
+    # Only redact matches at or above the threshold
+    to_redact = [m for m in all_matches if m.severity >= min_severity]
+
+    if not to_redact:
+        return content, [], None
+
+    # Hash original content for dedup tracking
+    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    # Sort by position descending to replace from end (preserves earlier positions)
+    sorted_redact = sorted(to_redact, key=lambda m: m.start, reverse=True)
+
+    redacted = content
+    for match in sorted_redact:
+        redacted = redacted[: match.start] + replacement + redacted[match.end :]
+
+    return redacted, to_redact, content_hash
 
 
 def format_sensitive_warning(matches: list[SensitiveMatch], use_ascii: bool = False) -> str:

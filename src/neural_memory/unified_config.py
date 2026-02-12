@@ -110,6 +110,7 @@ class BrainSettings:
     activation_threshold: float = 0.2
     max_spread_hops: int = 4
     max_context_tokens: int = 1500
+    freshness_weight: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -118,6 +119,7 @@ class BrainSettings:
             "activation_threshold": self.activation_threshold,
             "max_spread_hops": self.max_spread_hops,
             "max_context_tokens": self.max_context_tokens,
+            "freshness_weight": self.freshness_weight,
         }
 
     @classmethod
@@ -128,6 +130,7 @@ class BrainSettings:
             activation_threshold=data.get("activation_threshold", 0.2),
             max_spread_hops=data.get("max_spread_hops", 4),
             max_context_tokens=data.get("max_context_tokens", 1500),
+            freshness_weight=data.get("freshness_weight", 0.0),
         )
 
 
@@ -181,9 +184,10 @@ class MaintenanceConfig:
     expired_memory_warn_threshold: int = 10
     stale_fiber_ratio_threshold: float = 0.3
     stale_fiber_days: int = 90
-    auto_consolidate: bool = False
+    auto_consolidate: bool = True
     auto_consolidate_strategies: tuple[str, ...] = ("prune", "merge")
     consolidate_cooldown_minutes: int = 60
+    dream_cooldown_hours: int = 24
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -199,6 +203,7 @@ class MaintenanceConfig:
             "auto_consolidate": self.auto_consolidate,
             "auto_consolidate_strategies": list(self.auto_consolidate_strategies),
             "consolidate_cooldown_minutes": self.consolidate_cooldown_minutes,
+            "dream_cooldown_hours": self.dream_cooldown_hours,
         }
 
     @classmethod
@@ -216,9 +221,103 @@ class MaintenanceConfig:
             expired_memory_warn_threshold=data.get("expired_memory_warn_threshold", 10),
             stale_fiber_ratio_threshold=data.get("stale_fiber_ratio_threshold", 0.3),
             stale_fiber_days=data.get("stale_fiber_days", 90),
-            auto_consolidate=data.get("auto_consolidate", False),
+            auto_consolidate=data.get("auto_consolidate", True),
             auto_consolidate_strategies=strategies,
             consolidate_cooldown_minutes=data.get("consolidate_cooldown_minutes", 60),
+            dream_cooldown_hours=data.get("dream_cooldown_hours", 24),
+        )
+
+
+@dataclass(frozen=True)
+class ConflictConfig:
+    """Auto-conflict resolution configuration.
+
+    Controls whether trivial conflicts are automatically resolved
+    instead of requiring manual intervention.
+    """
+
+    auto_resolve_trivial: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "auto_resolve_trivial": self.auto_resolve_trivial,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ConflictConfig:
+        return cls(
+            auto_resolve_trivial=data.get("auto_resolve_trivial", True),
+        )
+
+
+@dataclass(frozen=True)
+class SafetyConfig:
+    """Safety and auto-redaction configuration.
+
+    Controls automatic redaction of high-severity sensitive content
+    instead of blocking the entire operation.
+    """
+
+    auto_redact_min_severity: int = 3  # Auto-redact severity 3+ by default
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "auto_redact_min_severity": self.auto_redact_min_severity,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SafetyConfig:
+        severity = data.get("auto_redact_min_severity", 3)
+        try:
+            severity = max(1, min(int(severity), 3))
+        except (ValueError, TypeError):
+            severity = 3
+        return cls(auto_redact_min_severity=severity)
+
+
+@dataclass(frozen=True)
+class DedupSettings:
+    """LLM-powered deduplication settings.
+
+    Controls the 3-tier dedup pipeline: SimHash -> Embedding -> LLM.
+    All off by default to preserve zero-LLM core.
+    """
+
+    enabled: bool = False
+    simhash_threshold: int = 10
+    embedding_threshold: float = 0.85
+    embedding_ambiguous_low: float = 0.75
+    llm_enabled: bool = False
+    llm_provider: str = "none"
+    llm_model: str = ""
+    llm_max_pairs_per_encode: int = 3
+    merge_strategy: str = "keep_newer"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "simhash_threshold": self.simhash_threshold,
+            "embedding_threshold": self.embedding_threshold,
+            "embedding_ambiguous_low": self.embedding_ambiguous_low,
+            "llm_enabled": self.llm_enabled,
+            "llm_provider": self.llm_provider,
+            "llm_model": self.llm_model,
+            "llm_max_pairs_per_encode": self.llm_max_pairs_per_encode,
+            "merge_strategy": self.merge_strategy,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> DedupSettings:
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            simhash_threshold=int(data.get("simhash_threshold", 10)),
+            embedding_threshold=float(data.get("embedding_threshold", 0.85)),
+            embedding_ambiguous_low=float(data.get("embedding_ambiguous_low", 0.75)),
+            llm_enabled=bool(data.get("llm_enabled", False)),
+            llm_provider=str(data.get("llm_provider", "none")),
+            llm_model=str(data.get("llm_model", "")),
+            llm_max_pairs_per_encode=int(data.get("llm_max_pairs_per_encode", 3)),
+            merge_strategy=str(data.get("merge_strategy", "keep_newer")),
         )
 
 
@@ -321,6 +420,15 @@ class UnifiedConfig:
     # Proactive maintenance settings
     maintenance: MaintenanceConfig = field(default_factory=MaintenanceConfig)
 
+    # Conflict resolution settings
+    conflict: ConflictConfig = field(default_factory=ConflictConfig)
+
+    # Safety settings
+    safety: SafetyConfig = field(default_factory=SafetyConfig)
+
+    # Dedup settings
+    dedup: DedupSettings = field(default_factory=DedupSettings)
+
     # Mem0 auto-sync settings
     mem0_sync: Mem0SyncConfig = field(default_factory=Mem0SyncConfig)
 
@@ -358,6 +466,9 @@ class UnifiedConfig:
             auto=AutoConfig.from_dict(data.get("auto", {})),
             eternal=EternalConfig.from_dict(data.get("eternal", {})),
             maintenance=MaintenanceConfig.from_dict(data.get("maintenance", {})),
+            conflict=ConflictConfig.from_dict(data.get("conflict", {})),
+            safety=SafetyConfig.from_dict(data.get("safety", {})),
+            dedup=DedupSettings.from_dict(data.get("dedup", {})),
             mem0_sync=Mem0SyncConfig.from_dict(data.get("mem0_sync", {})),
             json_output=data.get("cli", {}).get("json_output", False),
             default_depth=data.get("cli", {}).get("default_depth"),
@@ -391,6 +502,7 @@ class UnifiedConfig:
             f"activation_threshold = {self.brain.activation_threshold}",
             f"max_spread_hops = {self.brain.max_spread_hops}",
             f"max_context_tokens = {self.brain.max_context_tokens}",
+            f"freshness_weight = {self.brain.freshness_weight}",
             "",
             "# Auto-capture settings for MCP server",
             "[auto]",
@@ -425,6 +537,27 @@ class UnifiedConfig:
             f"auto_consolidate = {'true' if self.maintenance.auto_consolidate else 'false'}",
             f"auto_consolidate_strategies = {json.dumps(list(self.maintenance.auto_consolidate_strategies))}",
             f"consolidate_cooldown_minutes = {self.maintenance.consolidate_cooldown_minutes}",
+            f"dream_cooldown_hours = {self.maintenance.dream_cooldown_hours}",
+            "",
+            "# Conflict resolution settings",
+            "[conflict]",
+            f"auto_resolve_trivial = {'true' if self.conflict.auto_resolve_trivial else 'false'}",
+            "",
+            "# Safety settings",
+            "[safety]",
+            f"auto_redact_min_severity = {self.safety.auto_redact_min_severity}",
+            "",
+            "# Dedup settings",
+            "[dedup]",
+            f"enabled = {'true' if self.dedup.enabled else 'false'}",
+            f"simhash_threshold = {self.dedup.simhash_threshold}",
+            f"embedding_threshold = {self.dedup.embedding_threshold}",
+            f"embedding_ambiguous_low = {self.dedup.embedding_ambiguous_low}",
+            f"llm_enabled = {'true' if self.dedup.llm_enabled else 'false'}",
+            f'llm_provider = "{self.dedup.llm_provider}"',
+            f'llm_model = "{self.dedup.llm_model}"',
+            f"llm_max_pairs_per_encode = {self.dedup.llm_max_pairs_per_encode}",
+            f'merge_strategy = "{self.dedup.merge_strategy}"',
             "",
             "# Mem0 auto-sync settings",
             "[mem0_sync]",
@@ -645,6 +778,7 @@ async def get_shared_storage(brain_name: str | None = None) -> SQLiteStorage:
             activation_threshold=config.brain.activation_threshold,
             max_spread_hops=config.brain.max_spread_hops,
             max_context_tokens=config.brain.max_context_tokens,
+            freshness_weight=config.brain.freshness_weight,
         )
         brain = Brain.create(name=name, config=brain_config, brain_id=name)
         await storage.save_brain(brain)

@@ -4,6 +4,12 @@ Piggybacks on remember/recall operations via an operation counter.
 Every N ops, runs a cheap get_stats() query (<1ms), compares counts
 against thresholds, and surfaces a maintenance_hint field in the response.
 Optionally triggers auto-consolidation as fire-and-forget background task.
+
+Smart features (v1.10):
+- Severity-weighted health hints with recommended strategies
+- Dynamic strategy selection based on actual health problems
+- Adaptive check intervals (healthy brains check less, unhealthy more)
+- Auto-dream trigger for low-connectivity brains
 """
 
 from __future__ import annotations
@@ -12,6 +18,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from neural_memory.core.trigger_engine import TriggerResult, TriggerType
@@ -20,6 +27,30 @@ if TYPE_CHECKING:
     from neural_memory.unified_config import MaintenanceConfig
 
 logger = logging.getLogger(__name__)
+
+
+class HintSeverity(StrEnum):
+    """Severity levels for health hints."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+@dataclass(frozen=True)
+class HealthHint:
+    """A structured health hint with severity and recommended action.
+
+    Attributes:
+        message: Human-readable description of the issue
+        severity: How urgent this issue is
+        recommended_strategy: Consolidation strategy to address it
+    """
+
+    message: str
+    severity: HintSeverity
+    recommended_strategy: str  # "prune", "merge", "enrich", "mature", "dream"
 
 
 @dataclass(frozen=True)
@@ -33,8 +64,13 @@ class HealthPulse:
     orphan_ratio: float
     expired_memory_count: int
     stale_fiber_ratio: float
-    hints: tuple[str, ...]
+    hints: tuple[HealthHint, ...]
     should_consolidate: bool
+
+    @property
+    def hint_messages(self) -> tuple[str, ...]:
+        """Backward-compatible string access to hint messages."""
+        return tuple(h.message for h in self.hints)
 
 
 class MaintenanceHandler:
@@ -42,12 +78,15 @@ class MaintenanceHandler:
 
     Tracks operation count and periodically checks brain health
     using a cheap get_stats() query. Surfaces hints and optionally
-    triggers auto-consolidation.
+    triggers auto-consolidation with dynamic strategy selection.
     """
 
     _op_count: int = 0
     _last_pulse: HealthPulse | None = None
     _last_consolidation_at: datetime | None = None
+    _last_dream_at: datetime | None = None
+    _effective_check_interval: int | None = None
+    _consolidation_task: asyncio.Task[None] | None = None
 
     def _increment_op_counter(self) -> int:
         self._op_count += 1
@@ -57,7 +96,8 @@ class MaintenanceHandler:
         cfg: MaintenanceConfig = self.config.maintenance  # type: ignore[attr-defined]
         if not cfg.enabled:
             return False
-        return self._op_count > 0 and self._op_count % cfg.check_interval == 0
+        interval = self._effective_check_interval or cfg.check_interval
+        return self._op_count > 0 and self._op_count % interval == 0
 
     async def _health_pulse(self) -> HealthPulse | None:
         """Run a cheap health check using get_stats().
@@ -136,27 +176,81 @@ class MaintenanceHandler:
         """Format a single maintenance hint string from pulse results."""
         if pulse is None or not pulse.hints:
             return None
-        return pulse.hints[0]
+        return pulse.hints[0].message
 
     async def _maybe_auto_consolidate(self, pulse: HealthPulse) -> None:
-        """Fire-and-forget auto-consolidation if enabled and off cooldown."""
+        """Fire-and-forget auto-consolidation with dynamic strategy selection."""
         cfg: MaintenanceConfig = self.config.maintenance  # type: ignore[attr-defined]
 
         if not cfg.auto_consolidate or not pulse.should_consolidate:
             return
 
         now = datetime.now(UTC)
+
+        # Compute effective cooldown based on severity
+        effective_cooldown_minutes = _compute_effective_cooldown(
+            pulse.hints, cfg.consolidate_cooldown_minutes
+        )
+
+        # Skip if a prior consolidation is still running
+        if self._consolidation_task is not None and not self._consolidation_task.done():
+            logger.debug("Auto-consolidation skipped: previous task still running")
+            return
+
         if self._last_consolidation_at is not None:
-            cooldown = timedelta(minutes=cfg.consolidate_cooldown_minutes)
+            cooldown = timedelta(minutes=effective_cooldown_minutes)
             if now - self._last_consolidation_at < cooldown:
                 logger.debug("Auto-consolidation skipped: cooldown active")
                 return
 
-        self._last_consolidation_at = now
-        self._consolidation_task = asyncio.create_task(self._run_auto_consolidation(cfg))
+        # Dynamic strategy selection from hints
+        strategies = _select_strategies(pulse.hints)
 
-    async def _run_auto_consolidation(self, cfg: MaintenanceConfig) -> None:
-        """Background task: run lightweight consolidation strategies."""
+        # Auto-dream injection for low-connectivity brains
+        strategies = self._maybe_inject_dream(
+            strategies, pulse, cfg, now
+        )
+
+        self._last_consolidation_at = now
+        self._consolidation_task = asyncio.create_task(
+            self._run_auto_consolidation_dynamic(strategies)
+        )
+
+    def _maybe_inject_dream(
+        self,
+        strategies: tuple[str, ...],
+        pulse: HealthPulse,
+        cfg: MaintenanceConfig,
+        now: datetime,
+    ) -> tuple[str, ...]:
+        """Inject DREAM strategy if connectivity is low and cooldown expired.
+
+        Dream exploration discovers hidden connections via random spreading
+        activation. Only fires when:
+        - connectivity < 1.5
+        - neuron_count >= 50
+        - dream cooldown has expired (default 24h)
+        """
+        if pulse.connectivity >= 1.5 or pulse.neuron_count < 50:
+            return strategies
+
+        if "dream" in strategies:
+            return strategies
+
+        dream_cooldown = timedelta(hours=cfg.dream_cooldown_hours)
+        if self._last_dream_at is not None and now - self._last_dream_at < dream_cooldown:
+            return strategies
+
+        self._last_dream_at = now
+        logger.info(
+            "Auto-dream triggered: connectivity=%.2f, neurons=%d",
+            pulse.connectivity,
+            pulse.neuron_count,
+        )
+        return (*strategies, "dream")
+
+    async def _run_auto_consolidation_dynamic(self, strategy_names: tuple[str, ...]) -> None:
+        """Background task: run dynamically selected consolidation strategies."""
         try:
             from neural_memory.engine.consolidation import (
                 ConsolidationEngine,
@@ -164,12 +258,23 @@ class MaintenanceHandler:
             )
 
             storage = await self.get_storage()  # type: ignore[attr-defined]
-            strategies = [ConsolidationStrategy(s) for s in cfg.auto_consolidate_strategies]
+            strategies = [ConsolidationStrategy(s) for s in strategy_names]
             engine = ConsolidationEngine(storage)
             report = await engine.run(strategies=strategies)
-            logger.info("Auto-consolidation complete: %s", report.summary())
+            logger.info(
+                "Auto-consolidation complete (strategies=%s): %s",
+                strategy_names,
+                report.summary(),
+            )
+
+            # Reset adaptive interval after successful consolidation
+            self._effective_check_interval = None
         except Exception:
             logger.error("Auto-consolidation failed", exc_info=True)
+
+    async def _run_auto_consolidation(self, cfg: MaintenanceConfig) -> None:
+        """Background task: run lightweight consolidation strategies (legacy)."""
+        await self._run_auto_consolidation_dynamic(cfg.auto_consolidate_strategies)
 
     def _fire_health_trigger(self, pulse: HealthPulse) -> TriggerResult:
         """Create a HEALTH_DEGRADATION trigger when pulse has hints.
@@ -183,13 +288,14 @@ class MaintenanceHandler:
         result = TriggerResult(
             triggered=True,
             trigger_type=TriggerType.HEALTH_DEGRADATION,
-            message=pulse.hints[0],
+            message=pulse.hints[0].message,
             save_tiers=(3,),
         )
         logger.info(
-            "Health degradation detected (op #%d): %s",
+            "Health degradation detected (op #%d): %s [%s]",
             self._op_count,
-            pulse.hints[0],
+            pulse.hints[0].message,
+            pulse.hints[0].severity,
         )
         return result
 
@@ -207,6 +313,13 @@ class MaintenanceHandler:
         pulse = await self._health_pulse()
         if pulse is not None:
             self._fire_health_trigger(pulse)
+
+            # Adapt check interval based on health
+            cfg: MaintenanceConfig = self.config.maintenance  # type: ignore[attr-defined]
+            self._effective_check_interval = _compute_adaptive_interval(
+                len(pulse.hints), cfg.check_interval
+            )
+
             if pulse.should_consolidate:
                 await self._maybe_auto_consolidate(pulse)
 
@@ -223,48 +336,171 @@ def _evaluate_thresholds(
     expired_memory_count: int = 0,
     stale_fiber_ratio: float = 0.0,
     cfg: MaintenanceConfig,
-) -> list[str]:
-    """Evaluate health thresholds and return hint strings."""
-    hints: list[str] = []
+) -> list[HealthHint]:
+    """Evaluate health thresholds and return structured hints with severity."""
+    hints: list[HealthHint] = []
 
     if neuron_count > cfg.neuron_warn_threshold:
         hints.append(
-            f"High neuron count ({neuron_count}). "
-            "Consider running consolidation with prune strategy."
+            HealthHint(
+                message=f"High neuron count ({neuron_count}). "
+                "Consider running consolidation with prune strategy.",
+                severity=HintSeverity.MEDIUM,
+                recommended_strategy="prune",
+            )
         )
 
     if fiber_count > cfg.fiber_warn_threshold:
         hints.append(
-            f"High fiber count ({fiber_count}). Consider running consolidation with merge strategy."
+            HealthHint(
+                message=f"High fiber count ({fiber_count}). "
+                "Consider running consolidation with merge strategy.",
+                severity=HintSeverity.MEDIUM,
+                recommended_strategy="merge",
+            )
         )
 
     if synapse_count > cfg.synapse_warn_threshold:
         hints.append(
-            f"High synapse count ({synapse_count}). "
-            "Consider running consolidation with prune strategy."
+            HealthHint(
+                message=f"High synapse count ({synapse_count}). "
+                "Consider running consolidation with prune strategy.",
+                severity=HintSeverity.MEDIUM,
+                recommended_strategy="prune",
+            )
         )
 
     if neuron_count >= 10 and connectivity < 1.5:
         hints.append(
-            f"Low connectivity ({connectivity:.1f} synapses/neuron). "
-            "Consider running consolidation with enrich strategy."
+            HealthHint(
+                message=f"Low connectivity ({connectivity:.1f} synapses/neuron). "
+                "Consider running consolidation with enrich strategy.",
+                severity=HintSeverity.LOW,
+                recommended_strategy="enrich",
+            )
         )
 
     if neuron_count >= 10 and orphan_ratio > cfg.orphan_ratio_threshold:
         pct = int(orphan_ratio * 100)
-        hints.append(f"High orphan ratio ({pct}%). Consider running nmem_health for diagnostics.")
+        severity = HintSeverity.CRITICAL if orphan_ratio > 0.4 else HintSeverity.MEDIUM
+        hints.append(
+            HealthHint(
+                message=f"High orphan ratio ({pct}%). "
+                "Consider running nmem_health for diagnostics.",
+                severity=severity,
+                recommended_strategy="prune",
+            )
+        )
 
     if expired_memory_count > cfg.expired_memory_warn_threshold:
         hints.append(
-            f"{expired_memory_count} expired memories found. "
-            "Consider cleanup via nmem list --expired."
+            HealthHint(
+                message=f"{expired_memory_count} expired memories found. "
+                "Consider cleanup via nmem list --expired.",
+                severity=HintSeverity.LOW,
+                recommended_strategy="prune",
+            )
         )
 
     if fiber_count >= 10 and stale_fiber_ratio > cfg.stale_fiber_ratio_threshold:
         pct = round(stale_fiber_ratio * 100)
         hints.append(
-            f"{pct}% of fibers are stale (>{cfg.stale_fiber_days} days unused). "
-            "Consider running nmem_health for review."
+            HealthHint(
+                message=f"{pct}% of fibers are stale (>{cfg.stale_fiber_days} days unused). "
+                "Consider running nmem_health for review.",
+                severity=HintSeverity.LOW,
+                recommended_strategy="prune",
+            )
         )
 
     return hints
+
+
+def _compute_effective_cooldown(
+    hints: tuple[HealthHint, ...],
+    base_cooldown_minutes: int,
+) -> int:
+    """Compute cooldown based on hint severity.
+
+    More hints or higher severity = shorter cooldown (more urgent consolidation).
+
+    Returns:
+        Effective cooldown in minutes.
+    """
+    if not hints:
+        return base_cooldown_minutes
+
+    has_critical = any(h.severity == HintSeverity.CRITICAL for h in hints)
+    hint_count = len(hints)
+
+    # 4+ hints OR any CRITICAL: force immediate (0 cooldown)
+    if hint_count >= 4 or has_critical:
+        return 0
+
+    # 2-3 hints: halved cooldown
+    if hint_count >= 2:
+        return base_cooldown_minutes // 2
+
+    # 1 hint LOW/MEDIUM: full cooldown
+    return base_cooldown_minutes
+
+
+def _select_strategies(hints: tuple[HealthHint, ...]) -> tuple[str, ...]:
+    """Select consolidation strategies from hints, ordered by severity.
+
+    Deduplicates strategies and orders them by the highest severity
+    hint that recommended each strategy.
+
+    Returns:
+        Tuple of strategy names, highest-severity first.
+        Falls back to ("prune", "merge") if no hints.
+    """
+    if not hints:
+        return ("prune", "merge")
+
+    _SEVERITY_ORDER = {
+        HintSeverity.CRITICAL: 0,
+        HintSeverity.HIGH: 1,
+        HintSeverity.MEDIUM: 2,
+        HintSeverity.LOW: 3,
+    }
+
+    # Track best severity per strategy
+    strategy_severity: dict[str, HintSeverity] = {}
+    for hint in hints:
+        existing = strategy_severity.get(hint.recommended_strategy)
+        if existing is None or _SEVERITY_ORDER[hint.severity] < _SEVERITY_ORDER[existing]:
+            strategy_severity[hint.recommended_strategy] = hint.severity
+
+    # Sort by severity (highest first)
+    sorted_strategies = sorted(
+        strategy_severity.items(),
+        key=lambda item: _SEVERITY_ORDER[item[1]],
+    )
+
+    return tuple(s for s, _ in sorted_strategies)
+
+
+def _compute_adaptive_interval(hint_count: int, base_interval: int) -> int:
+    """Compute adaptive check interval based on brain health.
+
+    Healthy brains are checked less frequently (fewer wasted cycles).
+    Unhealthy brains are checked more often (faster response).
+
+    Args:
+        hint_count: Number of health hints from last pulse
+        base_interval: Configured base check interval
+
+    Returns:
+        Adapted interval in operations.
+    """
+    # 0 hints (healthy): double the interval, cap at 50
+    if hint_count == 0:
+        return min(base_interval * 2, 50)
+
+    # 1-2 hints (degrading): keep base interval
+    if hint_count <= 2:
+        return base_interval
+
+    # 3+ hints (unhealthy): reduce to 40% of base, minimum 5
+    return max(int(base_interval / 2.5), 5)

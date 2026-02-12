@@ -65,6 +65,7 @@ class MemoryEncoder:
         temporal_extractor: TemporalExtractor | None = None,
         entity_extractor: EntityExtractor | None = None,
         relation_extractor: RelationExtractor | None = None,
+        dedup_pipeline: object | None = None,
     ) -> None:
         """
         Initialize the encoder.
@@ -75,6 +76,7 @@ class MemoryEncoder:
             temporal_extractor: Custom temporal extractor
             entity_extractor: Custom entity extractor
             relation_extractor: Custom relation extractor
+            dedup_pipeline: Optional DedupPipeline for anchor deduplication
         """
         self._storage = storage
         self._config = config
@@ -83,6 +85,7 @@ class MemoryEncoder:
         self._relation = relation_extractor or RelationExtractor()
         self._sentiment = SentimentExtractor()
         self._tag_normalizer = TagNormalizer()
+        self._dedup_pipeline = dedup_pipeline
 
     async def encode(
         self,
@@ -151,19 +154,83 @@ class MemoryEncoder:
         if "type" not in effective_metadata or not effective_metadata["type"]:
             effective_metadata["type"] = suggest_memory_type(content).value
 
-        # 5. Create the anchor neuron (main content)
-        anchor_neuron = Neuron.create(
-            type=NeuronType.CONCEPT,
-            content=content,
-            metadata={
-                "is_anchor": True,
-                "timestamp": timestamp.isoformat(),
-                **effective_metadata,
-            },
-            content_hash=simhash(content),
-        )
-        await self._storage.add_neuron(anchor_neuron)
-        neurons_created.append(anchor_neuron)
+        # 4c. Check for duplicate anchors (if dedup enabled)
+        content_hash = simhash(content)
+        dedup_reused_anchor: Neuron | None = None
+        if self._dedup_pipeline is not None:
+            from neural_memory.engine.dedup.pipeline import DedupResult
+
+            dedup_result = await self._dedup_pipeline.check_duplicate(
+                content, content_hash=content_hash
+            )
+            if dedup_result.is_duplicate and dedup_result.existing_neuron_id:
+                # Reuse existing anchor
+                existing = await self._storage.find_neurons(
+                    content_exact=None,
+                    limit=1,
+                )
+                # Look up by ID via get_neurons_batch
+                batch = await self._storage.get_neurons_batch(
+                    [dedup_result.existing_neuron_id]
+                )
+                existing_neuron = batch.get(dedup_result.existing_neuron_id)
+                if existing_neuron is not None:
+                    dedup_reused_anchor = existing_neuron
+                    logger.debug(
+                        "Dedup: reusing anchor %s (tier=%d, score=%.3f)",
+                        dedup_result.existing_neuron_id,
+                        dedup_result.tier,
+                        dedup_result.similarity_score,
+                    )
+
+        # 5. Create the anchor neuron (main content) or reuse dedup match
+        if dedup_reused_anchor is not None:
+            anchor_neuron = dedup_reused_anchor
+            # Create ALIAS synapse from new content to existing anchor
+            from neural_memory.core.synapse import SynapseType as ST
+
+            alias_neuron = Neuron.create(
+                type=NeuronType.CONCEPT,
+                content=content,
+                metadata={
+                    "is_anchor": True,
+                    "timestamp": timestamp.isoformat(),
+                    "_dedup_alias_of": anchor_neuron.id,
+                    **effective_metadata,
+                },
+                content_hash=content_hash,
+            )
+            await self._storage.add_neuron(alias_neuron)
+            neurons_created.append(alias_neuron)
+
+            alias_synapse = Synapse.create(
+                source_id=alias_neuron.id,
+                target_id=anchor_neuron.id,
+                type=ST.ALIAS,
+                weight=0.9,
+                metadata={"_dedup": True},
+            )
+            try:
+                await self._storage.add_synapse(alias_synapse)
+                synapses_created.append(alias_synapse)
+            except ValueError:
+                logger.debug("ALIAS synapse already exists")
+
+            # Use the alias neuron as fiber anchor so this fiber is distinct
+            anchor_neuron = alias_neuron
+        else:
+            anchor_neuron = Neuron.create(
+                type=NeuronType.CONCEPT,
+                content=content,
+                metadata={
+                    "is_anchor": True,
+                    "timestamp": timestamp.isoformat(),
+                    **effective_metadata,
+                },
+                content_hash=content_hash,
+            )
+            await self._storage.add_neuron(anchor_neuron)
+            neurons_created.append(anchor_neuron)
 
         # 6. Create synapses between neurons
         all_neurons = neurons_created
@@ -268,13 +335,40 @@ class MemoryEncoder:
             )
             _conflicts_detected = len(conflicts)
             if conflicts:
-                resolutions = await resolve_conflicts(
-                    conflicts=conflicts,
-                    new_neuron_id=anchor_neuron.id,
-                    storage=self._storage,
-                )
-                for resolution in resolutions:
-                    synapses_created.append(resolution.contradicts_synapse)
+                # 7a. Try auto-resolve trivial conflicts first
+                remaining_conflicts = conflicts
+                try:
+                    from neural_memory.engine.conflict_auto_resolve import try_auto_resolve
+
+                    auto_resolved: list[object] = []
+                    still_manual: list[object] = []
+                    for conflict in conflicts:
+                        result = await try_auto_resolve(
+                            conflict, self._storage, new_confidence=0.5
+                        )
+                        if result.auto_resolved:
+                            auto_resolved.append(result)
+                        else:
+                            still_manual.append(conflict)
+                    remaining_conflicts = still_manual  # type: ignore[assignment]
+                    if auto_resolved:
+                        logger.debug(
+                            "Auto-resolved %d/%d conflicts",
+                            len(auto_resolved),
+                            len(conflicts),
+                        )
+                except Exception:
+                    logger.debug("Auto-resolve failed, falling back to standard", exc_info=True)
+
+                # 7b. Standard resolution for remaining conflicts
+                if remaining_conflicts:
+                    resolutions = await resolve_conflicts(
+                        conflicts=remaining_conflicts,
+                        new_neuron_id=anchor_neuron.id,
+                        storage=self._storage,
+                    )
+                    for resolution in resolutions:
+                        synapses_created.append(resolution.contradicts_synapse)
 
         # 8. Link to nearby temporal memories
         linked = await self._link_temporal_neighbors(anchor_neuron, timestamp)

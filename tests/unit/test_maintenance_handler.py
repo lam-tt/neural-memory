@@ -11,7 +11,9 @@ import pytest
 
 from neural_memory.core.trigger_engine import TriggerType
 from neural_memory.mcp.maintenance_handler import (
+    HealthHint,
     HealthPulse,
+    HintSeverity,
     MaintenanceHandler,
     _evaluate_thresholds,
 )
@@ -77,7 +79,7 @@ class TestMaintenanceConfig:
         assert cfg.expired_memory_warn_threshold == 10
         assert cfg.stale_fiber_ratio_threshold == 0.3
         assert cfg.stale_fiber_days == 90
-        assert cfg.auto_consolidate is False
+        assert cfg.auto_consolidate is True
         assert cfg.auto_consolidate_strategies == ("prune", "merge")
         assert cfg.consolidate_cooldown_minutes == 60
 
@@ -184,8 +186,8 @@ class TestEvaluateThresholds:
             cfg=cfg,
         )
         assert len(hints) == 1
-        assert "neuron count (150)" in hints[0].lower()
-        assert "prune" in hints[0].lower()
+        assert "neuron count (150)" in hints[0].message.lower()
+        assert "prune" in hints[0].message.lower()
 
     def test_high_fiber_count(self) -> None:
         cfg = MaintenanceConfig(fiber_warn_threshold=100)
@@ -198,8 +200,8 @@ class TestEvaluateThresholds:
             cfg=cfg,
         )
         assert len(hints) == 1
-        assert "fiber count (150)" in hints[0].lower()
-        assert "merge" in hints[0].lower()
+        assert "fiber count (150)" in hints[0].message.lower()
+        assert "merge" in hints[0].message.lower()
 
     def test_high_synapse_count(self) -> None:
         cfg = MaintenanceConfig(synapse_warn_threshold=100)
@@ -211,7 +213,7 @@ class TestEvaluateThresholds:
             orphan_ratio=0.0,
             cfg=cfg,
         )
-        assert any("synapse count (150)" in h.lower() for h in hints)
+        assert any("synapse count (150)" in h.message.lower() for h in hints)
 
     def test_low_connectivity(self) -> None:
         cfg = MaintenanceConfig()
@@ -223,8 +225,8 @@ class TestEvaluateThresholds:
             orphan_ratio=0.0,
             cfg=cfg,
         )
-        assert any("connectivity" in h.lower() for h in hints)
-        assert any("enrich" in h.lower() for h in hints)
+        assert any("connectivity" in h.message.lower() for h in hints)
+        assert any("enrich" in h.message.lower() for h in hints)
 
     def test_low_connectivity_skipped_small_brain(self) -> None:
         cfg = MaintenanceConfig()
@@ -236,7 +238,7 @@ class TestEvaluateThresholds:
             orphan_ratio=0.0,
             cfg=cfg,
         )
-        assert not any("connectivity" in h.lower() for h in hints)
+        assert not any("connectivity" in h.message.lower() for h in hints)
 
     def test_high_orphan_ratio(self) -> None:
         cfg = MaintenanceConfig(orphan_ratio_threshold=0.2)
@@ -248,7 +250,7 @@ class TestEvaluateThresholds:
             orphan_ratio=0.5,
             cfg=cfg,
         )
-        assert any("orphan" in h.lower() for h in hints)
+        assert any("orphan" in h.message.lower() for h in hints)
 
     def test_multiple_issues(self) -> None:
         cfg = MaintenanceConfig(
@@ -378,7 +380,10 @@ class TestGetMaintenanceHint:
             orphan_ratio=0.0,
             expired_memory_count=0,
             stale_fiber_ratio=0.0,
-            hints=("First hint", "Second hint"),
+            hints=(
+                HealthHint("First hint", HintSeverity.MEDIUM, "prune"),
+                HealthHint("Second hint", HintSeverity.LOW, "merge"),
+            ),
             should_consolidate=False,
         )
         assert server._get_maintenance_hint(pulse) == "First hint"
@@ -401,7 +406,7 @@ class TestAutoConsolidation:
             orphan_ratio=0.0,
             expired_memory_count=0,
             stale_fiber_ratio=0.0,
-            hints=("some hint",),
+            hints=(HealthHint("some hint", HintSeverity.LOW, "prune"),),
             should_consolidate=False,
         )
         await server._maybe_auto_consolidate(pulse)
@@ -425,7 +430,7 @@ class TestAutoConsolidation:
             orphan_ratio=0.0,
             expired_memory_count=0,
             stale_fiber_ratio=0.0,
-            hints=("hint",),
+            hints=(HealthHint("hint", HintSeverity.MEDIUM, "prune"),),
             should_consolidate=True,
         )
         await server._maybe_auto_consolidate(pulse)
@@ -449,11 +454,11 @@ class TestAutoConsolidation:
             orphan_ratio=0.0,
             expired_memory_count=0,
             stale_fiber_ratio=0.0,
-            hints=("hint",),
+            hints=(HealthHint("hint", HintSeverity.MEDIUM, "prune"),),
             should_consolidate=True,
         )
 
-        with patch.object(server, "_run_auto_consolidation", new_callable=AsyncMock) as mock_run:
+        with patch.object(server, "_run_auto_consolidation_dynamic", new_callable=AsyncMock) as mock_run:
             await server._maybe_auto_consolidate(pulse)
             # create_task fires the coroutine; give it a tick
             await asyncio.sleep(0.05)
@@ -538,7 +543,7 @@ class TestFireHealthTrigger:
             orphan_ratio=0.0,
             expired_memory_count=0,
             stale_fiber_ratio=0.0,
-            hints=("High neuron count (3000). Consider pruning.",),
+            hints=(HealthHint("High neuron count (3000). Consider pruning.", HintSeverity.MEDIUM, "prune"),),
             should_consolidate=False,
         )
         result = server._fire_health_trigger(pulse)
@@ -559,8 +564,8 @@ class TestFireHealthTrigger:
             expired_memory_count=0,
             stale_fiber_ratio=0.0,
             hints=(
-                "High neuron count (3000).",
-                "High synapse count (6000).",
+                HealthHint("High neuron count (3000).", HintSeverity.MEDIUM, "prune"),
+                HealthHint("High synapse count (6000).", HintSeverity.MEDIUM, "prune"),
             ),
             should_consolidate=False,
         )
@@ -605,7 +610,7 @@ class TestExpiredMemoryHint:
             stale_fiber_ratio=0.0,
             cfg=cfg,
         )
-        assert not any("expired" in h.lower() for h in hints)
+        assert not any("expired" in h.message.lower() for h in hints)
 
     def test_expired_above_threshold_hint(self) -> None:
         cfg = MaintenanceConfig(expired_memory_warn_threshold=10)
@@ -619,8 +624,8 @@ class TestExpiredMemoryHint:
             stale_fiber_ratio=0.0,
             cfg=cfg,
         )
-        assert any("expired" in h.lower() for h in hints)
-        assert any("15" in h for h in hints)
+        assert any("expired" in h.message.lower() for h in hints)
+        assert any("15" in h.message for h in hints)
 
     @pytest.mark.asyncio
     async def test_pulse_includes_expired_count(self) -> None:
@@ -645,7 +650,7 @@ class TestExpiredMemoryHint:
         pulse = await server._health_pulse()
         assert pulse is not None
         assert pulse.expired_memory_count == 5
-        assert any("expired" in h.lower() for h in pulse.hints)
+        assert any("expired" in h.message.lower() for h in pulse.hints)
 
 
 # ========== P3: Stale fiber hint tests ==========
@@ -664,7 +669,7 @@ class TestStaleFiberHint:
             stale_fiber_ratio=0.2,
             cfg=cfg,
         )
-        assert not any("stale" in h.lower() for h in hints)
+        assert not any("stale" in h.message.lower() for h in hints)
 
     def test_stale_above_threshold_hint(self) -> None:
         cfg = MaintenanceConfig(stale_fiber_ratio_threshold=0.3, stale_fiber_days=90)
@@ -678,9 +683,9 @@ class TestStaleFiberHint:
             stale_fiber_ratio=0.5,
             cfg=cfg,
         )
-        assert any("stale" in h.lower() for h in hints)
-        assert any("50%" in h for h in hints)
-        assert any("90" in h for h in hints)
+        assert any("stale" in h.message.lower() for h in hints)
+        assert any("50%" in h.message for h in hints)
+        assert any("90" in h.message for h in hints)
 
     def test_stale_skipped_small_brain(self) -> None:
         cfg = MaintenanceConfig(stale_fiber_ratio_threshold=0.3)
@@ -694,7 +699,7 @@ class TestStaleFiberHint:
             stale_fiber_ratio=0.8,
             cfg=cfg,
         )
-        assert not any("stale" in h.lower() for h in hints)
+        assert not any("stale" in h.message.lower() for h in hints)
 
     @pytest.mark.asyncio
     async def test_pulse_includes_stale_ratio(self) -> None:
@@ -727,4 +732,4 @@ class TestStaleFiberHint:
         pulse = await server._health_pulse()
         assert pulse is not None
         assert pulse.stale_fiber_ratio == 0.5
-        assert any("stale" in h.lower() for h in pulse.hints)
+        assert any("stale" in h.message.lower() for h in pulse.hints)

@@ -174,12 +174,32 @@ class MCPServer(
         if len(content) > MAX_CONTENT_LENGTH:
             return {"error": f"Content too long ({len(content)} chars). Max: {MAX_CONTENT_LENGTH}."}
 
-        # Check for sensitive content (high severity only)
-        from neural_memory.safety.sensitive import check_sensitive_content
+        # Check for sensitive content with selective auto-redaction
+        from neural_memory.safety.sensitive import auto_redact_content, check_sensitive_content
 
-        sensitive_matches = check_sensitive_content(content, min_severity=2)
-        if sensitive_matches:
-            types_found = sorted({m.type.value for m in sensitive_matches})
+        try:
+            auto_redact_severity = int(self.config.safety.auto_redact_min_severity)
+        except (TypeError, ValueError, AttributeError):
+            auto_redact_severity = 3
+        redacted_content, redacted_matches, content_hash = auto_redact_content(
+            content, min_severity=auto_redact_severity
+        )
+
+        if redacted_matches:
+            # Content was auto-redacted — use redacted version
+            content = redacted_content
+            logger.info(
+                "Auto-redacted %d sensitive matches (severity >= %d)",
+                len(redacted_matches),
+                auto_redact_severity,
+            )
+
+        # Check for remaining sensitive content below auto-redact threshold
+        remaining_matches = check_sensitive_content(content, min_severity=2)
+        # Filter out matches that were already redacted
+        remaining_matches = [m for m in remaining_matches if m.severity < auto_redact_severity]
+        if remaining_matches:
+            types_found = sorted({m.type.value for m in remaining_matches})
             return {
                 "error": "Sensitive content detected",
                 "sensitive_types": types_found,
@@ -198,7 +218,42 @@ class MCPServer(
 
         priority = Priority.from_int(args.get("priority", 5))
 
-        encoder = MemoryEncoder(storage, brain.config)
+        # Build dedup pipeline if enabled
+        dedup_pipeline = None
+        try:
+            dedup_settings = self.config.dedup
+            if isinstance(dedup_settings.enabled, bool) and dedup_settings.enabled:
+                from neural_memory.engine.dedup.config import DedupConfig
+                from neural_memory.engine.dedup.pipeline import DedupPipeline
+
+                dedup_cfg = DedupConfig(
+                    enabled=True,
+                    simhash_threshold=int(dedup_settings.simhash_threshold),
+                    embedding_threshold=float(dedup_settings.embedding_threshold),
+                    embedding_ambiguous_low=float(dedup_settings.embedding_ambiguous_low),
+                    llm_enabled=bool(dedup_settings.llm_enabled),
+                    llm_provider=str(dedup_settings.llm_provider),
+                    llm_model=str(dedup_settings.llm_model),
+                    llm_max_pairs_per_encode=int(dedup_settings.llm_max_pairs_per_encode),
+                    merge_strategy=str(dedup_settings.merge_strategy),
+                )
+
+                # Create LLM judge if enabled
+                llm_judge = None
+                if dedup_cfg.llm_enabled and dedup_cfg.llm_provider != "none":
+                    from neural_memory.engine.dedup.llm_judge import create_judge
+
+                    llm_judge = create_judge(dedup_cfg.llm_provider, dedup_cfg.llm_model)
+
+                dedup_pipeline = DedupPipeline(
+                    config=dedup_cfg,
+                    storage=storage,
+                    llm_judge=llm_judge,
+                )
+        except (AttributeError, TypeError, ValueError):
+            dedup_pipeline = None
+
+        encoder = MemoryEncoder(storage, brain.config, dedup_pipeline=dedup_pipeline)
         storage.disable_auto_save()
 
         try:
@@ -263,6 +318,10 @@ class MCPServer(
             "neurons_created": len(result.neurons_created),
             "message": f"Remembered: {content[:50]}{'...' if len(content) > 50 else ''}",
         }
+
+        if redacted_matches:
+            response["auto_redacted"] = True
+            response["auto_redacted_count"] = len(redacted_matches)
 
         if expiry_days is not None:
             response["expires_in_days"] = expiry_days

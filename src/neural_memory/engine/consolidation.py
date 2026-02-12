@@ -35,6 +35,7 @@ class ConsolidationStrategy(StrEnum):
     ENRICH = "enrich"
     DREAM = "dream"
     LEARN_HABITS = "learn_habits"
+    DEDUP = "dedup"
     ALL = "all"
 
 
@@ -84,6 +85,7 @@ class ConsolidationReport:
     dream_synapses_created: int = 0
     habits_learned: int = 0
     action_events_pruned: int = 0
+    duplicates_found: int = 0
     merge_details: list[MergeDetail] = field(default_factory=list)
     dry_run: bool = False
 
@@ -103,6 +105,7 @@ class ConsolidationReport:
             f"  Dream synapses created: {self.dream_synapses_created}",
             f"  Habits learned: {self.habits_learned}",
             f"  Action events pruned: {self.action_events_pruned}",
+            f"  Duplicates found: {self.duplicates_found}",
             f"  Duration: {self.duration_ms:.1f}ms",
         ]
         if self.merge_details:
@@ -182,6 +185,9 @@ class ConsolidationEngine:
 
         if run_all or ConsolidationStrategy.LEARN_HABITS in strategies:
             await self._learn_habits(report, reference_time, dry_run)
+
+        if run_all or ConsolidationStrategy.DEDUP in strategies:
+            await self._dedup(report, dry_run)
 
         report.duration_ms = (time.perf_counter() - start) * 1000
         return report
@@ -839,3 +845,65 @@ class ConsolidationEngine:
             report.action_events_pruned = habit_report.action_events_pruned
         except Exception:
             logger.debug("Habit learning failed (non-critical)", exc_info=True)
+
+    async def _dedup(
+        self,
+        report: ConsolidationReport,
+        dry_run: bool,
+    ) -> None:
+        """Deduplicate anchor neurons using SimHash comparison.
+
+        Scans all anchor neurons and finds near-duplicates by Hamming distance.
+        Creates ALIAS synapses and redirects fibers to canonical anchors.
+        """
+        import logging
+
+        from neural_memory.core.synapse import SynapseType
+        from neural_memory.utils.simhash import is_near_duplicate
+
+        logger = logging.getLogger(__name__)
+
+        brain_id = self._storage.current_brain_id
+        if not brain_id:
+            return
+
+        # Fetch all anchor neurons
+        all_neurons = await self._storage.find_neurons(limit=100000)
+        anchors = [n for n in all_neurons if n.metadata.get("is_anchor", False)]
+
+        if len(anchors) < 2:
+            return
+
+        # Group duplicates by SimHash proximity
+        seen: set[str] = set()
+        for i, anchor_a in enumerate(anchors):
+            if anchor_a.id in seen:
+                continue
+            if anchor_a.content_hash is None or anchor_a.content_hash == 0:
+                continue
+
+            for anchor_b in anchors[i + 1 :]:
+                if anchor_b.id in seen:
+                    continue
+                if anchor_b.content_hash is None or anchor_b.content_hash == 0:
+                    continue
+
+                if is_near_duplicate(anchor_a.content_hash, anchor_b.content_hash):
+                    report.duplicates_found += 1
+                    seen.add(anchor_b.id)
+
+                    if dry_run:
+                        continue
+
+                    # Create ALIAS synapse from newer to older (canonical)
+                    alias_synapse = Synapse.create(
+                        source_id=anchor_b.id,
+                        target_id=anchor_a.id,
+                        type=SynapseType.ALIAS,
+                        weight=0.9,
+                        metadata={"_dedup": True},
+                    )
+                    try:
+                        await self._storage.add_synapse(alias_synapse)
+                    except ValueError:
+                        logger.debug("ALIAS synapse already exists")

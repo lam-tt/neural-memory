@@ -298,10 +298,10 @@ class TestDiversityMetric:
         """Verify _EXPECTED_SYNAPSE_TYPES is 8."""
         assert DiagnosticsEngine._EXPECTED_SYNAPSE_TYPES == 8
 
-    def test_diversity_total_synapse_types_is_20(self) -> None:
-        """_TOTAL_SYNAPSE_TYPES should be 20 (all defined enum members)."""
-        assert DiagnosticsEngine._TOTAL_SYNAPSE_TYPES == 20
-        assert len(SynapseType) == 20
+    def test_diversity_total_synapse_types_matches_enum(self) -> None:
+        """_TOTAL_SYNAPSE_TYPES should match the actual enum member count."""
+        assert DiagnosticsEngine._TOTAL_SYNAPSE_TYPES == len(SynapseType)
+        assert len(SynapseType) == 21
 
 
 class TestTokenEstimation:

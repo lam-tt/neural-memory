@@ -1971,28 +1971,26 @@ class TestMCPRecallExtended:
 
     @pytest.mark.asyncio
     async def test_remember_sensitive_content(self) -> None:
-        """Test nmem_remember rejects sensitive content."""
+        """Test nmem_remember handles sensitive content.
+
+        With auto-redact (Phase F), severity-3 API keys are auto-redacted
+        rather than blocking. The memory is stored with [REDACTED] content.
+        """
         server = self._make_server()
         mock_storage = AsyncMock()
         mock_brain = MagicMock(id="test-brain", config=MagicMock())
         mock_storage.get_brain = AsyncMock(return_value=mock_brain)
         mock_storage._current_brain_id = "test-brain"
 
-        with (
-            patch.object(server, "get_storage", return_value=mock_storage),
-            patch(
-                "neural_memory.safety.sensitive.check_sensitive_content",
-                return_value=[MagicMock(type=MagicMock(value="api_key"))],
-            ),
-        ):
+        with patch.object(server, "get_storage", return_value=mock_storage):
             result = await server.call_tool(
                 "nmem_remember",
                 {"content": "API_KEY=sk-1234567890abcdef"},
             )
 
-        assert "error" in result
-        assert "Sensitive content" in result["error"]
-        assert "sensitive_types" in result
+        # Severity-3 API key is auto-redacted and stored successfully
+        assert result.get("success") is True
+        assert result.get("auto_redacted") is True
 
     @pytest.mark.asyncio
     async def test_remember_auto_type_detection(self) -> None:

@@ -913,12 +913,25 @@ class ReflexPipeline:
         # Sort by composite score: salience * freshness * conductivity
         # Doc-trained fibers start at lower salience (ceiling 0.5) and EPISODIC stage,
         # so lifecycle naturally handles ranking without retrieval-time hacks.
+        fw = self._config.freshness_weight
+
         def _fiber_score(fiber: Fiber) -> float:
-            freshness = 0.5
+            recency = 0.5
             if fiber.last_conducted:
                 hours_ago = (utcnow() - fiber.last_conducted).total_seconds() / 3600
-                freshness = max(0.1, 1.0 / (1.0 + math.exp((hours_ago - 72) / 36)))
-            return fiber.salience * freshness * fiber.conductivity
+                recency = max(0.1, 1.0 / (1.0 + math.exp((hours_ago - 72) / 36)))
+
+            base_score = fiber.salience * recency * fiber.conductivity
+
+            # Creation-age freshness penalty (opt-in via freshness_weight > 0)
+            if fw > 0.0 and fiber.created_at:
+                from neural_memory.safety.freshness import evaluate_freshness
+
+                age_result = evaluate_freshness(fiber.created_at)
+                # fw=0: 1.0x | fw=0.5: 0.55x-1.0x | fw=1.0: 0.1x-1.0x
+                base_score *= (1.0 - fw) + fw * age_result.score
+
+            return base_score
 
         fibers.sort(key=_fiber_score, reverse=True)
 

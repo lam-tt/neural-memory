@@ -93,6 +93,8 @@ class ConflictHandler:
                         "confidence": s.weight,
                         "detected_at": s.metadata.get("detected_at", ""),
                         "is_superseded": is_superseded,
+                        "auto_resolved": s.metadata.get("_auto_resolved", False),
+                        "auto_resolve_reason": s.metadata.get("_auto_resolve_reason", ""),
                     }
                 )
 
