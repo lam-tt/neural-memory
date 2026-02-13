@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from neural_memory.core.fiber import Fiber
@@ -213,7 +213,7 @@ class ConsolidationEngine:
         start = time.perf_counter()
 
         run_all = ConsolidationStrategy.ALL in strategies
-        requested = (
+        requested: set[ConsolidationStrategy] = (
             {s for s in ConsolidationStrategy if s != ConsolidationStrategy.ALL}
             if run_all
             else set(strategies)

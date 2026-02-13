@@ -458,7 +458,7 @@ def _select_strategies(hints: tuple[HealthHint, ...]) -> tuple[str, ...]:
     if not hints:
         return ("prune", "merge")
 
-    _SEVERITY_ORDER = {
+    severity_order = {
         HintSeverity.CRITICAL: 0,
         HintSeverity.HIGH: 1,
         HintSeverity.MEDIUM: 2,
@@ -469,13 +469,13 @@ def _select_strategies(hints: tuple[HealthHint, ...]) -> tuple[str, ...]:
     strategy_severity: dict[str, HintSeverity] = {}
     for hint in hints:
         existing = strategy_severity.get(hint.recommended_strategy)
-        if existing is None or _SEVERITY_ORDER[hint.severity] < _SEVERITY_ORDER[existing]:
+        if existing is None or severity_order[hint.severity] < severity_order[existing]:
             strategy_severity[hint.recommended_strategy] = hint.severity
 
     # Sort by severity (highest first)
     sorted_strategies = sorted(
         strategy_severity.items(),
-        key=lambda item: _SEVERITY_ORDER[item[1]],
+        key=lambda item: severity_order[item[1]],
     )
 
     return tuple(s for s, _ in sorted_strategies)

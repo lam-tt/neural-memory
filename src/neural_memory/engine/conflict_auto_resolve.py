@@ -14,7 +14,6 @@ Rules (in priority order):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from neural_memory.safety.freshness import FreshnessLevel, evaluate_freshness

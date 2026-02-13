@@ -6,7 +6,6 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
 
 from neural_memory.engine.dedup.prompts import DEDUP_SYSTEM_PROMPT, format_dedup_prompt
 
