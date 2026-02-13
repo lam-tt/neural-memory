@@ -12,6 +12,7 @@ from neural_memory.core.synapse import Synapse, SynapseType
 from neural_memory.engine.consolidation import (
     ConsolidationConfig,
     ConsolidationEngine,
+    ConsolidationReport,
     ConsolidationStrategy,
 )
 from neural_memory.engine.lifecycle import DecayManager
@@ -250,3 +251,133 @@ async def test_infer_report_in_summary(infer_storage: InMemoryStorage) -> None:
     summary = report.summary()
     assert "Synapses inferred" in summary
     assert "Co-activations pruned" in summary
+
+
+# ── Parallel tier execution tests ──────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_strategy_tiers_cover_all_strategies() -> None:
+    """All non-ALL strategies appear in exactly one tier."""
+    all_in_tiers: set[ConsolidationStrategy] = set()
+    for tier in ConsolidationEngine.STRATEGY_TIERS:
+        # No overlap between tiers
+        assert not (all_in_tiers & tier), f"Overlap detected: {all_in_tiers & tier}"
+        all_in_tiers |= tier
+
+    expected = {s for s in ConsolidationStrategy if s != ConsolidationStrategy.ALL}
+    assert all_in_tiers == expected
+
+
+@pytest.mark.asyncio
+async def test_run_all_strategies_parallel(
+    consolidation_storage: InMemoryStorage,
+) -> None:
+    """Running ALL strategies via tiered parallel produces a valid report."""
+    engine = ConsolidationEngine(consolidation_storage)
+    report = await engine.run(strategies=[ConsolidationStrategy.ALL])
+
+    assert report.duration_ms >= 0
+    assert not report.dry_run
+
+
+@pytest.mark.asyncio
+async def test_run_single_strategy_still_works(
+    consolidation_storage: InMemoryStorage,
+) -> None:
+    """A single strategy request still works through the tier system."""
+    engine = ConsolidationEngine(consolidation_storage)
+    report = await engine.run(strategies=[ConsolidationStrategy.PRUNE])
+
+    # Should complete without error
+    assert report.duration_ms >= 0
+
+
+@pytest.mark.asyncio
+async def test_run_multiple_same_tier_strategies(
+    consolidation_storage: InMemoryStorage,
+) -> None:
+    """Multiple strategies from the same tier run in parallel."""
+    engine = ConsolidationEngine(consolidation_storage)
+    # LEARN_HABITS and DEDUP are in the same tier as PRUNE
+    report = await engine.run(
+        strategies=[
+            ConsolidationStrategy.PRUNE,
+            ConsolidationStrategy.DEDUP,
+        ]
+    )
+
+    assert report.duration_ms >= 0
+
+
+@pytest.mark.asyncio
+async def test_run_strategies_across_tiers(
+    consolidation_storage: InMemoryStorage,
+) -> None:
+    """Strategies from different tiers execute in correct tier order."""
+    execution_order: list[str] = []
+
+    original_prune = engine_cls._prune if (engine_cls := ConsolidationEngine) else None  # noqa: F841
+
+    # Patch strategies to record execution order
+    engine = ConsolidationEngine(consolidation_storage)
+
+    async def tracking_prune(report, ref_time, dry_run):
+        execution_order.append("prune")
+
+    async def tracking_merge(report, dry_run):
+        execution_order.append("merge")
+
+    async def tracking_enrich(report, dry_run):
+        execution_order.append("enrich")
+
+    engine._prune = tracking_prune  # type: ignore[assignment]
+    engine._merge = tracking_merge  # type: ignore[assignment]
+    engine._enrich = tracking_enrich  # type: ignore[assignment]
+
+    await engine.run(
+        strategies=[
+            ConsolidationStrategy.ENRICH,  # tier 4
+            ConsolidationStrategy.PRUNE,   # tier 1
+            ConsolidationStrategy.MERGE,   # tier 2
+        ]
+    )
+
+    # Tier order: prune(1) -> merge(2) -> enrich(4)
+    assert execution_order == ["prune", "merge", "enrich"]
+
+
+@pytest.mark.asyncio
+async def test_run_default_none_strategies(
+    consolidation_storage: InMemoryStorage,
+) -> None:
+    """Passing None defaults to ALL strategies."""
+    engine = ConsolidationEngine(consolidation_storage)
+    report = await engine.run(strategies=None)
+
+    assert report.duration_ms >= 0
+
+
+@pytest.mark.asyncio
+async def test_run_strategy_dispatcher(
+    consolidation_storage: InMemoryStorage,
+) -> None:
+    """_run_strategy dispatches to the correct method."""
+    engine = ConsolidationEngine(consolidation_storage)
+    report = ConsolidationReport()
+
+    called = False
+
+    async def mock_dream(report, dry_run):
+        nonlocal called
+        called = True
+
+    engine._dream = mock_dream  # type: ignore[assignment]
+
+    from neural_memory.utils.timeutils import utcnow
+
+    await engine._run_strategy(
+        ConsolidationStrategy.DREAM, report, utcnow(), dry_run=True
+    )
+
+    assert called

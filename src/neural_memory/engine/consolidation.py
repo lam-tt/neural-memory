@@ -8,6 +8,7 @@ Provides automated memory maintenance:
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -121,11 +122,35 @@ class ConsolidationReport:
 class ConsolidationEngine:
     """Engine for memory consolidation operations.
 
-    Supports three strategies:
-    - prune: Remove weak synapses and orphan neurons
-    - merge: Combine overlapping fibers
-    - summarize: Create concept neurons for topic clusters
+    Supports strategies: prune, merge, summarize, mature, infer, enrich,
+    dream, learn_habits, dedup.
+
+    Strategies are grouped into dependency tiers and run in parallel
+    within each tier using asyncio.gather().
     """
+
+    # Dependency tiers — strategies within a tier are independent and
+    # can safely run concurrently. Tiers execute sequentially because
+    # later tiers depend on results from earlier ones.
+    STRATEGY_TIERS: tuple[frozenset[ConsolidationStrategy], ...] = (
+        frozenset({
+            ConsolidationStrategy.PRUNE,
+            ConsolidationStrategy.LEARN_HABITS,
+            ConsolidationStrategy.DEDUP,
+        }),
+        frozenset({
+            ConsolidationStrategy.MERGE,
+            ConsolidationStrategy.MATURE,
+        }),
+        frozenset({
+            ConsolidationStrategy.SUMMARIZE,
+            ConsolidationStrategy.INFER,
+        }),
+        frozenset({
+            ConsolidationStrategy.ENRICH,
+            ConsolidationStrategy.DREAM,
+        }),
+    )
 
     def __init__(
         self,
@@ -137,6 +162,29 @@ class ConsolidationEngine:
         self._config = config or ConsolidationConfig()
         self._dream_decay_multiplier = dream_decay_multiplier
 
+    async def _run_strategy(
+        self,
+        strategy: ConsolidationStrategy,
+        report: ConsolidationReport,
+        reference_time: datetime,
+        dry_run: bool,
+    ) -> None:
+        """Dispatch a single strategy to its implementation method."""
+        dispatch: dict[ConsolidationStrategy, Any] = {
+            ConsolidationStrategy.PRUNE: lambda: self._prune(report, reference_time, dry_run),
+            ConsolidationStrategy.MERGE: lambda: self._merge(report, dry_run),
+            ConsolidationStrategy.SUMMARIZE: lambda: self._summarize(report, dry_run),
+            ConsolidationStrategy.MATURE: lambda: self._mature(report, reference_time, dry_run),
+            ConsolidationStrategy.INFER: lambda: self._infer(report, reference_time, dry_run),
+            ConsolidationStrategy.ENRICH: lambda: self._enrich(report, dry_run),
+            ConsolidationStrategy.DREAM: lambda: self._dream(report, dry_run),
+            ConsolidationStrategy.LEARN_HABITS: lambda: self._learn_habits(report, reference_time, dry_run),
+            ConsolidationStrategy.DEDUP: lambda: self._dedup(report, dry_run),
+        }
+        handler = dispatch.get(strategy)
+        if handler is not None:
+            await handler()
+
     async def run(
         self,
         strategies: list[ConsolidationStrategy] | None = None,
@@ -144,6 +192,10 @@ class ConsolidationEngine:
         reference_time: datetime | None = None,
     ) -> ConsolidationReport:
         """Run consolidation with specified strategies.
+
+        Strategies are grouped into dependency tiers and run in parallel
+        within each tier. Tiers execute sequentially so that later
+        strategies can depend on results from earlier ones.
 
         Args:
             strategies: List of strategies to run (default: all)
@@ -161,33 +213,25 @@ class ConsolidationEngine:
         start = time.perf_counter()
 
         run_all = ConsolidationStrategy.ALL in strategies
+        requested = (
+            {s for s in ConsolidationStrategy if s != ConsolidationStrategy.ALL}
+            if run_all
+            else set(strategies)
+        )
 
-        if run_all or ConsolidationStrategy.PRUNE in strategies:
-            await self._prune(report, reference_time, dry_run)
-
-        if run_all or ConsolidationStrategy.MERGE in strategies:
-            await self._merge(report, dry_run)
-
-        if run_all or ConsolidationStrategy.SUMMARIZE in strategies:
-            await self._summarize(report, dry_run)
-
-        if run_all or ConsolidationStrategy.MATURE in strategies:
-            await self._mature(report, reference_time, dry_run)
-
-        if run_all or ConsolidationStrategy.INFER in strategies:
-            await self._infer(report, reference_time, dry_run)
-
-        if run_all or ConsolidationStrategy.ENRICH in strategies:
-            await self._enrich(report, dry_run)
-
-        if run_all or ConsolidationStrategy.DREAM in strategies:
-            await self._dream(report, dry_run)
-
-        if run_all or ConsolidationStrategy.LEARN_HABITS in strategies:
-            await self._learn_habits(report, reference_time, dry_run)
-
-        if run_all or ConsolidationStrategy.DEDUP in strategies:
-            await self._dedup(report, dry_run)
+        for tier in self.STRATEGY_TIERS:
+            tier_strategies = tier & requested
+            if not tier_strategies:
+                continue
+            if len(tier_strategies) == 1:
+                await self._run_strategy(
+                    next(iter(tier_strategies)), report, reference_time, dry_run
+                )
+            else:
+                await asyncio.gather(*(
+                    self._run_strategy(s, report, reference_time, dry_run)
+                    for s in tier_strategies
+                ))
 
         report.duration_ms = (time.perf_counter() - start) * 1000
         return report
