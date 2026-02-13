@@ -230,7 +230,7 @@ def check_sensitive_content(
                 new_end = max(prev.end, span.end)
                 best = span if span.severity > prev.severity else prev
                 # Use actual content slice for accurate audit trail
-                merged_text = content[prev.start:new_end]
+                merged_text = content[prev.start : new_end]
                 merged[-1] = SensitiveMatch(
                     pattern_name=best.pattern_name,
                     matched_text=merged_text,

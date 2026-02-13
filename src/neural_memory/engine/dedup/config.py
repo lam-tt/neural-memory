@@ -42,13 +42,11 @@ class DedupConfig:
     def __post_init__(self) -> None:
         if not 0.0 <= self.embedding_ambiguous_low <= 1.0:
             raise ValueError(
-                f"embedding_ambiguous_low must be in [0.0, 1.0], "
-                f"got {self.embedding_ambiguous_low}"
+                f"embedding_ambiguous_low must be in [0.0, 1.0], got {self.embedding_ambiguous_low}"
             )
         if not 0.0 <= self.embedding_threshold <= 1.0:
             raise ValueError(
-                f"embedding_threshold must be in [0.0, 1.0], "
-                f"got {self.embedding_threshold}"
+                f"embedding_threshold must be in [0.0, 1.0], got {self.embedding_threshold}"
             )
         if self.embedding_ambiguous_low > self.embedding_threshold:
             raise ValueError(
@@ -56,21 +54,16 @@ class DedupConfig:
                 f"must be <= embedding_threshold ({self.embedding_threshold})"
             )
         if not 0 <= self.simhash_threshold <= 64:
-            raise ValueError(
-                f"simhash_threshold must be in [0, 64], got {self.simhash_threshold}"
-            )
+            raise ValueError(f"simhash_threshold must be in [0, 64], got {self.simhash_threshold}")
         if self.max_candidates < 1:
-            raise ValueError(
-                f"max_candidates must be >= 1, got {self.max_candidates}"
-            )
+            raise ValueError(f"max_candidates must be >= 1, got {self.max_candidates}")
         if self.llm_max_pairs_per_encode < 1:
             raise ValueError(
                 f"llm_max_pairs_per_encode must be >= 1, got {self.llm_max_pairs_per_encode}"
             )
         if self.llm_provider not in self._VALID_PROVIDERS:
             raise ValueError(
-                f"llm_provider must be one of {self._VALID_PROVIDERS}, "
-                f"got '{self.llm_provider}'"
+                f"llm_provider must be one of {self._VALID_PROVIDERS}, got '{self.llm_provider}'"
             )
         if self.merge_strategy not in self._VALID_STRATEGIES:
             raise ValueError(

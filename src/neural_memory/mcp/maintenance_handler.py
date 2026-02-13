@@ -207,9 +207,7 @@ class MaintenanceHandler:
         strategies = _select_strategies(pulse.hints)
 
         # Auto-dream injection for low-connectivity brains
-        strategies = self._maybe_inject_dream(
-            strategies, pulse, cfg, now
-        )
+        strategies = self._maybe_inject_dream(strategies, pulse, cfg, now)
 
         self._last_consolidation_at = now
         self._consolidation_task = asyncio.create_task(

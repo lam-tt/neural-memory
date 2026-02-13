@@ -150,7 +150,9 @@ def create_app(
 
         # Build neuron ID set for filtering synapses to visible nodes
         neuron_ids = {n.id for n in paginated}
-        visible_synapses = [s for s in capped_synapses if s.source_id in neuron_ids and s.target_id in neuron_ids]
+        visible_synapses = [
+            s for s in capped_synapses if s.source_id in neuron_ids and s.target_id in neuron_ids
+        ]
 
         return {
             "neurons": [

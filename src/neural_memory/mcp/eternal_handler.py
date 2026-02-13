@@ -36,10 +36,7 @@ class EternalHandler:
         the last call, so brain switches are reflected immediately.
         """
         current_brain = self.config.current_brain
-        if (
-            self._eternal_ctx is None
-            or self._eternal_ctx._brain_id != current_brain
-        ):
+        if self._eternal_ctx is None or self._eternal_ctx._brain_id != current_brain:
             storage = await self.get_storage()
             self._eternal_ctx = EternalContext(storage, current_brain)
         return self._eternal_ctx

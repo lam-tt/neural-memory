@@ -71,9 +71,7 @@ class HookRegistry:
         """Remove a listener for an event."""
         if event in self._listeners:
             self._listeners[event] = [
-                existing
-                for existing in self._listeners[event]
-                if existing is not listener
+                existing for existing in self._listeners[event] if existing is not listener
             ]
 
     def has_listeners(self, event: HookEvent) -> bool:

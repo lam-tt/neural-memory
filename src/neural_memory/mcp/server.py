@@ -322,13 +322,16 @@ class MCPServer(
 
         pulse = await self._check_maintenance()
 
-        await self.hooks.emit(HookEvent.POST_REMEMBER, {
-            "fiber_id": result.fiber.id,
-            "content": content,
-            "type": mem_type.value,
-            "neurons_created": len(result.neurons_created),
-            "conflicts_detected": result.conflicts_detected,
-        })
+        await self.hooks.emit(
+            HookEvent.POST_REMEMBER,
+            {
+                "fiber_id": result.fiber.id,
+                "content": content,
+                "type": mem_type.value,
+                "neurons_created": len(result.neurons_created),
+                "conflicts_detected": result.conflicts_detected,
+            },
+        )
 
         response: dict[str, Any] = {
             "success": True,
@@ -539,12 +542,15 @@ class MCPServer(
         if hint:
             response["maintenance_hint"] = hint
 
-        await self.hooks.emit(HookEvent.POST_RECALL, {
-            "query": query,
-            "confidence": result.confidence,
-            "neurons_activated": result.neurons_activated,
-            "fibers_matched": result.fibers_matched,
-        })
+        await self.hooks.emit(
+            HookEvent.POST_RECALL,
+            {
+                "query": query,
+                "confidence": result.confidence,
+                "neurons_activated": result.neurons_activated,
+                "fibers_matched": result.fibers_matched,
+            },
+        )
 
         return response
 

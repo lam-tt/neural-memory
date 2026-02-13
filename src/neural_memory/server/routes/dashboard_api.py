@@ -283,7 +283,11 @@ async def get_timeline(
     for n in neurons:
         created = n.metadata.get("_created_at", "") if n.metadata else ""
         if not created and hasattr(n, "created_at") and n.created_at:
-            created = n.created_at.isoformat() if hasattr(n.created_at, "isoformat") else str(n.created_at)
+            created = (
+                n.created_at.isoformat()
+                if hasattr(n.created_at, "isoformat")
+                else str(n.created_at)
+            )
 
         if start and created and created < start:
             continue

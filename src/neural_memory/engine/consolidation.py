@@ -133,23 +133,31 @@ class ConsolidationEngine:
     # can safely run concurrently. Tiers execute sequentially because
     # later tiers depend on results from earlier ones.
     STRATEGY_TIERS: tuple[frozenset[ConsolidationStrategy], ...] = (
-        frozenset({
-            ConsolidationStrategy.PRUNE,
-            ConsolidationStrategy.LEARN_HABITS,
-            ConsolidationStrategy.DEDUP,
-        }),
-        frozenset({
-            ConsolidationStrategy.MERGE,
-            ConsolidationStrategy.MATURE,
-        }),
-        frozenset({
-            ConsolidationStrategy.SUMMARIZE,
-            ConsolidationStrategy.INFER,
-        }),
-        frozenset({
-            ConsolidationStrategy.ENRICH,
-            ConsolidationStrategy.DREAM,
-        }),
+        frozenset(
+            {
+                ConsolidationStrategy.PRUNE,
+                ConsolidationStrategy.LEARN_HABITS,
+                ConsolidationStrategy.DEDUP,
+            }
+        ),
+        frozenset(
+            {
+                ConsolidationStrategy.MERGE,
+                ConsolidationStrategy.MATURE,
+            }
+        ),
+        frozenset(
+            {
+                ConsolidationStrategy.SUMMARIZE,
+                ConsolidationStrategy.INFER,
+            }
+        ),
+        frozenset(
+            {
+                ConsolidationStrategy.ENRICH,
+                ConsolidationStrategy.DREAM,
+            }
+        ),
     )
 
     def __init__(
@@ -178,7 +186,9 @@ class ConsolidationEngine:
             ConsolidationStrategy.INFER: lambda: self._infer(report, reference_time, dry_run),
             ConsolidationStrategy.ENRICH: lambda: self._enrich(report, dry_run),
             ConsolidationStrategy.DREAM: lambda: self._dream(report, dry_run),
-            ConsolidationStrategy.LEARN_HABITS: lambda: self._learn_habits(report, reference_time, dry_run),
+            ConsolidationStrategy.LEARN_HABITS: lambda: self._learn_habits(
+                report, reference_time, dry_run
+            ),
             ConsolidationStrategy.DEDUP: lambda: self._dedup(report, dry_run),
         }
         handler = dispatch.get(strategy)
@@ -228,10 +238,12 @@ class ConsolidationEngine:
                     next(iter(tier_strategies)), report, reference_time, dry_run
                 )
             else:
-                await asyncio.gather(*(
-                    self._run_strategy(s, report, reference_time, dry_run)
-                    for s in tier_strategies
-                ))
+                await asyncio.gather(
+                    *(
+                        self._run_strategy(s, report, reference_time, dry_run)
+                        for s in tier_strategies
+                    )
+                )
 
         report.duration_ms = (time.perf_counter() - start) * 1000
         return report

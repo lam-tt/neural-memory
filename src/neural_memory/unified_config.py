@@ -815,9 +815,7 @@ async def get_shared_storage(brain_name: str | None = None) -> SQLiteStorage:
         disk_brain = _read_current_brain_from_toml()
         if disk_brain is not None and disk_brain != config.current_brain:
             logger = logging.getLogger(__name__)
-            logger.info(
-                "Brain changed on disk: %s → %s", config.current_brain, disk_brain
-            )
+            logger.info("Brain changed on disk: %s → %s", config.current_brain, disk_brain)
             config.current_brain = disk_brain
 
     # Auto-migrate flat-layout DB → brains/ layout (one-time, non-blocking)
