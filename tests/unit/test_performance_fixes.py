@@ -34,7 +34,7 @@ except ImportError:
     _CONSOLIDATION_AVAILABLE = False
 
 try:
-    from neural_memory.engine.encoder import MemoryEncoder
+    from neural_memory.engine.encoder import MemoryEncoder  # noqa: F401
 
     _ENCODER_AVAILABLE = True
 except ImportError:

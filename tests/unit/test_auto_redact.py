@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from neural_memory.safety.sensitive import (
     auto_redact_content,
-    check_sensitive_content,
 )
 from neural_memory.unified_config import SafetyConfig
 
@@ -56,8 +55,7 @@ class TestAutoRedactContent:
 
     def test_multiple_secrets_all_redacted(self) -> None:
         content = (
-            "api_key = sk-1234567890abcdef1234567890\n"
-            "secret = MyVeryLongSecretValue1234567890\n"
+            "api_key = sk-1234567890abcdef1234567890\nsecret = MyVeryLongSecretValue1234567890\n"
         )
         redacted, matches, _ = auto_redact_content(content, min_severity=3)
         assert len(matches) >= 2

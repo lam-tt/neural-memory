@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.engine.dedup.config import DedupConfig
 from neural_memory.engine.dedup.llm_judge import DedupJudgment, DedupVerdict
-from neural_memory.engine.dedup.pipeline import DedupPipeline, DedupResult
+from neural_memory.engine.dedup.pipeline import DedupPipeline
 from neural_memory.utils.simhash import simhash
 
 

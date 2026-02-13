@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from neural_memory.cli.config import _sync_brain_to_toml
 from neural_memory.unified_config import (
     _MIN_LEGACY_DB_BYTES,
     UnifiedConfig,
@@ -13,7 +14,6 @@ from neural_memory.unified_config import (
     _read_current_brain_from_toml,
     _read_legacy_brain,
 )
-from neural_memory.cli.config import _sync_brain_to_toml
 
 
 def _create_fake_db(path: Path, *, size: int = 0) -> None:
@@ -234,9 +234,7 @@ class TestReadCurrentBrainFromToml:
         data_dir = tmp_data_dir
         data_dir.mkdir(parents=True, exist_ok=True)
         toml_path = data_dir / "config.toml"
-        toml_path.write_text(
-            'current_brain = "../hacked"\n', encoding="utf-8"
-        )
+        toml_path.write_text('current_brain = "../hacked"\n', encoding="utf-8")
 
         with patch("neural_memory.unified_config.get_neuralmemory_dir", return_value=data_dir):
             result = _read_current_brain_from_toml()

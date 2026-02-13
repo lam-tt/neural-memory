@@ -338,8 +338,8 @@ async def test_run_strategies_across_tiers(
     await engine.run(
         strategies=[
             ConsolidationStrategy.ENRICH,  # tier 4
-            ConsolidationStrategy.PRUNE,   # tier 1
-            ConsolidationStrategy.MERGE,   # tier 2
+            ConsolidationStrategy.PRUNE,  # tier 1
+            ConsolidationStrategy.MERGE,  # tier 2
         ]
     )
 
@@ -376,8 +376,6 @@ async def test_run_strategy_dispatcher(
 
     from neural_memory.utils.timeutils import utcnow
 
-    await engine._run_strategy(
-        ConsolidationStrategy.DREAM, report, utcnow(), dry_run=True
-    )
+    await engine._run_strategy(ConsolidationStrategy.DREAM, report, utcnow(), dry_run=True)
 
     assert called

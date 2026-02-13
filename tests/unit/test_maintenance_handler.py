@@ -458,7 +458,9 @@ class TestAutoConsolidation:
             should_consolidate=True,
         )
 
-        with patch.object(server, "_run_auto_consolidation_dynamic", new_callable=AsyncMock) as mock_run:
+        with patch.object(
+            server, "_run_auto_consolidation_dynamic", new_callable=AsyncMock
+        ) as mock_run:
             await server._maybe_auto_consolidate(pulse)
             # create_task fires the coroutine; give it a tick
             await asyncio.sleep(0.05)
@@ -543,7 +545,11 @@ class TestFireHealthTrigger:
             orphan_ratio=0.0,
             expired_memory_count=0,
             stale_fiber_ratio=0.0,
-            hints=(HealthHint("High neuron count (3000). Consider pruning.", HintSeverity.MEDIUM, "prune"),),
+            hints=(
+                HealthHint(
+                    "High neuron count (3000). Consider pruning.", HintSeverity.MEDIUM, "prune"
+                ),
+            ),
             should_consolidate=False,
         )
         result = server._fire_health_trigger(pulse)

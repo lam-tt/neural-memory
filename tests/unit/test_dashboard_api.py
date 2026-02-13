@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
@@ -94,9 +94,7 @@ class TestTimelineEndpoint:
         assert data["entries"] == []
         assert data["total"] == 0
 
-    def test_timeline_with_neurons(
-        self, client: TestClient, mock_storage: AsyncMock
-    ) -> None:
+    def test_timeline_with_neurons(self, client: TestClient, mock_storage: AsyncMock) -> None:
         neurons = [
             FakeNeuron(
                 id="n1",
@@ -122,15 +120,13 @@ class TestTimelineEndpoint:
         assert data["entries"][0]["id"] == "n2"
         assert data["entries"][1]["id"] == "n1"
 
-    def test_timeline_respects_limit(
-        self, client: TestClient, mock_storage: AsyncMock
-    ) -> None:
+    def test_timeline_respects_limit(self, client: TestClient, mock_storage: AsyncMock) -> None:
         neurons = [
             FakeNeuron(
                 id=f"n{i}",
                 content=f"Memory {i}",
                 type=FakeType("concept"),
-                metadata={"_created_at": f"2026-02-{10+i:02d}T10:00:00"},
+                metadata={"_created_at": f"2026-02-{10 + i:02d}T10:00:00"},
             )
             for i in range(5)
         ]
@@ -167,9 +163,7 @@ class TestFibersEndpoint:
         data = resp.json()
         assert data["fibers"] == []
 
-    def test_fibers_list(
-        self, client: TestClient, mock_storage: AsyncMock
-    ) -> None:
+    def test_fibers_list(self, client: TestClient, mock_storage: AsyncMock) -> None:
         fibers = [
             FakeFiber(id="f1", summary="Test fiber", neuron_ids=["n1", "n2"]),
             FakeFiber(id="f2", summary="Another fiber", neuron_ids=["n3"]),
@@ -184,12 +178,8 @@ class TestFibersEndpoint:
         assert data["fibers"][0]["neuron_count"] == 2
         assert data["fibers"][1]["neuron_count"] == 1
 
-    def test_fibers_limit(
-        self, client: TestClient, mock_storage: AsyncMock
-    ) -> None:
-        fibers = [
-            FakeFiber(id=f"f{i}", summary=f"Fiber {i}") for i in range(10)
-        ]
+    def test_fibers_limit(self, client: TestClient, mock_storage: AsyncMock) -> None:
+        fibers = [FakeFiber(id=f"f{i}", summary=f"Fiber {i}") for i in range(10)]
         mock_storage.get_fibers.return_value = fibers
 
         resp = client.get("/api/dashboard/fibers?limit=5")
@@ -202,9 +192,7 @@ class TestFiberDiagramEndpoint:
         resp = client.get("/api/dashboard/fiber/nonexistent/diagram")
         assert resp.status_code == 404
 
-    def test_fiber_diagram_success(
-        self, client: TestClient, mock_storage: AsyncMock
-    ) -> None:
+    def test_fiber_diagram_success(self, client: TestClient, mock_storage: AsyncMock) -> None:
         fiber = FakeFiber(id="f1", summary="Test", neuron_ids=["n1", "n2"])
         mock_storage.get_fibers.return_value = [fiber]
 
@@ -231,9 +219,7 @@ class TestFiberDiagramEndpoint:
         assert data["synapses"][0]["source_id"] == "n1"
         assert data["synapses"][0]["target_id"] == "n2"
 
-    def test_fiber_diagram_no_synapses(
-        self, client: TestClient, mock_storage: AsyncMock
-    ) -> None:
+    def test_fiber_diagram_no_synapses(self, client: TestClient, mock_storage: AsyncMock) -> None:
         fiber = FakeFiber(id="f1", summary="Test", neuron_ids=["n1"])
         mock_storage.get_fibers.return_value = [fiber]
 

@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-
-import pytest
-
 from neural_memory.mcp.maintenance_handler import (
     HealthHint,
     HealthPulse,
@@ -16,7 +12,6 @@ from neural_memory.mcp.maintenance_handler import (
     _select_strategies,
 )
 from neural_memory.unified_config import MaintenanceConfig
-
 
 # ========== Phase A: _evaluate_thresholds returns HealthHint ==========
 
@@ -147,9 +142,7 @@ class TestComputeEffectiveCooldown:
         assert _compute_effective_cooldown(hints, 60) == 30
 
     def test_four_hints_immediate(self) -> None:
-        hints = tuple(
-            HealthHint(f"h{i}", HintSeverity.MEDIUM, "prune") for i in range(4)
-        )
+        hints = tuple(HealthHint(f"h{i}", HintSeverity.MEDIUM, "prune") for i in range(4))
         assert _compute_effective_cooldown(hints, 60) == 0
 
     def test_critical_hint_immediate(self) -> None:

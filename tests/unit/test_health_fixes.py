@@ -22,7 +22,6 @@ from neural_memory.core.neuron import Neuron, NeuronType
 from neural_memory.core.synapse import SynapseType
 from neural_memory.engine.activation import ActivationResult
 from neural_memory.engine.diagnostics import DiagnosticsEngine
-from neural_memory.engine.encoder import MemoryEncoder
 from neural_memory.engine.pipeline import PipelineContext
 from neural_memory.engine.pipeline_steps import TemporalLinkingStep
 from neural_memory.engine.retrieval_context import _TOKEN_RATIO, _estimate_tokens, format_context
@@ -302,7 +301,7 @@ class TestDiversityMetric:
 
     def test_diversity_total_synapse_types_matches_enum(self) -> None:
         """_TOTAL_SYNAPSE_TYPES should match the actual enum member count."""
-        assert DiagnosticsEngine._TOTAL_SYNAPSE_TYPES == len(SynapseType)
+        assert len(SynapseType) == DiagnosticsEngine._TOTAL_SYNAPSE_TYPES
         assert len(SynapseType) == 21
 
 

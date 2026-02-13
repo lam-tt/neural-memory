@@ -205,11 +205,15 @@ async def test_emit_with_none_data_defaults_to_empty_dict() -> None:
 def test_hook_event_values() -> None:
     """All expected hook events exist."""
     expected = {
-        "pre_remember", "post_remember",
-        "pre_recall", "post_recall",
-        "pre_encode", "post_encode",
+        "pre_remember",
+        "post_remember",
+        "pre_recall",
+        "post_recall",
+        "pre_encode",
+        "post_encode",
         "conflict_detected",
-        "pre_consolidate", "post_consolidate",
+        "pre_consolidate",
+        "post_consolidate",
         "memory_expired",
     }
     actual = {e.value for e in HookEvent}

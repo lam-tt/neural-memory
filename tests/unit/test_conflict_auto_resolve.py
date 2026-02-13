@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from neural_memory.engine.conflict_auto_resolve import (
-    AutoResolution,
     _count_superseded,
     try_auto_resolve,
 )
