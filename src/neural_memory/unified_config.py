@@ -451,9 +451,19 @@ class UnifiedConfig:
             data_dir = config_path.parent
 
         if not config_path.exists():
-            # Create default config
-            config = cls(data_dir=data_dir)
+            # Migrate current_brain from legacy config.json if available
+            legacy_brain = _read_legacy_brain(data_dir)
+            config = cls(
+                data_dir=data_dir,
+                current_brain=legacy_brain or get_default_brain(),
+            )
             config.save()
+            if legacy_brain:
+                _logger = logging.getLogger(__name__)
+                _logger.info(
+                    "Migrated current_brain=%s from legacy config.json to config.toml",
+                    legacy_brain,
+                )
             return config
 
         with open(config_path, "rb") as f:
@@ -664,6 +674,36 @@ def get_config(reload: bool = False) -> UnifiedConfig:
     if _config is None or reload:
         _config = UnifiedConfig.load()
     return _config
+
+
+def _read_legacy_brain(data_dir: Path) -> str | None:
+    """Read current_brain from legacy config.json during first-time migration.
+
+    Checks both the given data_dir and the legacy ~/.neural-memory/ location
+    for an existing config.json with a non-default brain selection.
+
+    Returns:
+        The brain name string, or ``None`` if no legacy config found
+        or it uses the default brain.
+    """
+    # Check locations in priority order
+    candidates = [data_dir / "config.json"]
+    legacy_dir = Path.home() / ".neural-memory"
+    if legacy_dir != data_dir:
+        candidates.append(legacy_dir / "config.json")
+
+    for config_file in candidates:
+        if not config_file.is_file():
+            continue
+        try:
+            with open(config_file, encoding="utf-8") as f:
+                data = json.load(f)
+            name = data.get("current_brain")
+            if isinstance(name, str) and name != "default" and _BRAIN_NAME_PATTERN.match(name):
+                return name
+        except Exception:
+            continue
+    return None
 
 
 def _read_current_brain_from_toml() -> str | None:

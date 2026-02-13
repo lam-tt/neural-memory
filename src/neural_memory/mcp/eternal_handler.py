@@ -30,10 +30,18 @@ class EternalHandler:
         raise NotImplementedError
 
     async def get_eternal_context(self) -> EternalContext:
-        """Get or create the eternal context query layer."""
-        if self._eternal_ctx is None:
+        """Get or create the eternal context query layer.
+
+        Re-creates the context if the active brain has changed since
+        the last call, so brain switches are reflected immediately.
+        """
+        current_brain = self.config.current_brain
+        if (
+            self._eternal_ctx is None
+            or self._eternal_ctx._brain_id != current_brain
+        ):
             storage = await self.get_storage()
-            self._eternal_ctx = EternalContext(storage, self.config.current_brain)
+            self._eternal_ctx = EternalContext(storage, current_brain)
         return self._eternal_ctx
 
     async def _eternal(self, args: dict[str, Any]) -> dict[str, Any]:

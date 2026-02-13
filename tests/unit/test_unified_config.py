@@ -11,6 +11,7 @@ from neural_memory.unified_config import (
     UnifiedConfig,
     _migrate_legacy_db,
     _read_current_brain_from_toml,
+    _read_legacy_brain,
 )
 from neural_memory.cli.config import _sync_brain_to_toml
 
@@ -264,3 +265,90 @@ class TestEndToEndBrainSync:
         if result is not None and result != config.current_brain:
             config.current_brain = result
         assert config.current_brain == "work"
+
+
+# ── Legacy brain migration tests ────────────────────────────────
+
+
+def _write_legacy_json(data_dir: Path, brain_name: str) -> Path:
+    """Write a legacy config.json with the given brain name."""
+    import json
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    config_file = data_dir / "config.json"
+    config_file.write_text(
+        json.dumps({"current_brain": brain_name}),
+        encoding="utf-8",
+    )
+    return config_file
+
+
+class TestReadLegacyBrain:
+    """Tests for _read_legacy_brain — reads current_brain from config.json."""
+
+    def test_reads_from_same_dir(self, tmp_data_dir: Path) -> None:
+        _write_legacy_json(tmp_data_dir, "myproject")
+        result = _read_legacy_brain(tmp_data_dir)
+        assert result == "myproject"
+
+    def test_returns_none_for_default_brain(self, tmp_data_dir: Path) -> None:
+        _write_legacy_json(tmp_data_dir, "default")
+        result = _read_legacy_brain(tmp_data_dir)
+        assert result is None
+
+    def test_returns_none_when_no_json(self, tmp_data_dir: Path) -> None:
+        tmp_data_dir.mkdir(parents=True, exist_ok=True)
+        result = _read_legacy_brain(tmp_data_dir)
+        assert result is None
+
+    def test_reads_from_legacy_dir(self, tmp_path: Path) -> None:
+        """Falls back to ~/.neural-memory/ when data_dir has no config.json."""
+        data_dir = tmp_path / ".neuralmemory"
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        legacy_dir = tmp_path / ".neural-memory"
+        _write_legacy_json(legacy_dir, "work-brain")
+
+        with patch("neural_memory.unified_config.Path.home", return_value=tmp_path):
+            result = _read_legacy_brain(data_dir)
+        assert result == "work-brain"
+
+    def test_rejects_invalid_brain_name(self, tmp_data_dir: Path) -> None:
+        _write_legacy_json(tmp_data_dir, "../escape")
+        result = _read_legacy_brain(tmp_data_dir)
+        assert result is None
+
+    def test_handles_corrupt_json(self, tmp_data_dir: Path) -> None:
+        tmp_data_dir.mkdir(parents=True, exist_ok=True)
+        (tmp_data_dir / "config.json").write_text("not json", encoding="utf-8")
+        result = _read_legacy_brain(tmp_data_dir)
+        assert result is None
+
+
+class TestConfigLoadMigratesBrain:
+    """Tests for UnifiedConfig.load() migrating current_brain from config.json."""
+
+    def test_migrates_brain_from_legacy_json(self, tmp_data_dir: Path) -> None:
+        """When config.toml doesn't exist, load() picks up brain from config.json."""
+        _write_legacy_json(tmp_data_dir, "myproject")
+
+        config = UnifiedConfig.load(config_path=tmp_data_dir / "config.toml")
+
+        assert config.current_brain == "myproject"
+        # config.toml should now exist with the migrated brain
+        toml_content = (tmp_data_dir / "config.toml").read_text(encoding="utf-8")
+        assert 'current_brain = "myproject"' in toml_content
+
+    def test_defaults_when_no_legacy_json(self, tmp_data_dir: Path) -> None:
+        """When neither config.toml nor config.json exist, uses default."""
+        tmp_data_dir.mkdir(parents=True, exist_ok=True)
+        config = UnifiedConfig.load(config_path=tmp_data_dir / "config.toml")
+        assert config.current_brain == "default"
+
+    def test_existing_toml_not_overridden(self, tmp_data_dir: Path) -> None:
+        """When config.toml already exists, config.json is NOT consulted."""
+        _write_legacy_json(tmp_data_dir, "old-brain")
+        _write_toml(tmp_data_dir, "toml-brain")
+
+        config = UnifiedConfig.load(config_path=tmp_data_dir / "config.toml")
+        assert config.current_brain == "toml-brain"
