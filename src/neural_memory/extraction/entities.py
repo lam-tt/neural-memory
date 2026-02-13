@@ -140,7 +140,12 @@ class EntityExtractor:
 
         # Try to load underthesea for Vietnamese
         try:
-            import underthesea
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                warnings.filterwarnings("ignore", category=FutureWarning)
+                import underthesea
 
             self._nlp_vi = underthesea
         except ImportError:

@@ -666,6 +666,17 @@ class MCPServer(
                 for w in report.warnings
             ],
             "recommendations": list(report.recommendations),
+            "top_penalties": [
+                {
+                    "component": p.component,
+                    "current_score": p.current_score,
+                    "weight": p.weight,
+                    "penalty_points": p.penalty_points,
+                    "estimated_gain": p.estimated_gain,
+                    "action": p.action,
+                }
+                for p in report.top_penalties
+            ],
         }
 
     async def _evolution(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -684,7 +695,7 @@ class MCPServer(
             logger.error("Evolution analysis failed", exc_info=True)
             return {"error": "Evolution analysis failed"}
 
-        return {
+        result: dict[str, Any] = {
             "brain": evo.brain_name,
             "proficiency_level": evo.proficiency_level.value,
             "proficiency_index": evo.proficiency_index,
@@ -703,6 +714,32 @@ class MCPServer(
             "fibers_at_semantic": evo.fibers_at_semantic,
             "fibers_at_episodic": evo.fibers_at_episodic,
         }
+
+        if evo.stage_distribution is not None:
+            result["stage_distribution"] = {
+                "short_term": evo.stage_distribution.short_term,
+                "working": evo.stage_distribution.working,
+                "episodic": evo.stage_distribution.episodic,
+                "semantic": evo.stage_distribution.semantic,
+                "total": evo.stage_distribution.total,
+            }
+
+        if evo.closest_to_semantic:
+            result["closest_to_semantic"] = [
+                {
+                    "fiber_id": p.fiber_id,
+                    "stage": p.stage,
+                    "days_in_stage": p.days_in_stage,
+                    "days_required": p.days_required,
+                    "reinforcement_days": p.reinforcement_days,
+                    "reinforcement_required": p.reinforcement_required,
+                    "progress_pct": p.progress_pct,
+                    "next_step": p.next_step,
+                }
+                for p in evo.closest_to_semantic
+            ]
+
+        return result
 
     async def _suggest(self, args: dict[str, Any]) -> dict[str, Any]:
         """Get prefix-based autocomplete suggestions."""

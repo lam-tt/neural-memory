@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 import typer
 
 # Main app
@@ -12,8 +14,29 @@ app = typer.Typer(
 )
 
 
+def _version_callback(value: bool) -> None:
+    """Print version and exit when --version is passed."""
+    if value:
+        from neural_memory import __version__
+
+        typer.echo(f"neural-memory {__version__}")
+        raise typer.Exit()
+
+
 @app.callback(invoke_without_command=True)
-def _app_callback(ctx: typer.Context) -> None:
+def _app_callback(
+    ctx: typer.Context,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            help="Show version and exit.",
+            callback=_version_callback,
+            is_eager=True,
+        ),
+    ] = False,
+) -> None:
     """Global callback: runs before every command."""
     if ctx.invoked_subcommand is None:
         return

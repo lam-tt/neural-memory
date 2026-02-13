@@ -51,6 +51,50 @@ class ProficiencyLevel(StrEnum):
 
 
 @dataclass(frozen=True)
+class SemanticProgress:
+    """Progress of an individual fiber toward SEMANTIC promotion.
+
+    Attributes:
+        fiber_id: The fiber identifier.
+        stage: Current maturation stage.
+        days_in_stage: Days since entering current stage.
+        days_required: Days required for next promotion.
+        reinforcement_days: Distinct calendar days with reinforcement.
+        reinforcement_required: Minimum distinct days needed.
+        progress_pct: Overall progress toward SEMANTIC (0.0-1.0).
+        next_step: Actionable text describing what the user should do.
+    """
+
+    fiber_id: str
+    stage: str
+    days_in_stage: float
+    days_required: float
+    reinforcement_days: int
+    reinforcement_required: int
+    progress_pct: float
+    next_step: str
+
+
+@dataclass(frozen=True)
+class StageDistribution:
+    """Distribution of fibers across maturation stages.
+
+    Attributes:
+        short_term: Fibers at SHORT_TERM stage.
+        working: Fibers at WORKING stage.
+        episodic: Fibers at EPISODIC stage.
+        semantic: Fibers at SEMANTIC stage.
+        total: Total fibers with maturation records.
+    """
+
+    short_term: int
+    working: int
+    episodic: int
+    semantic: int
+    total: int
+
+
+@dataclass(frozen=True)
 class BrainEvolution:
     """Brain evolution snapshot — cognitive dynamics metrics.
 
@@ -78,6 +122,9 @@ class BrainEvolution:
         total_neurons: Total neuron count.
         fibers_at_semantic: Fibers that reached SEMANTIC stage.
         fibers_at_episodic: Fibers at EPISODIC stage.
+
+        stage_distribution: Breakdown of fibers by maturation stage.
+        closest_to_semantic: Top fibers closest to SEMANTIC promotion.
     """
 
     brain_id: str
@@ -107,6 +154,10 @@ class BrainEvolution:
     total_neurons: int
     fibers_at_semantic: int
     fibers_at_episodic: int
+
+    # Maturation progress
+    stage_distribution: StageDistribution | None = None
+    closest_to_semantic: tuple[SemanticProgress, ...] = ()
 
 
 class EvolutionEngine:
@@ -176,6 +227,9 @@ class EvolutionEngine:
             decay_factor=decay_factor,
         )
 
+        # Stage distribution and semantic progress
+        stage_dist, closest = await self._compute_stage_progress(now)
+
         return BrainEvolution(
             brain_id=brain_id,
             brain_name=brain_name,
@@ -196,9 +250,84 @@ class EvolutionEngine:
             total_neurons=neuron_count,
             fibers_at_semantic=fibers_semantic,
             fibers_at_episodic=fibers_episodic,
+            stage_distribution=stage_dist,
+            closest_to_semantic=closest,
         )
 
     # ── Internal computations ────────────────────────────────
+
+    async def _compute_stage_progress(
+        self,
+        now: datetime,
+    ) -> tuple[StageDistribution, tuple[SemanticProgress, ...]]:
+        """Compute stage distribution and progress toward SEMANTIC.
+
+        Returns:
+            (StageDistribution, top 3 fibers closest to SEMANTIC promotion)
+        """
+        all_maturations = await self._storage.find_maturations()
+
+        counts = {
+            MemoryStage.SHORT_TERM: 0,
+            MemoryStage.WORKING: 0,
+            MemoryStage.EPISODIC: 0,
+            MemoryStage.SEMANTIC: 0,
+        }
+        for m in all_maturations:
+            if m.stage in counts:
+                counts[m.stage] += 1
+
+        stage_dist = StageDistribution(
+            short_term=counts[MemoryStage.SHORT_TERM],
+            working=counts[MemoryStage.WORKING],
+            episodic=counts[MemoryStage.EPISODIC],
+            semantic=counts[MemoryStage.SEMANTIC],
+            total=len(all_maturations),
+        )
+
+        # Compute progress for EPISODIC fibers (closest to SEMANTIC)
+        days_required = 7.0
+        reinf_required = 3
+        progress_items: list[SemanticProgress] = []
+
+        for m in all_maturations:
+            if m.stage != MemoryStage.EPISODIC:
+                continue
+
+            days_in = (now - m.stage_entered_at).total_seconds() / 86400
+            reinf_days = m.distinct_reinforcement_days
+
+            time_pct = min(1.0, days_in / days_required)
+            reinf_pct = min(1.0, reinf_days / reinf_required)
+            overall_pct = min(time_pct, reinf_pct)
+
+            if reinf_days < reinf_required:
+                next_step = (
+                    f"Recall this memory on {reinf_required - reinf_days} more "
+                    f"distinct day(s) to reach SEMANTIC."
+                )
+            elif days_in < days_required:
+                remaining = days_required - days_in
+                next_step = f"Wait ~{remaining:.1f} more day(s) in EPISODIC stage."
+            else:
+                next_step = "Ready for promotion — run consolidation with mature strategy."
+
+            progress_items.append(
+                SemanticProgress(
+                    fiber_id=m.fiber_id,
+                    stage=m.stage.value,
+                    days_in_stage=round(days_in, 1),
+                    days_required=days_required,
+                    reinforcement_days=reinf_days,
+                    reinforcement_required=reinf_required,
+                    progress_pct=round(overall_pct, 2),
+                    next_step=next_step,
+                )
+            )
+
+        # Sort by progress descending, take top 3
+        progress_items.sort(key=lambda p: p.progress_pct, reverse=True)
+        return stage_dist, tuple(progress_items[:3])
 
     async def _compute_maturation(
         self,

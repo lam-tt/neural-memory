@@ -60,6 +60,79 @@ class QualityBadge:
 
 
 @dataclass(frozen=True)
+class PenaltyFactor:
+    """A ranked penalty factor explaining why health score is low.
+
+    Attributes:
+        component: Name of the health component (e.g. "connectivity")
+        current_score: Current score for this component (0.0-1.0)
+        weight: Weight of this component in purity calculation
+        penalty_points: Points lost due to this component (0-100 scale)
+        estimated_gain: Points gained if component improved to 0.8
+        action: Suggested action to improve this component
+    """
+
+    component: str
+    current_score: float
+    weight: float
+    penalty_points: float
+    estimated_gain: float
+    action: str
+
+
+# Component weights and improvement actions (must match purity formula)
+_COMPONENT_WEIGHTS: dict[str, tuple[float, str]] = {
+    "connectivity": (0.25, "Store more detailed memories to build richer connections."),
+    "diversity": (0.20, "Store memories with causal, temporal, and emotional context."),
+    "freshness": (0.15, "Store new memories or recall existing ones to keep brain active."),
+    "consolidation_ratio": (0.15, "Run consolidation with mature strategy to advance memories."),
+    "orphan_rate": (0.10, "Run consolidation with prune strategy to clean orphaned neurons."),
+    "activation_efficiency": (0.10, "Use recall more often to activate stored neurons."),
+    "recall_confidence": (0.05, "Reinforce memories by recalling them to strengthen synapses."),
+}
+
+
+def _rank_penalty_factors(
+    scores: dict[str, float],
+    *,
+    top_n: int = 3,
+    target: float = 0.8,
+) -> tuple[PenaltyFactor, ...]:
+    """Rank health components by their penalty contribution.
+
+    For each component, penalty = (1.0 - effective_score) * weight * 100.
+    Estimated gain = (min(target, 1.0) - effective_score) * weight * 100 (clamped >= 0).
+
+    Args:
+        scores: Mapping of component name to current score (0.0-1.0).
+        top_n: Number of top factors to return.
+        target: Target score for estimated gain calculation.
+
+    Returns:
+        Top penalty factors sorted by penalty_points descending.
+    """
+    factors: list[PenaltyFactor] = []
+    for component, (weight, action) in _COMPONENT_WEIGHTS.items():
+        score = scores.get(component, 0.0)
+        # orphan_rate is inverted in purity formula: (1.0 - orphan_rate) * weight
+        effective_score = (1.0 - score) if component == "orphan_rate" else score
+        penalty = (1.0 - effective_score) * weight * 100
+        gain = max(0.0, (min(target, 1.0) - effective_score) * weight * 100)
+        factors.append(
+            PenaltyFactor(
+                component=component,
+                current_score=round(score, 4),
+                weight=weight,
+                penalty_points=round(penalty, 1),
+                estimated_gain=round(gain, 1),
+                action=action,
+            )
+        )
+    factors.sort(key=lambda f: f.penalty_points, reverse=True)
+    return tuple(factors[:top_n])
+
+
+@dataclass(frozen=True)
 class BrainHealthReport:
     """Complete brain health diagnostics report.
 
@@ -88,6 +161,9 @@ class BrainHealthReport:
     # Diagnostics
     warnings: tuple[DiagnosticWarning, ...]
     recommendations: tuple[str, ...]
+
+    # Penalty breakdown (top factors hurting the score)
+    top_penalties: tuple[PenaltyFactor, ...] = ()
 
 
 # ── Grade mapping ────────────────────────────────────────────────
@@ -199,6 +275,18 @@ class DiagnosticsEngine:
             contradicts_count=contradicts_count,
         )
 
+        # Rank penalty factors
+        component_scores = {
+            "connectivity": connectivity,
+            "diversity": diversity,
+            "freshness": freshness,
+            "consolidation_ratio": consolidation_ratio,
+            "orphan_rate": orphan_rate,
+            "activation_efficiency": activation_efficiency,
+            "recall_confidence": recall_confidence,
+        }
+        top_penalties = _rank_penalty_factors(component_scores)
+
         return BrainHealthReport(
             purity_score=round(purity, 1),
             grade=grade,
@@ -214,6 +302,7 @@ class DiagnosticsEngine:
             fiber_count=fiber_count,
             warnings=tuple(warnings),
             recommendations=tuple(recommendations),
+            top_penalties=top_penalties,
         )
 
     # ── Metric computations ──────────────────────────────────────
