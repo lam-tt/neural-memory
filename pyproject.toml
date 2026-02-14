@@ -227,6 +227,9 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-v --tb=short"
 timeout = 60
+markers = [
+    "stress: real-world workflow stress tests with SQLiteStorage",
+]
 filterwarnings = [
     "ignore::DeprecationWarning:pyvi",
     "ignore::DeprecationWarning:numpy",
